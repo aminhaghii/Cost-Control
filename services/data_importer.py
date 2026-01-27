@@ -17,13 +17,71 @@ import pandas as pd
 from models import db, Item, Transaction, ImportBatch
 
 
-def compute_file_hash(file_path):
-    """Compute SHA256 hash of file for idempotency check"""
-    sha256_hash = hashlib.sha256()
-    with open(file_path, "rb") as f:
-        for byte_block in iter(lambda: f.read(4096), b""):
-            sha256_hash.update(byte_block)
-    return sha256_hash.hexdigest()
+def compute_file_hash(file_path, timeout_seconds=30):
+    """
+    Compute SHA256 hash of file for idempotency check
+    BUG-FIX #7: Add timeout to prevent hanging on large files
+    """
+    import signal
+    import platform
+    
+    class TimeoutError(Exception):
+        pass
+    
+    def timeout_handler(signum, frame):
+        raise TimeoutError(f"File hash computation timed out after {timeout_seconds} seconds")
+    
+    # For Windows, signal.SIGALRM is not available, use threading instead
+    if platform.system() == 'Windows':
+        import threading
+        
+        result = {'hash': None, 'error': None}
+        
+        def compute_hash():
+            try:
+                sha256_hash = hashlib.sha256()
+                file_size = os.path.getsize(file_path)
+                chunk_size = 65536 if file_size > 100*1024*1024 else 4096
+                
+                with open(file_path, "rb") as f:
+                    for byte_block in iter(lambda: f.read(chunk_size), b""):
+                        sha256_hash.update(byte_block)
+                result['hash'] = sha256_hash.hexdigest()
+            except Exception as e:
+                result['error'] = e
+        
+        thread = threading.Thread(target=compute_hash)
+        thread.daemon = True
+        thread.start()
+        thread.join(timeout_seconds)
+        
+        if thread.is_alive():
+            raise ValueError(f"File is too large to process (timeout after {timeout_seconds}s)")
+        
+        if result['error']:
+            raise result['error']
+        
+        return result['hash']
+    else:
+        # Unix/Linux: use signal.SIGALRM
+        try:
+            signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(timeout_seconds)
+            
+            sha256_hash = hashlib.sha256()
+            file_size = os.path.getsize(file_path)
+            chunk_size = 65536 if file_size > 100*1024*1024 else 4096
+            
+            with open(file_path, "rb") as f:
+                for byte_block in iter(lambda: f.read(chunk_size), b""):
+                    sha256_hash.update(byte_block)
+            
+            signal.alarm(0)  # Cancel alarm
+            return sha256_hash.hexdigest()
+            
+        except TimeoutError:
+            signal.alarm(0)
+            raise ValueError(f"File is too large to process (timeout after {timeout_seconds}s)")
 
 
 def check_import_exists(file_hash):

@@ -62,22 +62,32 @@ class Alert(db.Model):
     def create_if_not_exists(cls, hotel_id, alert_type, item_id=None, message=None,
                               severity='warning', threshold_value=None, actual_value=None,
                               related_transaction_id=None, related_count_id=None):
-        """Create alert only if similar active alert doesn't exist"""
-        existing = cls.query.filter_by(
+        """
+        Create alert only if similar active alert doesn't exist
+        BUG-FIX #8: Sanitize message to prevent XSS
+        BUG-FIX #9: Use SELECT FOR UPDATE to prevent race condition
+        """
+        import html
+        
+        # BUG-FIX #9: Lock row during check to prevent duplicate alert creation
+        existing = db.session.query(cls).filter_by(
             hotel_id=hotel_id,
             alert_type=alert_type,
             item_id=item_id,
             status='active'
-        ).first()
+        ).with_for_update().first()
         
         if existing:
             return existing
+        
+        # BUG-FIX #8: Escape HTML in message to prevent XSS
+        safe_message = html.escape(message) if message else ALERT_TYPES.get(alert_type, alert_type)
         
         alert = cls(
             hotel_id=hotel_id,
             alert_type=alert_type,
             item_id=item_id,
-            message=message or ALERT_TYPES.get(alert_type, alert_type),
+            message=safe_message,
             severity=severity,
             threshold_value=threshold_value,
             actual_value=actual_value,

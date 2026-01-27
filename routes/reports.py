@@ -4,6 +4,8 @@ from services import ParetoService, ABCService
 from models import db, Transaction, Item
 from sqlalchemy import func
 from datetime import date, timedelta
+# BUG-FIX #15: Import timezone utility
+from utils.timezone import get_iran_today
 
 reports_bp = Blueprint('reports', __name__, url_prefix='/reports')
 
@@ -46,8 +48,8 @@ def executive_summary():
     potential_savings_nonfood = nonfood_stats.get('class_a_amount', 0) * 0.10
     potential_savings = potential_savings_food + potential_savings_nonfood
     
-    # مقایسه با دوره قبل
-    today = date.today()
+    # BUG-FIX #15: Use Iran timezone instead of UTC
+    today = get_iran_today()
     current_start = today - timedelta(days=days)
     previous_start = current_start - timedelta(days=days)
     

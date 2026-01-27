@@ -844,10 +844,24 @@ def data_import():
                 
                 flash(f'داده‌ها با موفقیت وارد شدند: {result["total_items"]} کالا از {len(result["sheets"])} شیت', 'success')
                 
+                # BUG-FIX #5: Delete uploaded file after successful import
+                try:
+                    os.remove(filepath)
+                    logger.info(f'Deleted uploaded file after import: {filename}')
+                except OSError as e:
+                    logger.warning(f'Failed to delete file {filename}: {e}')
+                
                 # Show detailed results
                 return render_template('admin/import/result.html', result=result, filename=filename)
             else:
                 flash(f'خطا در وارد کردن داده: {result.get("error", "خطای نامشخص")}', 'danger')
+                
+                # BUG-FIX #5: Delete file even on import failure
+                try:
+                    os.remove(filepath)
+                    logger.info(f'Deleted failed import file: {filename}')
+                except OSError:
+                    pass
         else:
             flash('فقط فایل‌های Excel (.xlsx, .xls) مجاز هستند', 'danger')
         

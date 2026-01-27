@@ -9,6 +9,12 @@ from utils.decimal_utils import parse_decimal_input
 import html
 import logging
 
+# BUG-FIX #11: Import limiter for API rate limiting
+try:
+    from app import limiter
+except ImportError:
+    limiter = None
+
 logger = logging.getLogger(__name__)
 
 # Iran timezone (UTC+03:30)
@@ -499,6 +505,8 @@ def delete(id):
 # API endpoint for fetching item details including price
 @transactions_bp.route('/api/item/<int:item_id>')
 @login_required
+# BUG-FIX #11: Add rate limiting
+@limiter.limit("60 per minute") if limiter else lambda f: f
 def api_get_item(item_id):
     """Get item details including unit price for transaction form"""
     from services.hotel_scope_service import get_allowed_hotel_ids, user_can_access_hotel
@@ -523,6 +531,8 @@ def api_get_item(item_id):
 # UX #5: API endpoint for Load More transactions
 @transactions_bp.route('/api/list')
 @login_required
+# BUG-FIX #11: Add rate limiting to API endpoint
+@limiter.limit("30 per minute") if limiter else lambda f: f
 def api_list_transactions():
     """API endpoint for loading more transactions (AJAX)"""
     from services.hotel_scope_service import get_allowed_hotel_ids
