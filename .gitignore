@@ -1,33 +1,58 @@
-venv/
-.venv/
+# Python
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
+.Python
+*.so
+
+# Virtual Environment
+venv/
+.venv/
+env/
+ENV/
+
+# Environment & Secrets
 .env
+.env.local
+.env.*
+secrets.json
+credentials.json
+*.pem
+*.key
+*.crt
+*.pfx
+
+# Database
 database/*.db
 database/*.db-wal
 database/*.db-shm
 **/*.db
 **/*.db-wal
 **/*.db-shm
+instance/
+
+# Uploads & Exports
+uploads/*
+!uploads/.gitkeep
 exports/
 *.xlsx
-.DS_Store
+*.xls
+
+# Logs
 *.log
 app.log
-instance/
+logs/
+
+# IDE
 .idea/
 .vscode/
 *.swp
 *.swo
-*.pem
-*.key
-*.crt
-*.pfx
-*.env.local
-*.env.*
-secrets.json
-credentials.json
+.DS_Store
+
+# Documentation (temporary)
 IMPLEMENTATION_CHANGES.md
 NEW_CHANGES.md
 PHASE3_CHANGES.md
+_deprecated/
