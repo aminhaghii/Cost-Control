@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+
+{% block title %}ورود داده از Excel{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-file-import me-2"></i> ورود داده از Excel</h2>
+    <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-right me-1"></i> بازگشت
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <i class="fas fa-upload me-2"></i> آپلود فایل جدید
+            </div>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data" id="uploadForm">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">انتخاب فایل Excel:</label>
+                        <input type="file" name="file" class="form-control" accept=".xlsx,.xls" required>
+                        <div class="form-text">فقط فایل‌های .xlsx و .xls پشتیبانی می‌شوند</div>
+                    </div>
+                    
+                    <div class="alert alert-info small">
+                        <i class="fas fa-info-circle me-1"></i>
+                        <strong>فرمت مورد انتظار:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>ستون نام کالا (شرح / نام کالا)</li>
+                            <li>ستون واحد</li>
+                            <li>ستون موجودی (اختیاری)</li>
+                            <li>ستون قیمت خرید (اختیاری)</li>
+                            <li>ستون مصرف هفتگی/ماهانه (اختیاری)</li>
+                        </ul>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-upload me-2"></i> آپلود و وارد کردن
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-folder-open me-2"></i> فایل‌های موجود
+            </div>
+            <div class="card-body">
+                {% if existing_files %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>نام فایل</th>
+                                <th>حجم</th>
+                                <th>تاریخ</th>
+                                <th>عملیات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for file in existing_files %}
+                            <tr>
+                                <td><i class="fas fa-file-excel text-success me-1"></i> {{ file.name }}</td>
+                                <td>{{ (file.size / 1024) | round(1) }} KB</td>
+                                <td>{{ file.modified.strftime('%Y/%m/%d') }}</td>
+                                <td>
+                                    <a href="{{ url_for('admin.import_preview', filename=file.name) }}" 
+                                       class="btn btn-sm btn-outline-info" title="پیش‌نمایش">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{{ url_for('admin.import_existing_file', filename=file.name) }}" 
+                                       class="btn btn-sm btn-outline-success" title="وارد کردن">
+                                        <i class="fas fa-file-import"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="fas fa-inbox fa-3x mb-3"></i>
+                    <p>فایلی آپلود نشده است</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Quick Import from Project -->
+        <div class="card mt-3">
+            <div class="card-header bg-success text-white">
+                <i class="fas fa-bolt me-2"></i> ورود سریع
+            </div>
+            <div class="card-body">
+                <p class="small text-muted">اگر فایل Excel در پوشه پروژه قرار دارد:</p>
+                <a href="{{ url_for('admin.import_existing_file', filename='aghllam.xlsx') }}" 
+                   class="btn btn-success btn-sm mb-2 d-block">
+                    <i class="fas fa-file-excel me-1"></i> aghllam.xlsx
+                </a>
+                <a href="{{ url_for('admin.import_existing_file', filename='گزارش_تحلیلی_جامع.xlsx') }}" 
+                   class="btn btn-success btn-sm d-block">
+                    <i class="fas fa-file-excel me-1"></i> گزارش_تحلیلی_جامع.xlsx
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-4">
+    <div class="card-header">
+        <i class="fas fa-question-circle me-2"></i> راهنما
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4">
+                <h6><i class="fas fa-1 text-primary me-2"></i> ساختار فایل</h6>
+                <p class="small text-muted">
+                    فایل Excel باید دارای ستون‌های نام کالا و واحد باشد. 
+                    سایر ستون‌ها مثل موجودی، قیمت و مصرف اختیاری هستند.
+                </p>
+            </div>
+            <div class="col-md-4">
+                <h6><i class="fas fa-2 text-primary me-2"></i> شیت‌های مختلف</h6>
+                <p class="small text-muted">
+                    هر شیت به عنوان یک دسته‌بندی جداگانه (هتل/انبار) در نظر گرفته می‌شود.
+                    سیستم خودکار دسته‌بندی Food/NonFood را تشخیص می‌دهد.
+                </p>
+            </div>
+            <div class="col-md-4">
+                <h6><i class="fas fa-3 text-primary me-2"></i> کالاهای تکراری</h6>
+                <p class="small text-muted">
+                    اگر کالایی با همان نام وجود داشته باشد، فقط قیمت و موجودی آن به‌روز می‌شود.
+                    کد کالای جدید خودکار تولید می‌شود.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+
+{% block title %}جزئیات لاگ #{{ log.id }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <h2><i class="fas fa-file-alt me-2"></i> جزئیات لاگ #{{ log.id }}</h2>
+    <a href="{{ url_for('admin.logs_list') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-right me-1"></i> بازگشت
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="fas fa-info-circle me-2"></i> اطلاعات عمومی
+            </div>
+            <div class="card-body">
+                <table class="table table-bordered">
+                    <tr>
+                        <th width="30%">شناسه لاگ</th>
+                        <td>{{ log.id }}</td>
+                    </tr>
+                    <tr>
+                        <th>زمان</th>
+                        <td>{{ log.created_at.strftime('%Y/%m/%d %H:%M:%S') }}</td>
+                    </tr>
+                    <tr>
+                        <th>کاربر</th>
+                        <td>
+                            <a href="{{ url_for('admin.user_activity', user_id=log.user_id) }}">
+                                {{ log.username }}
+                            </a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>نقش</th>
+                        <td>
+                            <span class="badge bg-{{ 'danger' if log.user_role == 'admin' else 'primary' if log.user_role == 'manager' else 'secondary' }}">
+                                {{ log.user_role }}
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>عملیات</th>
+                        <td>
+                            {% if log.action == 'create' %}
+                            <span class="badge bg-success">{{ log.action_label }}</span>
+                            {% elif log.action == 'update' %}
+                            <span class="badge bg-warning text-dark">{{ log.action_label }}</span>
+                            {% elif log.action == 'delete' %}
+                            <span class="badge bg-danger">{{ log.action_label }}</span>
+                            {% else %}
+                            <span class="badge bg-secondary">{{ log.action_label }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>نوع منبع</th>
+                        <td>{{ log.resource_label }}</td>
+                    </tr>
+                    <tr>
+                        <th>شناسه منبع</th>
+                        <td>{{ log.resource_id or '-' }}</td>
+                    </tr>
+                    <tr>
+                        <th>نام منبع</th>
+                        <td>{{ log.resource_name or '-' }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="fas fa-globe me-2"></i> اطلاعات درخواست
+            </div>
+            <div class="card-body">
+                <table class="table table-bordered">
+                    <tr>
+                        <th width="30%">IP آدرس</th>
+                        <td><code>{{ log.ip_address or '-' }}</code></td>
+                    </tr>
+                    <tr>
+                        <th>User Agent</th>
+                        <td><small>{{ log.user_agent or '-' }}</small></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="fas fa-comment me-2"></i> توضیحات
+            </div>
+            <div class="card-body">
+                {{ log.description or 'بدون توضیحات' }}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if log.old_values or log.new_values %}
+<div class="row">
+    {% if log.old_values %}
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-danger text-white">
+                <i class="fas fa-minus-circle me-2"></i> مقادیر قبلی
+            </div>
+            <div class="card-body">
+                <pre class="bg-light p-3 rounded" dir="ltr" style="font-size: 0.85rem;">{{ log.old_values }}</pre>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    {% if log.new_values %}
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <i class="fas fa-plus-circle me-2"></i> مقادیر جدید
+            </div>
+            <div class="card-body">
+                <pre class="bg-light p-3 rounded" dir="ltr" style="font-size: 0.85rem;">{{ log.new_values }}</pre>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

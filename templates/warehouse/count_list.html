@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block title %}شمارش موجودی{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-clipboard-check me-2"></i>شمارش موجودی</h2>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="{{ url_for('warehouse.dashboard', hotel_id=hotel_id) }}">انبار</a></li>
+                    <li class="breadcrumb-item active">شمارش</li>
+                </ol>
+            </nav>
+        </div>
+        <a href="{{ url_for('warehouse.count_new', hotel_id=hotel_id) }}" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i>شمارش جدید
+        </a>
+    </div>
+
+    <!-- Summary -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h3>{{ variance_summary.total_counts }}</h3>
+                    <small>کل شمارش‌ها (۳۰ روز)</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark">
+                <div class="card-body text-center">
+                    <h3>{{ variance_summary.with_variance }}</h3>
+                    <small>با مغایرت</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h3>{{ variance_summary.avg_variance_pct }}%</h3>
+                    <small>میانگین مغایرت</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-secondary text-white">
+                <div class="card-body text-center">
+                    <h3>{{ items_needing_count|length }}</h3>
+                    <small>نیاز به شمارش</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Pending Counts -->
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>در انتظار بررسی</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if pending_counts %}
+                    <ul class="list-group list-group-flush">
+                        {% for count in pending_counts %}
+                        <li class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>{{ count.item.item_name_fa }}</strong>
+                                    <br>
+                                    <small class="text-muted">
+                                        مغایرت: 
+                                        <span class="{% if count.variance > 0 %}text-success{% else %}text-danger{% endif %}">
+                                            {{ count.variance|round(2) }}
+                                        </span>
+                                        ({{ count.variance_percentage|round(1) }}%)
+                                    </small>
+                                </div>
+                                <a href="{{ url_for('warehouse.count_detail', count_id=count.id) }}" class="btn btn-sm btn-outline-primary">
+                                    بررسی
+                                </a>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted text-center py-3 mb-0">موردی در انتظار نیست</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Counts -->
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-history me-2"></i>شمارش‌های اخیر</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if recent_counts %}
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>کالا</th>
+                                    <th>مغایرت</th>
+                                    <th>وضعیت</th>
+                                    <th>تاریخ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for count in recent_counts[:10] %}
+                                <tr>
+                                    <td>{{ count.item.item_name_fa }}</td>
+                                    <td>
+                                        {% if count.variance == 0 %}
+                                        <span class="text-success">۰</span>
+                                        {% else %}
+                                        <span class="{% if count.variance > 0 %}text-success{% else %}text-danger{% endif %}">
+                                            {{ count.variance|round(2) }}
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if count.status == 'resolved' %}
+                                        <span class="badge bg-success">حل شده</span>
+                                        {% elif count.status == 'adjusted' %}
+                                        <span class="badge bg-info">اصلاح شده</span>
+                                        {% else %}
+                                        <span class="badge bg-warning">در انتظار</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ count.count_date.strftime('%m/%d') }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-3 mb-0">شمارشی ثبت نشده</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Items Needing Count -->
+    {% if items_needing_count %}
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-clock me-2"></i>اقلام نیازمند شمارش</h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-2">
+                {% for data in items_needing_count[:20] %}
+                <div class="col-md-3 col-6">
+                    <div class="border rounded p-2 text-center">
+                        <strong>{{ data.item.item_name_fa }}</strong>
+                        <br>
+                        <small class="text-muted">
+                            {% if data.days_since_count %}
+                            {{ data.days_since_count }} روز پیش
+                            {% else %}
+                            شمارش نشده
+                            {% endif %}
+                        </small>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <a href="{{ url_for('warehouse.count_new', hotel_id=hotel_id) }}" class="btn btn-primary mt-3">
+                <i class="fas fa-clipboard-check me-1"></i>شروع شمارش
+            </a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

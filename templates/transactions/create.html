@@ -1,0 +1,592 @@
+{% extends 'base.html' %}
+
+{% block title %}ثبت تراکنش جدید{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2><i class="fas fa-plus-circle me-2"></i> ثبت تراکنش جدید</h2>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('transactions.create') }}" class="needs-validation" novalidate>
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-calendar me-1"></i> تاریخ
+                            </label>
+                            <!-- UX #6: Date field with proper validation -->
+                            <input type="date" name="transaction_date" id="transactionDate" 
+                                   class="form-control" value="{{ today }}" required>
+                            <div class="invalid-feedback" id="dateError">تاریخ نمی‌تواند در آینده باشد</div>
+                            <small class="form-text text-muted">تاریخ باید امروز یا قبل از آن باشد</small>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-box me-1"></i> کالا
+                            </label>
+                            <!-- UX #9: Searchable dropdown with price data -->
+                            <select name="item_id" id="itemSelect" class="form-select select2" required
+                                    data-placeholder="جستجو و انتخاب کالا...">
+                                <option value="">انتخاب کالا...</option>
+                                {% for item in items %}
+                                <option value="{{ item.id }}" 
+                                        data-unit="{{ item.unit }}"
+                                        data-stock="{{ item.current_stock }}"
+                                        data-category="{{ item.category }}"
+                                        data-price="{{ item.unit_price|default(0) }}">
+                                    {{ item.item_name_fa }} ({{ item.item_code }}) - {{ item.unit }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="item-info mt-2 d-none" id="itemInfo">
+                                <small class="text-muted">
+                                    <i class="fas fa-cubes me-1"></i>موجودی فعلی: 
+                                    <span id="currentStock" class="fw-bold">-</span>
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-tag me-1"></i> نوع تراکنش
+                            </label>
+                            <select name="transaction_type" class="form-select" required>
+                                <option value="خرید">خرید</option>
+                                <option value="مصرف">مصرف</option>
+                                <option value="ضایعات">ضایعات</option>
+                                <option value="اصلاحی">اصلاحی</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-layer-group me-1"></i> گروه
+                            </label>
+                            <select name="category" class="form-select" required>
+                                <option value="Food">مواد غذایی</option>
+                                <option value="NonFood">مواد غیرغذایی</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-sort-numeric-up me-1"></i> مقدار
+                            </label>
+                            <!-- BUG-VALIDATION-001: Prevent negative/zero input -->
+                            <input type="number" step="0.001" name="quantity" id="quantityInput"
+                                   class="form-control" placeholder="0" required min="0.001" max="999999">
+                            <div class="invalid-feedback" id="quantityError">مقدار باید بزرگتر از صفر باشد</div>
+                            <div class="valid-feedback"><i class="fas fa-check"></i> صحیح</div>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-money-bill me-1"></i> قیمت واحد (ریال)
+                                {% if current_user.role not in ['admin', 'manager', 'accountant'] %}
+                                <span class="badge bg-secondary ms-1">خودکار</span>
+                                {% endif %}
+                            </label>
+                            <!-- PRICE CONTROL: Auto-populated from item, readonly for normal users -->
+                            {% if current_user.role in ['admin', 'manager', 'accountant'] %}
+                            <input type="text" name="unit_price" id="unitPriceInput"
+                                   class="form-control text-start" dir="ltr" placeholder="0" required>
+                            <small class="text-warning d-block mt-1">
+                                <i class="fas fa-exclamation-triangle me-1"></i>
+                                تغییر قیمت از مقدار پیش‌فرض نیاز به دلیل دارد
+                            </small>
+                            {% else %}
+                            <input type="text" name="unit_price" id="unitPriceInput"
+                                   class="form-control text-start bg-light" dir="ltr" placeholder="0" required readonly>
+                            <small class="text-muted d-block mt-1">
+                                <i class="fas fa-lock me-1"></i>
+                                قیمت به صورت خودکار از کالا دریافت می‌شود
+                            </small>
+                            {% endif %}
+                            <input type="hidden" id="unitPriceHidden" name="unit_price_value" value="0">
+                            <div class="invalid-feedback" id="priceError">قیمت باید بزرگتر از صفر باشد</div>
+                            <div class="valid-feedback"><i class="fas fa-check"></i> صحیح</div>
+                            <small class="text-info d-block mt-1" id="unitPriceWords"></small>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-calculator me-1"></i> مبلغ کل (ریال)
+                            </label>
+                            <!-- UX #8: Live total calculation display -->
+                            <div class="total-amount-box p-3 rounded border bg-light">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-coins text-warning fs-4 me-2"></i>
+                                    <div>
+                                        <small class="text-muted d-block">مبلغ کل:</small>
+                                        <span id="totalAmountDisplay" class="fs-5 fw-bold text-primary">۰ ریال</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <small class="text-success d-block mt-1 fw-bold" id="totalAmountWords"></small>
+                            <input type="hidden" id="totalAmount" name="total_amount" value="0">
+                        </div>
+                    </div>
+                    
+                    <!-- ═══ Warehouse Management: Conditional Fields ═══ -->
+                    <div class="mb-3" id="wasteReasonSection" style="display: none;">
+                        <label class="form-label fw-bold">
+                            <i class="fas fa-question-circle me-1 text-danger"></i> دلیل ضایعات <span class="text-danger">*</span>
+                        </label>
+                        <select name="waste_reason" id="wasteReason" class="form-select">
+                            <option value="">انتخاب کنید...</option>
+                            {% if WASTE_REASONS %}
+                            {% for key, label in WASTE_REASONS.items() %}
+                            <option value="{{ key }}">{{ label }}</option>
+                            {% endfor %}
+                            {% else %}
+                            <option value="expiry">تاریخ انقضا</option>
+                            <option value="damage">خرابی/آسیب</option>
+                            <option value="transport">آسیب حمل‌ونقل</option>
+                            <option value="overproduction">تولید اضافی</option>
+                            <option value="quality">کیفیت نامطلوب</option>
+                            <option value="theft">سرقت/مفقودی</option>
+                            <option value="other">سایر</option>
+                            {% endif %}
+                        </select>
+                        <textarea name="waste_reason_detail" class="form-control mt-2" rows="2" 
+                                  placeholder="توضیحات تکمیلی دلیل ضایعات (اختیاری)..."></textarea>
+                    </div>
+
+                    <div class="mb-3" id="departmentSection" style="display: none;">
+                        <label class="form-label fw-bold">
+                            <i class="fas fa-building me-1 text-primary"></i> بخش مصرف‌کننده
+                        </label>
+                        <select name="destination_department" class="form-select">
+                            <option value="">انتخاب کنید...</option>
+                            {% if DEPARTMENTS %}
+                            {% for key, label in DEPARTMENTS.items() %}
+                            <option value="{{ key }}">{{ label }}</option>
+                            {% endfor %}
+                            {% else %}
+                            <option value="kitchen">آشپزخانه</option>
+                            <option value="housekeeping">خانه‌داری</option>
+                            <option value="restaurant">رستوران</option>
+                            <option value="bar">بار</option>
+                            <option value="banquet">تشریفات</option>
+                            <option value="maintenance">تعمیرات</option>
+                            <option value="admin">اداری</option>
+                            <option value="other">سایر</option>
+                            {% endif %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3" id="referenceSection" style="display: none;">
+                        <label class="form-label fw-bold">
+                            <i class="fas fa-file-invoice me-1 text-success"></i> شماره فاکتور/رسید
+                        </label>
+                        <input type="text" name="reference_number" class="form-control" 
+                               placeholder="شماره فاکتور یا رسید خرید...">
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">
+                            <i class="fas fa-comment me-1"></i> توضیحات
+                        </label>
+                        <textarea name="description" class="form-control" rows="2" 
+                                  placeholder="توضیحات اختیاری..."></textarea>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-save me-2"></i> ذخیره تراکنش
+                        </button>
+                        <a href="{{ url_for('transactions.list_transactions') }}" class="btn btn-outline-secondary btn-lg">
+                            <i class="fas fa-times me-2"></i> انصراف
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-info-circle me-2"></i> راهنما
+            </div>
+            <div class="card-body">
+                <h6 class="fw-bold">انواع تراکنش:</h6>
+                <ul class="list-unstyled">
+                    <li class="mb-2">
+                        <span class="badge bg-success">خرید</span>
+                        افزایش موجودی
+                    </li>
+                    <li class="mb-2">
+                        <span class="badge bg-info">مصرف</span>
+                        کاهش موجودی (استفاده عادی)
+                    </li>
+                    <li class="mb-2">
+                        <span class="badge bg-danger">ضایعات</span>
+                        کاهش موجودی (خراب/منقضی)
+                    </li>
+                    <li class="mb-2">
+                        <span class="badge bg-secondary">اصلاحی</span>
+                        تصحیح موجودی
+                    </li>
+                </ul>
+                <hr>
+                <h6 class="fw-bold">نکات:</h6>
+                <ul class="small text-muted">
+                    <li>مبلغ کل به صورت خودکار محاسبه می‌شود</li>
+                    <li>قیمت‌ها به ریال وارد شود</li>
+                    <li>واحد کالا از لیست کالاها نمایش داده می‌شود</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Persian number to words converter
+function numberToPersianWords(num) {
+    if (num === 0) return '';
+    
+    const ones = ['', 'یک', 'دو', 'سه', 'چهار', 'پنج', 'شش', 'هفت', 'هشت', 'نه'];
+    const teens = ['ده', 'یازده', 'دوازده', 'سیزده', 'چهارده', 'پانزده', 'شانزده', 'هفده', 'هجده', 'نوزده'];
+    const tens = ['', '', 'بیست', 'سی', 'چهل', 'پنجاه', 'شصت', 'هفتاد', 'هشتاد', 'نود'];
+    const hundreds = ['', 'صد', 'دویست', 'سیصد', 'چهارصد', 'پانصد', 'ششصد', 'هفتصد', 'هشتصد', 'نهصد'];
+    
+    function convertLessThanThousand(n) {
+        if (n === 0) return '';
+        
+        let result = '';
+        
+        if (n >= 100) {
+            result += hundreds[Math.floor(n / 100)];
+            n %= 100;
+            if (n > 0) result += ' و ';
+        }
+        
+        if (n >= 10 && n < 20) {
+            result += teens[n - 10];
+        } else if (n >= 20) {
+            result += tens[Math.floor(n / 10)];
+            n %= 10;
+            if (n > 0) result += ' و ' + ones[n];
+        } else if (n > 0) {
+            result += ones[n];
+        }
+        
+        return result;
+    }
+    
+    // Convert Rial to Toman (divide by 10)
+    const toman = Math.floor(num / 10);
+    if (toman === 0) return 'کمتر از یک تومان';
+    
+    const units = [
+        { value: 1000000000000, name: 'هزار میلیارد' },
+        { value: 1000000000, name: 'میلیارد' },
+        { value: 1000000, name: 'میلیون' },
+        { value: 1000, name: 'هزار' },
+        { value: 1, name: '' }
+    ];
+    
+    let result = '';
+    let remaining = toman;
+    
+    for (const unit of units) {
+        if (remaining >= unit.value) {
+            const count = Math.floor(remaining / unit.value);
+            remaining %= unit.value;
+            
+            if (result) result += ' و ';
+            result += convertLessThanThousand(count);
+            if (unit.name) result += ' ' + unit.name;
+        }
+    }
+    
+    return result + ' تومان';
+}
+
+// Format number with thousand separators
+function formatNumber(num) {
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+// Normalize Persian/Arabic digits and separators to ASCII
+function normalizeNumericInput(value) {
+    if (value === null || value === undefined) return '';
+    const persianMap = {
+        '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4',
+        '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9',
+        '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+        '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
+    };
+    let normalized = String(value).trim();
+    normalized = normalized.replace(/[۰-۹٠-٩]/g, (d) => persianMap[d] || d);
+    normalized = normalized.replace(/[\s\u00A0\u202F\u2007\u066C٬]/g, '');
+    normalized = normalized.replace(/[،]/g, ',');
+    return normalized;
+}
+
+// Parse formatted number back to integer
+function parseFormattedNumber(str) {
+    const normalized = normalizeNumericInput(str).replace(/,/g, '');
+    return parseInt(normalized, 10) || 0;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const quantityInput = document.getElementById('quantityInput');
+    const unitPriceInput = document.getElementById('unitPriceInput');
+    const unitPriceHidden = document.getElementById('unitPriceHidden');
+    const unitPriceWords = document.getElementById('unitPriceWords');
+    const totalAmountDisplay = document.getElementById('totalAmountDisplay');
+    const totalAmountWords = document.getElementById('totalAmountWords');
+    const totalAmountHidden = document.getElementById('totalAmount');
+    const dateInput = document.getElementById('transactionDate');
+    const itemSelect = document.getElementById('itemSelect');
+    const itemInfo = document.getElementById('itemInfo');
+    const currentStock = document.getElementById('currentStock');
+    const categorySelect = document.querySelector('select[name="category"]');
+    
+    // UX #9: Initialize Select2 with search
+    $(itemSelect).select2({
+        theme: 'bootstrap-5',
+        placeholder: 'جستجو و انتخاب کالا...',
+        allowClear: true,
+        dir: 'rtl',
+        language: {
+            noResults: function() { return 'کالایی یافت نشد'; },
+            searching: function() { return 'در حال جستجو...'; }
+        }
+    });
+
+    // ═══ Warehouse Management: Show/hide conditional fields ═══
+    const transactionTypeSelect = document.querySelector('select[name="transaction_type"]');
+    const wasteReasonSection = document.getElementById('wasteReasonSection');
+    const departmentSection = document.getElementById('departmentSection');
+    const referenceSection = document.getElementById('referenceSection');
+    const wasteReasonInput = document.getElementById('wasteReason');
+
+    function updateConditionalFields() {
+        const type = transactionTypeSelect.value;
+        
+        // Hide all sections first
+        wasteReasonSection.style.display = 'none';
+        departmentSection.style.display = 'none';
+        referenceSection.style.display = 'none';
+        wasteReasonInput.required = false;
+        
+        // Show relevant section based on type
+        if (type === 'ضایعات') {
+            wasteReasonSection.style.display = 'block';
+            wasteReasonInput.required = true;
+        } else if (type === 'مصرف') {
+            departmentSection.style.display = 'block';
+        } else if (type === 'خرید') {
+            referenceSection.style.display = 'block';
+        }
+    }
+
+    transactionTypeSelect.addEventListener('change', updateConditionalFields);
+    updateConditionalFields(); // Initial call
+    
+    // Show item info when selected and auto-populate price
+    $(itemSelect).on('change', function() {
+        const selected = this.options[this.selectedIndex];
+        if (selected && selected.value) {
+            const stock = selected.dataset.stock || '0';
+            const category = selected.dataset.category || 'Food';
+            const price = selected.dataset.price || '0';
+            
+            currentStock.textContent = parseFloat(stock).toLocaleString('fa-IR') + ' ' + (selected.dataset.unit || '');
+            itemInfo.classList.remove('d-none');
+            
+            // Auto-set category
+            categorySelect.value = category;
+            
+            // PRICE CONTROL: Auto-populate price from item
+            const priceValue = parseInt(price, 10) || 0;
+            if (priceValue > 0) {
+                unitPriceInput.value = formatNumber(priceValue);
+                unitPriceHidden.value = priceValue;
+                unitPriceInput.classList.remove('is-invalid');
+                unitPriceInput.classList.add('is-valid');
+                
+                // Show Persian words for price
+                if (priceValue > 0) {
+                    unitPriceWords.textContent = '« ' + numberToPersianWords(priceValue) + ' »';
+                }
+                
+                // Update total amount
+                updateTotalAmount();
+            }
+        } else {
+            itemInfo.classList.add('d-none');
+        }
+    });
+    
+    // UX #6: Date validation (no auto-reset)
+    // Get server's today date from the value attribute
+    const serverToday = dateInput.value; // This is today's date from server (YYYY-MM-DD)
+    
+    dateInput.addEventListener('change', function() {
+        if (!this.value) return;
+        
+        // Simple string comparison works for YYYY-MM-DD format
+        if (this.value > serverToday) {
+            this.classList.add('is-invalid');
+            this.classList.remove('is-valid');
+            document.getElementById('dateError').textContent = 'تاریخ تراکنش نمی‌تواند در آینده باشد';
+        } else {
+            this.classList.remove('is-invalid');
+            this.classList.add('is-valid');
+        }
+    });
+    
+    // BUG-VALIDATION-001: Real-time quantity validation (reject negative/zero)
+    quantityInput.addEventListener('input', function() {
+        const value = parseFloat(this.value);
+        const errorEl = document.getElementById('quantityError');
+        
+        if (isNaN(value) || value <= 0) {
+            this.classList.add('is-invalid');
+            this.classList.remove('is-valid');
+            if (value < 0) {
+                errorEl.textContent = 'مقدار نمی‌تواند منفی باشد';
+            } else if (value === 0) {
+                errorEl.textContent = 'مقدار باید بزرگتر از صفر باشد';
+            } else {
+                errorEl.textContent = 'لطفاً مقدار را وارد کنید';
+            }
+        } else if (value > 999999) {
+            this.classList.add('is-invalid');
+            this.classList.remove('is-valid');
+            errorEl.textContent = 'مقدار نمی‌تواند بیشتر از ۹۹۹,۹۹۹ باشد';
+        } else {
+            this.classList.remove('is-invalid');
+            this.classList.add('is-valid');
+        }
+        updateTotalAmount();
+    });
+    
+    // UX #7: Real-time price validation with formatting
+    unitPriceInput.addEventListener('input', function() {
+        const normalized = normalizeNumericInput(this.value);
+        // Remove non-digit characters after normalization
+        let rawValue = normalized.replace(/[^\d]/g, '');
+        const value = parseInt(rawValue, 10) || 0;
+        
+        // Update hidden field with raw value
+        unitPriceHidden.value = value;
+        
+        // Format display with commas
+        if (rawValue) {
+            this.value = formatNumber(value);
+        }
+        
+        // Show Persian words
+        if (value > 0) {
+            unitPriceWords.textContent = '« ' + numberToPersianWords(value) + ' »';
+        } else {
+            unitPriceWords.textContent = '';
+        }
+        
+        const errorEl = document.getElementById('priceError');
+        
+        if (value <= 0) {
+            this.classList.add('is-invalid');
+            this.classList.remove('is-valid');
+            errorEl.textContent = 'قیمت باید بزرگتر از صفر باشد';
+        } else if (value > 999999999999) {
+            this.classList.add('is-invalid');
+            this.classList.remove('is-valid');
+            errorEl.textContent = 'قیمت نمی‌تواند بیشتر از ۹۹۹ میلیارد ریال باشد';
+        } else {
+            this.classList.remove('is-invalid');
+            this.classList.add('is-valid');
+        }
+        updateTotalAmount();
+    });
+    
+    // UX #8: Live total calculation
+    function updateTotalAmount() {
+        const quantity = parseFloat(quantityInput.value) || 0;
+        const price = parseFormattedNumber(unitPriceInput.value);
+        const total = Math.round(quantity * price);
+        
+        totalAmountHidden.value = total;
+        
+        if (total > 0) {
+            totalAmountDisplay.textContent = formatNumber(total) + ' ریال';
+            totalAmountDisplay.classList.remove('text-muted');
+            totalAmountDisplay.classList.add('text-success');
+            totalAmountWords.textContent = '« ' + numberToPersianWords(total) + ' »';
+        } else {
+            totalAmountDisplay.textContent = '۰ ریال';
+            totalAmountDisplay.classList.add('text-muted');
+            totalAmountDisplay.classList.remove('text-success');
+            totalAmountWords.textContent = '';
+        }
+    }
+    
+    // Form validation before submit
+    document.querySelector('form').addEventListener('submit', function(e) {
+        const quantity = parseFloat(quantityInput.value);
+        const dateValue = dateInput.value;
+        
+        let hasError = false;
+        
+        if (isNaN(quantity) || quantity <= 0 || quantity > 999999) {
+            quantityInput.classList.add('is-invalid');
+            hasError = true;
+        }
+        
+        const priceValue = parseFormattedNumber(unitPriceInput.value);
+        if (isNaN(priceValue) || priceValue <= 0 || priceValue > 999999999999) {
+            unitPriceInput.classList.add('is-invalid');
+            hasError = true;
+        }
+        
+        // Proper date validation - compare strings (YYYY-MM-DD format)
+        if (dateValue && dateValue > serverToday) {
+            dateInput.classList.add('is-invalid');
+            hasError = true;
+        }
+        
+        if (hasError) {
+            e.preventDefault();
+            // Scroll to first error
+            const firstError = document.querySelector('.is-invalid');
+            if (firstError) {
+                firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                firstError.focus();
+            }
+        }
+    });
+});
+</script>
+
+<style>
+.total-amount-box {
+    transition: all 0.3s ease;
+}
+.total-amount-box:hover {
+    border-color: #1976D2 !important;
+}
+.is-valid {
+    border-color: #198754 !important;
+}
+.is-invalid {
+    border-color: #dc3545 !important;
+}
+</style>
+{% endblock %}

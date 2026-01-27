@@ -1,0 +1,313 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Hotel Inventory Pareto Analysis API",
+    "description": "سیستم مدیریت موجودی هتل با تحلیل پارتو و ABC",
+    "version": "1.0.0",
+    "contact": {
+      "name": "API Support"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8084",
+      "description": "Development server"
+    }
+  ],
+  "paths": {
+    "/chat/api/message": {
+      "post": {
+        "tags": ["Chat"],
+        "summary": "ارسال پیام به چت‌بات",
+        "description": "پردازش پیام کاربر و دریافت پاسخ هوشمند",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message": {
+                    "type": "string",
+                    "description": "متن پیام کاربر"
+                  }
+                },
+                "required": ["message"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "پاسخ موفق",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {"type": "boolean"},
+                    "response": {"type": "string"},
+                    "suggestions": {"type": "array", "items": {"type": "string"}}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat/api/history": {
+      "get": {
+        "tags": ["Chat"],
+        "summary": "دریافت تاریخچه چت",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {"type": "integer", "default": 50}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "لیست پیام‌های قبلی"
+          }
+        }
+      }
+    },
+    "/chat/api/clear-history": {
+      "post": {
+        "tags": ["Chat"],
+        "summary": "پاک کردن تاریخچه چت",
+        "responses": {
+          "200": {
+            "description": "تاریخچه پاک شد"
+          }
+        }
+      }
+    },
+    "/reports/pareto": {
+      "get": {
+        "tags": ["Reports"],
+        "summary": "گزارش تحلیل پارتو",
+        "parameters": [
+          {
+            "name": "mode",
+            "in": "query",
+            "schema": {"type": "string", "default": "خرید"}
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {"type": "string", "enum": ["Food", "NonFood"], "default": "Food"}
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "schema": {"type": "integer", "default": 30}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "صفحه گزارش پارتو"
+          }
+        }
+      }
+    },
+    "/reports/abc": {
+      "get": {
+        "tags": ["Reports"],
+        "summary": "گزارش طبقه‌بندی ABC",
+        "parameters": [
+          {
+            "name": "mode",
+            "in": "query",
+            "schema": {"type": "string", "default": "خرید"}
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {"type": "string", "enum": ["Food", "NonFood"], "default": "Food"}
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "schema": {"type": "integer", "default": 30}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "صفحه گزارش ABC"
+          }
+        }
+      }
+    },
+    "/export/pareto-excel": {
+      "get": {
+        "tags": ["Export"],
+        "summary": "دانلود گزارش پارتو Excel",
+        "parameters": [
+          {
+            "name": "mode",
+            "in": "query",
+            "schema": {"type": "string", "default": "خرید"}
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {"type": "string", "default": "Food"}
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "schema": {"type": "integer", "default": 30}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "فایل Excel",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {}
+            }
+          }
+        }
+      }
+    },
+    "/ai/analyze-pareto": {
+      "get": {
+        "tags": ["AI Analysis"],
+        "summary": "تحلیل پارتو با هوش مصنوعی",
+        "responses": {
+          "200": {
+            "description": "صفحه تحلیل AI"
+          }
+        }
+      }
+    },
+    "/ai/reorder-suggestions": {
+      "get": {
+        "tags": ["AI Analysis"],
+        "summary": "پیشنهادات سفارش خرید",
+        "parameters": [
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {"type": "string", "default": "Food"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "لیست پیشنهادات"
+          }
+        }
+      }
+    },
+    "/ai/waste-analysis": {
+      "get": {
+        "tags": ["AI Analysis"],
+        "summary": "تحلیل ضایعات",
+        "parameters": [
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {"type": "string", "default": "Food"}
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "schema": {"type": "integer", "default": 30}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "صفحه تحلیل ضایعات"
+          }
+        }
+      }
+    },
+    "/ai/daily-insights": {
+      "get": {
+        "tags": ["AI Analysis"],
+        "summary": "بینش‌های روزانه",
+        "responses": {
+          "200": {
+            "description": "لیست بینش‌ها",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {"type": "boolean"},
+                    "insights": {"type": "array"},
+                    "ai_available": {"type": "boolean"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/transactions/": {
+      "get": {
+        "tags": ["Transactions"],
+        "summary": "لیست تراکنش‌ها",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {"type": "integer", "default": 1}
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {"type": "string"}
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {"type": "string"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "صفحه لیست تراکنش‌ها"
+          }
+        }
+      }
+    },
+    "/transactions/create": {
+      "get": {
+        "tags": ["Transactions"],
+        "summary": "فرم ثبت تراکنش جدید",
+        "responses": {
+          "200": {
+            "description": "فرم ثبت تراکنش"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Transactions"],
+        "summary": "ثبت تراکنش جدید",
+        "responses": {
+          "302": {
+            "description": "ریدایرکت به لیست تراکنش‌ها"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "session"
+      }
+    }
+  },
+  "security": [
+    {
+      "sessionAuth": []
+    }
+  ]
+}

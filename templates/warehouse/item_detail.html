@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}جزئیات کالا{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="mb-4">
+        <h2><i class="fas fa-box me-2"></i>{{ item.item_name_fa }}</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="{{ url_for('warehouse.dashboard', hotel_id=item.hotel_id) }}">انبار</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('warehouse.items_list', hotel_id=item.hotel_id) }}">موجودی</a></li>
+                <li class="breadcrumb-item active">{{ item.item_name_fa }}</li>
+            </ol>
+        </nav>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header"><h5 class="mb-0">اطلاعات کالا</h5></div>
+                <div class="card-body">
+                    <table class="table table-borderless mb-0">
+                        <tr><th>نام فارسی:</th><td>{{ item.item_name_fa }}</td></tr>
+                        <tr><th>نام انگلیسی:</th><td>{{ item.item_name_en or '-' }}</td></tr>
+                        <tr><th>دسته:</th><td>{{ item.category }}</td></tr>
+                        <tr><th>واحد:</th><td>{{ item.unit }}</td></tr>
+                        <tr><th>موجودی فعلی:</th><td><strong>{{ item.current_stock|round(2) }}</strong></td></tr>
+                        <tr><th>حداقل موجودی:</th><td>{{ item.min_stock or '-' }}</td></tr>
+                        <tr><th>حداکثر موجودی:</th><td>{{ item.max_stock or '-' }}</td></tr>
+                        <tr><th>روز موجودی:</th><td>{% if days_on_hand >= 999 %}-{% else %}{{ days_on_hand }} روز{% endif %}</td></tr>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header"><h5 class="mb-0">شمارش‌های اخیر</h5></div>
+                <div class="card-body p-0">
+                    {% if recent_counts %}
+                    <ul class="list-group list-group-flush">
+                        {% for count in recent_counts %}
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>{{ count.count_date.strftime('%Y-%m-%d') }}</span>
+                            <span class="{% if count.variance != 0 %}text-warning{% else %}text-success{% endif %}">
+                                مغایرت: {{ count.variance|round(2) }}
+                            </span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted text-center py-3 mb-0">شمارشی ثبت نشده</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">تاریخچه حرکات ({{ days }} روز اخیر)</h5>
+                    <form method="GET" class="d-flex gap-2">
+                        <select name="days" class="form-select form-select-sm" onchange="this.form.submit()">
+                            <option value="7" {% if days == 7 %}selected{% endif %}>۷ روز</option>
+                            <option value="30" {% if days == 30 %}selected{% endif %}>۳۰ روز</option>
+                            <option value="90" {% if days == 90 %}selected{% endif %}>۹۰ روز</option>
+                        </select>
+                    </form>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>تاریخ</th>
+                                    <th>نوع</th>
+                                    <th>مقدار</th>
+                                    <th>مبلغ</th>
+                                    <th>کاربر</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for tx in movements %}
+                                <tr>
+                                    <td>{{ tx.transaction_date.strftime('%Y-%m-%d') }}</td>
+                                    <td>
+                                        {% if tx.transaction_type == 'خرید' %}
+                                        <span class="badge bg-success">خرید</span>
+                                        {% elif tx.transaction_type == 'مصرف' %}
+                                        <span class="badge bg-primary">مصرف</span>
+                                        {% elif tx.transaction_type == 'ضایعات' %}
+                                        <span class="badge bg-danger">ضایعات</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">{{ tx.transaction_type }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if tx.direction == 1 %}
+                                        <span class="text-success">+{{ tx.quantity }}</span>
+                                        {% else %}
+                                        <span class="text-danger">-{{ tx.quantity }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ "{:,.0f}".format(tx.total_amount) }}</td>
+                                    <td>{{ tx.user.username if tx.user else '-' }}</td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="5" class="text-center py-4 text-muted">حرکتی ثبت نشده</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

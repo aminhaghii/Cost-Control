@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}حرکات موجودی{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="mb-4">
+        <h2><i class="fas fa-exchange-alt me-2"></i>حرکات موجودی</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="{{ url_for('warehouse.dashboard', hotel_id=hotel_id) }}">انبار</a></li>
+                <li class="breadcrumb-item active">حرکات</li>
+            </ol>
+        </nav>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <input type="hidden" name="hotel_id" value="{{ hotel_id }}">
+                <div class="col-md-3">
+                    <label class="form-label">کالا</label>
+                    <select name="item_id" class="form-select">
+                        <option value="">همه</option>
+                        {% for item in items %}
+                        <option value="{{ item.id }}" {% if selected_item_id == item.id %}selected{% endif %}>{{ item.item_name_fa }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">نوع</label>
+                    <select name="type" class="form-select">
+                        <option value="">همه</option>
+                        <option value="خرید" {% if selected_type == 'خرید' %}selected{% endif %}>خرید</option>
+                        <option value="مصرف" {% if selected_type == 'مصرف' %}selected{% endif %}>مصرف</option>
+                        <option value="ضایعات" {% if selected_type == 'ضایعات' %}selected{% endif %}>ضایعات</option>
+                        <option value="اصلاحی" {% if selected_type == 'اصلاحی' %}selected{% endif %}>اصلاحی</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">بازه زمانی</label>
+                    <select name="days" class="form-select">
+                        <option value="7" {% if days == 7 %}selected{% endif %}>۷ روز</option>
+                        <option value="30" {% if days == 30 %}selected{% endif %}>۳۰ روز</option>
+                        <option value="90" {% if days == 90 %}selected{% endif %}>۹۰ روز</option>
+                        <option value="365" {% if days == 365 %}selected{% endif %}>۱ سال</option>
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2"><i class="fas fa-filter me-1"></i>فیلتر</button>
+                    <a href="{{ url_for('warehouse.movements', hotel_id=hotel_id) }}" class="btn btn-outline-secondary">پاک</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>تاریخ</th>
+                            <th>نوع</th>
+                            <th>کالا</th>
+                            <th>مقدار</th>
+                            <th>مبلغ</th>
+                            <th>کاربر</th>
+                            <th>توضیحات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tx in movements %}
+                        <tr>
+                            <td>{{ tx.id }}</td>
+                            <td>{{ tx.transaction_date.strftime('%Y-%m-%d') }}</td>
+                            <td>
+                                {% if tx.transaction_type == 'خرید' %}
+                                <span class="badge bg-success">خرید</span>
+                                {% elif tx.transaction_type == 'مصرف' %}
+                                <span class="badge bg-primary">مصرف</span>
+                                {% elif tx.transaction_type == 'ضایعات' %}
+                                <span class="badge bg-danger">ضایعات</span>
+                                {% else %}
+                                <span class="badge bg-secondary">{{ tx.transaction_type }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ tx.item.item_name_fa if tx.item else '-' }}</td>
+                            <td>
+                                {% if tx.direction == 1 %}
+                                <span class="text-success">+{{ tx.quantity }}</span>
+                                {% else %}
+                                <span class="text-danger">-{{ tx.quantity }}</span>
+                                {% endif %}
+                                {{ tx.unit or '' }}
+                            </td>
+                            <td>{{ "{:,.0f}".format(tx.total_amount) }}</td>
+                            <td>{{ tx.user.username if tx.user else '-' }}</td>
+                            <td>
+                                {{ tx.description[:50] if tx.description else '-' }}
+                                {% if tx.description and tx.description|length > 50 %}...{% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center py-4 text-muted">حرکتی یافت نشد</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer">
+            <small class="text-muted">{{ movements|length }} مورد</small>
+        </div>
+    </div>
+</div>
+{% endblock %}

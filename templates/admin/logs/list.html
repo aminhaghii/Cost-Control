@@ -1,0 +1,185 @@
+{% extends 'base.html' %}
+
+{% block title %}لاگ فعالیت‌ها{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <h2><i class="fas fa-file-alt me-2"></i> لاگ فعالیت‌های سیستم</h2>
+    <a href="{{ url_for('admin.logs_export', user_id=user_filter, action=action_filter, resource_type=resource_filter, date_from=date_from, date_to=date_to) }}" 
+       class="btn btn-success">
+        <i class="fas fa-download me-1"></i> خروجی Excel
+    </a>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-2">
+                <label class="form-label">کاربر</label>
+                <select name="user_id" class="form-select">
+                    <option value="">همه کاربران</option>
+                    {% for user in users %}
+                    <option value="{{ user.id }}" {{ 'selected' if user_filter == user.id|string }}>
+                        {{ user.username }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">عملیات</label>
+                <select name="action" class="form-select">
+                    <option value="">همه</option>
+                    {% for action, label in action_labels.items() %}
+                    <option value="{{ action }}" {{ 'selected' if action_filter == action }}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">نوع منبع</label>
+                <select name="resource_type" class="form-select">
+                    <option value="">همه</option>
+                    {% for resource, label in resource_labels.items() %}
+                    <option value="{{ resource }}" {{ 'selected' if resource_filter == resource }}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">از تاریخ</label>
+                <input type="date" name="date_from" class="form-control" value="{{ date_from }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">تا تاریخ</label>
+                <input type="date" name="date_to" class="form-control" value="{{ date_to }}">
+            </div>
+            <div class="col-md-1 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="fas fa-search"></i>
+                </button>
+            </div>
+            <div class="col-md-1 d-flex align-items-end">
+                <a href="{{ url_for('admin.logs_list') }}" class="btn btn-outline-secondary w-100">
+                    <i class="fas fa-times"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Logs Table -->
+<div class="card">
+    <div class="card-header">
+        <i class="fas fa-list me-2"></i> لیست فعالیت‌ها
+        <span class="badge bg-secondary ms-2">{{ logs.total }} رکورد</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-sm mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>زمان</th>
+                        <th>کاربر</th>
+                        <th>نقش</th>
+                        <th>عملیات</th>
+                        <th>نوع منبع</th>
+                        <th>نام منبع</th>
+                        <th>توضیحات</th>
+                        <th>IP</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs.items %}
+                    <tr>
+                        <td>
+                            <small>{{ log.created_at.strftime('%Y/%m/%d') }}</small><br>
+                            <small class="text-muted">{{ log.created_at.strftime('%H:%M:%S') }}</small>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('admin.user_activity', user_id=log.user_id) }}">
+                                {{ log.username }}
+                            </a>
+                        </td>
+                        <td>
+                            <span class="badge bg-{{ 'danger' if log.user_role == 'admin' else 'primary' if log.user_role == 'manager' else 'secondary' }} badge-sm">
+                                {{ log.user_role }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if log.action == 'create' %}
+                            <span class="badge bg-success">{{ log.action_label }}</span>
+                            {% elif log.action == 'update' or log.action == 'role_change' %}
+                            <span class="badge bg-warning text-dark">{{ log.action_label }}</span>
+                            {% elif log.action == 'delete' %}
+                            <span class="badge bg-danger">{{ log.action_label }}</span>
+                            {% elif log.action == 'login' %}
+                            <span class="badge bg-info">{{ log.action_label }}</span>
+                            {% elif log.action == 'login_failed' %}
+                            <span class="badge bg-dark">{{ log.action_label }}</span>
+                            {% elif log.action == 'export' %}
+                            <span class="badge bg-primary">{{ log.action_label }}</span>
+                            {% else %}
+                            <span class="badge bg-secondary">{{ log.action_label }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ log.resource_label }}</td>
+                        <td>
+                            <small>{{ log.resource_name[:30] + '...' if log.resource_name and log.resource_name|length > 30 else log.resource_name or '-' }}</small>
+                        </td>
+                        <td>
+                            <small class="text-muted">{{ log.description[:40] + '...' if log.description and log.description|length > 40 else log.description or '-' }}</small>
+                        </td>
+                        <td>
+                            <small class="text-muted">{{ log.ip_address or '-' }}</small>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('admin.logs_detail', log_id=log.id) }}" 
+                               class="btn btn-sm btn-outline-info" title="جزئیات">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="9" class="text-center text-muted py-4">
+                            <i class="fas fa-file-alt fa-2x mb-2 d-block"></i>
+                            لاگی یافت نشد
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    {% if logs.pages > 1 %}
+    <div class="card-footer">
+        <nav>
+            <ul class="pagination pagination-sm mb-0 justify-content-center">
+                {% if logs.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('admin.logs_list', page=logs.prev_num, user_id=user_filter, action=action_filter, resource_type=resource_filter, date_from=date_from, date_to=date_to) }}">قبلی</a>
+                </li>
+                {% endif %}
+                
+                {% for p in logs.iter_pages() %}
+                    {% if p %}
+                    <li class="page-item {{ 'active' if p == logs.page }}">
+                        <a class="page-link" href="{{ url_for('admin.logs_list', page=p, user_id=user_filter, action=action_filter, resource_type=resource_filter, date_from=date_from, date_to=date_to) }}">{{ p }}</a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if logs.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('admin.logs_list', page=logs.next_num, user_id=user_filter, action=action_filter, resource_type=resource_filter, date_from=date_from, date_to=date_to) }}">بعدی</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

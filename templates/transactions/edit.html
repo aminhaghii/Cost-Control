@@ -1,0 +1,286 @@
+{% extends 'base.html' %}
+
+{% block title %}ویرایش تراکنش{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2><i class="fas fa-edit me-2"></i> ویرایش تراکنش #{{ transaction.id }}</h2>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('transactions.edit', id=transaction.id) }}" class="needs-validation" novalidate>
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-calendar me-1"></i> تاریخ
+                            </label>
+                            <input type="date" name="transaction_date" class="form-control" 
+                                   value="{{ transaction.transaction_date.strftime('%Y-%m-%d') }}" required>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-box me-1"></i> کالا
+                            </label>
+                            <select name="item_id" class="form-select select2" required>
+                                <option value="">انتخاب کالا...</option>
+                                {% for item in items %}
+                                <option value="{{ item.id }}" {% if item.id == transaction.item_id %}selected{% endif %}>
+                                    {{ item.item_name_fa }} ({{ item.item_code }}) - {{ item.unit }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-tag me-1"></i> نوع تراکنش
+                            </label>
+                            <select name="transaction_type" class="form-select" required>
+                                <option value="خرید" {% if transaction.transaction_type == 'خرید' %}selected{% endif %}>خرید</option>
+                                <option value="مصرف" {% if transaction.transaction_type == 'مصرف' %}selected{% endif %}>مصرف</option>
+                                <option value="ضایعات" {% if transaction.transaction_type == 'ضایعات' %}selected{% endif %}>ضایعات</option>
+                                <option value="اصلاحی" {% if transaction.transaction_type == 'اصلاحی' %}selected{% endif %}>اصلاحی</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-layer-group me-1"></i> گروه
+                            </label>
+                            <select name="category" class="form-select" required>
+                                <option value="Food" {% if transaction.category == 'Food' %}selected{% endif %}>مواد غذایی</option>
+                                <option value="NonFood" {% if transaction.category == 'NonFood' %}selected{% endif %}>مواد غیرغذایی</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-sort-numeric-up me-1"></i> مقدار
+                            </label>
+                            <!-- BUG-VALIDATION-001: Prevent negative/zero input -->
+                            <input type="number" step="0.001" name="quantity" 
+                                   class="form-control" value="{{ transaction.quantity }}" required min="0.001" max="999999">
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-money-bill me-1"></i> قیمت واحد (ریال)
+                            </label>
+                            <input type="text" name="unit_price" id="unitPriceInput"
+                                   class="form-control text-start" dir="ltr" 
+                                   value="{{ "{:,.0f}".format(transaction.unit_price) }}" required>
+                            <small class="text-info d-block mt-1" id="unitPriceWords"></small>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-calculator me-1"></i> مبلغ کل (ریال)
+                            </label>
+                            <div class="total-amount-box p-2 rounded border bg-light">
+                                <span id="totalAmountDisplay" class="fw-bold text-primary">{{ "{:,.0f}".format(transaction.total_amount) }} ریال</span>
+                            </div>
+                            <small class="text-success d-block mt-1 fw-bold" id="totalAmountWords"></small>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">
+                            <i class="fas fa-comment me-1"></i> توضیحات
+                        </label>
+                        <textarea name="description" class="form-control" rows="2">{{ transaction.description or '' }}</textarea>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-save me-2"></i> ذخیره تغییرات
+                        </button>
+                        <a href="{{ url_for('transactions.list_transactions') }}" class="btn btn-outline-secondary btn-lg">
+                            <i class="fas fa-times me-2"></i> انصراف
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-info-circle me-2"></i> اطلاعات تراکنش
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr>
+                        <th>شناسه:</th>
+                        <td>{{ transaction.id }}</td>
+                    </tr>
+                    <tr>
+                        <th>ثبت‌کننده:</th>
+                        <td>{{ transaction.user.username if transaction.user else '-' }}</td>
+                    </tr>
+                    <tr>
+                        <th>تاریخ ثبت:</th>
+                        <td>{{ transaction.created_at.strftime('%Y/%m/%d %H:%M') }}</td>
+                    </tr>
+                    {% if transaction.updated_at %}
+                    <tr>
+                        <th>آخرین ویرایش:</th>
+                        <td>{{ transaction.updated_at.strftime('%Y/%m/%d %H:%M') }}</td>
+                    </tr>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Persian number to words converter
+function numberToPersianWords(num) {
+    if (num === 0) return '';
+    
+    const ones = ['', 'یک', 'دو', 'سه', 'چهار', 'پنج', 'شش', 'هفت', 'هشت', 'نه'];
+    const teens = ['ده', 'یازده', 'دوازده', 'سیزده', 'چهارده', 'پانزده', 'شانزده', 'هفده', 'هجده', 'نوزده'];
+    const tens = ['', '', 'بیست', 'سی', 'چهل', 'پنجاه', 'شصت', 'هفتاد', 'هشتاد', 'نود'];
+    const hundreds = ['', 'صد', 'دویست', 'سیصد', 'چهارصد', 'پانصد', 'ششصد', 'هفتصد', 'هشتصد', 'نهصد'];
+    
+    function convertLessThanThousand(n) {
+        if (n === 0) return '';
+        let result = '';
+        if (n >= 100) {
+            result += hundreds[Math.floor(n / 100)];
+            n %= 100;
+            if (n > 0) result += ' و ';
+        }
+        if (n >= 10 && n < 20) {
+            result += teens[n - 10];
+        } else if (n >= 20) {
+            result += tens[Math.floor(n / 10)];
+            n %= 10;
+            if (n > 0) result += ' و ' + ones[n];
+        } else if (n > 0) {
+            result += ones[n];
+        }
+        return result;
+    }
+    
+    const toman = Math.floor(num / 10);
+    if (toman === 0) return 'کمتر از یک تومان';
+    
+    const units = [
+        { value: 1000000000000, name: 'هزار میلیارد' },
+        { value: 1000000000, name: 'میلیارد' },
+        { value: 1000000, name: 'میلیون' },
+        { value: 1000, name: 'هزار' },
+        { value: 1, name: '' }
+    ];
+    
+    let result = '';
+    let remaining = toman;
+    
+    for (const unit of units) {
+        if (remaining >= unit.value) {
+            const count = Math.floor(remaining / unit.value);
+            remaining %= unit.value;
+            if (result) result += ' و ';
+            result += convertLessThanThousand(count);
+            if (unit.name) result += ' ' + unit.name;
+        }
+    }
+    
+    return result + ' تومان';
+}
+
+function formatNumber(num) {
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+function normalizeNumericInput(value) {
+    if (value === null || value === undefined) return '';
+    const persianMap = {
+        '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4',
+        '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9',
+        '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+        '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
+    };
+    let normalized = String(value).trim();
+    normalized = normalized.replace(/[۰-۹٠-٩]/g, (d) => persianMap[d] || d);
+    normalized = normalized.replace(/[\s\u00A0\u202F\u2007\u066C٬]/g, '');
+    normalized = normalized.replace(/[،]/g, ',');
+    return normalized;
+}
+
+function parseFormattedNumber(str) {
+    const normalized = normalizeNumericInput(str).replace(/,/g, '');
+    return parseInt(normalized, 10) || 0;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const quantityInput = document.querySelector('input[name="quantity"]');
+    const unitPriceInput = document.getElementById('unitPriceInput');
+    const unitPriceWords = document.getElementById('unitPriceWords');
+    const totalAmountDisplay = document.getElementById('totalAmountDisplay');
+    const totalAmountWords = document.getElementById('totalAmountWords');
+    
+    // Initialize Persian words on load
+    const initialPrice = parseFormattedNumber(unitPriceInput.value);
+    if (initialPrice > 0) {
+        unitPriceWords.textContent = '« ' + numberToPersianWords(initialPrice) + ' »';
+    }
+    
+    const initialTotal = parseFloat(quantityInput.value) * initialPrice;
+    if (initialTotal > 0) {
+        totalAmountWords.textContent = '« ' + numberToPersianWords(initialTotal) + ' »';
+    }
+    
+    unitPriceInput.addEventListener('input', function() {
+        const normalized = normalizeNumericInput(this.value);
+        let rawValue = normalized.replace(/[^\d]/g, '');
+        const value = parseInt(rawValue, 10) || 0;
+        
+        if (rawValue) {
+            this.value = formatNumber(value);
+        }
+        
+        if (value > 0) {
+            unitPriceWords.textContent = '« ' + numberToPersianWords(value) + ' »';
+        } else {
+            unitPriceWords.textContent = '';
+        }
+        updateTotalAmount();
+    });
+    
+    quantityInput.addEventListener('input', function() {
+        // Force integer value
+        this.value = Math.floor(Math.abs(this.value)) || '';
+        updateTotalAmount();
+    });
+    
+    function updateTotalAmount() {
+        const quantity = parseFloat(quantityInput.value) || 0;
+        const price = parseFormattedNumber(unitPriceInput.value);
+        const total = Math.round(quantity * price);
+        
+        if (total > 0) {
+            totalAmountDisplay.textContent = formatNumber(total) + ' ریال';
+            totalAmountWords.textContent = '« ' + numberToPersianWords(total) + ' »';
+        } else {
+            totalAmountDisplay.textContent = '۰ ریال';
+            totalAmountWords.textContent = '';
+        }
+    }
+});
+</script>
+{% endblock %}

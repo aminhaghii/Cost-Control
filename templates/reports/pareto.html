@@ -1,0 +1,333 @@
+{% extends 'base.html' %}
+
+{% block title %}تحلیل پارتو{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <h2><i class="fas fa-chart-bar me-2"></i> تحلیل پارتو</h2>
+    <a href="{{ url_for('export.download_pareto_excel', mode=mode, category=category, days=days) }}" 
+       class="btn btn-success">
+        <i class="fas fa-file-excel me-2"></i> دانلود Excel
+    </a>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">نوع تراکنش</label>
+                <select name="mode" class="form-select">
+                    <option value="خرید" {% if mode == 'خرید' %}selected{% endif %}>خرید</option>
+                    <option value="ضایعات" {% if mode == 'ضایعات' %}selected{% endif %}>ضایعات</option>
+                    <option value="مصرف" {% if mode == 'مصرف' %}selected{% endif %}>مصرف</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">گروه</label>
+                <select name="category" class="form-select">
+                    <option value="Food" {% if category == 'Food' %}selected{% endif %}>مواد غذایی</option>
+                    <option value="NonFood" {% if category == 'NonFood' %}selected{% endif %}>مواد غیرغذایی</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">دوره زمانی</label>
+                <select name="days" class="form-select">
+                    <option value="7" {% if days == 7 %}selected{% endif %}>7 روز اخیر</option>
+                    <option value="30" {% if days == 30 %}selected{% endif %}>30 روز اخیر</option>
+                    <option value="90" {% if days == 90 %}selected{% endif %}>90 روز اخیر</option>
+                    <option value="365" {% if days == 365 %}selected{% endif %}>یک سال اخیر</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="fas fa-filter me-1"></i> اعمال فیلتر
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Pareto 80/20 Validation Card -->
+<div class="card mb-4 {% if stats.pareto_valid %}border-success{% else %}border-warning{% endif %}">
+    <div class="card-header {% if stats.pareto_valid %}bg-success{% else %}bg-warning{% endif %} text-white">
+        <i class="fas fa-balance-scale me-2"></i>
+        اعتبارسنجی قانون پارتو 80/20
+    </div>
+    <div class="card-body">
+        <div class="row align-items-center">
+            <div class="col-md-4 text-center">
+                <div class="display-4 {% if stats.pareto_valid %}text-success{% else %}text-warning{% endif %}">
+                    {% if stats.pareto_valid %}✅{% else %}⚠️{% endif %}
+                </div>
+                <h5>{% if stats.pareto_valid %}قانون رعایت شده{% else %}نزدیک به پارتو{% endif %}</h5>
+            </div>
+            <div class="col-md-4">
+                <div class="text-center p-3 bg-light rounded">
+                    <div class="h2 text-primary mb-0">{{ stats.class_a_pct_items|default(0) }}%</div>
+                    <small class="text-muted">از اقلام (کلاس A)</small>
+                    <div class="mt-2">
+                        <i class="fas fa-arrow-down text-success"></i>
+                    </div>
+                    <div class="h2 text-success mb-0">{{ stats.class_a_pct_value|default(0) }}%</div>
+                    <small class="text-muted">از ارزش کل</small>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <ul class="list-unstyled mb-0">
+                    <li class="mb-2">
+                        <strong>نسبت پارتو:</strong> 
+                        <span class="badge bg-primary fs-6">{{ stats.pareto_ratio|default(0) }}x</span>
+                    </li>
+                    <li class="mb-2">
+                        <strong>ضریب جینی:</strong> 
+                        <span class="badge bg-info fs-6">{{ stats.gini_coefficient|default(0) }}</span>
+                    </li>
+                    <li>
+                        <small class="text-muted">
+                            {% if stats.pareto_valid %}
+                            توزیع داده‌ها با قانون 80/20 سازگار است
+                            {% else %}
+                            توزیع نزدیک به پارتو است (قابل قبول)
+                            {% endif %}
+                        </small>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="kpi-card primary">
+            <i class="fas fa-boxes kpi-icon"></i>
+            <div class="kpi-value">{{ stats.total_items }}</div>
+            <div class="kpi-label">تعداد کالاها</div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="kpi-card success">
+            <i class="fas fa-check-circle kpi-icon"></i>
+            <div class="kpi-value">{{ stats.class_a_count }}</div>
+            <div class="kpi-label">کلاس A (حیاتی)</div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="kpi-card warning">
+            <i class="fas fa-exclamation-circle kpi-icon"></i>
+            <div class="kpi-value">{{ stats.class_b_count }}</div>
+            <div class="kpi-label">کلاس B (مهم)</div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="kpi-card info">
+            <i class="fas fa-info-circle kpi-icon"></i>
+            <div class="kpi-value">{{ stats.class_c_count }}</div>
+            <div class="kpi-label">کلاس C (معمولی)</div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart -->
+<div class="card mb-4">
+    <div class="card-header">
+        <i class="fas fa-chart-bar me-2"></i>
+        نمودار پارتو - {{ mode }} {{ 'مواد غذایی' if category == 'Food' else 'مواد غیرغذایی' }}
+    </div>
+    <div class="card-body">
+        <canvas id="paretoChart" height="300"></canvas>
+    </div>
+</div>
+
+<!-- Data Table -->
+<div class="card">
+    <div class="card-header">
+        <i class="fas fa-table me-2"></i>
+        جدول تحلیل پارتو
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>ردیف</th>
+                        <th>کد کالا</th>
+                        <th>نام کالا</th>
+                        <th>مبلغ (ریال)</th>
+                        <th>درصد سهم</th>
+                        <th>مبلغ تجمعی</th>
+                        <th>درصد تجمعی</th>
+                        <th>کلاس ABC</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in pareto_data %}
+                    <tr>
+                        <td>{{ item.row_num }}</td>
+                        <td><code>{{ item.item_code }}</code></td>
+                        <td>{{ item.item_name }}</td>
+                        <td class="number-fa">{{ "{:,.0f}".format(item.amount) }}</td>
+                        <td>{{ item.percentage }}%</td>
+                        <td class="number-fa">{{ "{:,.0f}".format(item.cumulative_amount) }}</td>
+                        <td>
+                            <div class="progress" style="height: 20px;">
+                                <div class="progress-bar 
+                                    {% if item.cumulative_percentage <= 80 %}bg-success
+                                    {% elif item.cumulative_percentage <= 95 %}bg-warning
+                                    {% else %}bg-danger{% endif %}" 
+                                    style="width: {{ item.cumulative_percentage }}%">
+                                    {{ item.cumulative_percentage }}%
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            {% if item.abc_class == 'A' %}
+                                <span class="badge badge-a fs-6">✅ A</span>
+                            {% elif item.abc_class == 'B' %}
+                                <span class="badge badge-b fs-6">⚠️ B</span>
+                            {% else %}
+                                <span class="badge badge-c fs-6">⚪ C</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-5">
+                            <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
+                            داده‌ای برای نمایش وجود ندارد
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Pareto Principle Info -->
+<div class="card mt-4">
+    <div class="card-header bg-info text-white">
+        <i class="fas fa-lightbulb me-2"></i> اصل پارتو (قانون 80/20)
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <h6 class="fw-bold">اصل پارتو چیست؟</h6>
+                <p>اصل پارتو بیان می‌کند که تقریباً 80% نتایج از 20% علل ناشی می‌شود. در مدیریت موجودی:</p>
+                <ul>
+                    <li>حدود 20% کالاها، 80% ارزش خرید را تشکیل می‌دهند</li>
+                    <li>این کالاها نیاز به کنترل و توجه بیشتری دارند</li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <h6 class="fw-bold">کاربرد در این سیستم:</h6>
+                <ul>
+                    <li><span class="badge badge-a">کلاس A</span> 0-80% تجمعی: کنترل روزانه</li>
+                    <li><span class="badge badge-b">کلاس B</span> 80-95% تجمعی: کنترل هفتگی</li>
+                    <li><span class="badge badge-c">کلاس C</span> 95-100% تجمعی: کنترل ماهانه</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    var chartData = {{ chart_data | tojson }};
+    
+    if (chartData.labels.length > 0) {
+        var ctx = document.getElementById('paretoChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: chartData.labels,
+                datasets: [{
+                    label: 'مبلغ (ریال)',
+                    data: chartData.amounts,
+                    backgroundColor: chartData.amounts.map((_, i) => {
+                        var cumPct = chartData.cumulative[i];
+                        if (cumPct <= 80) return 'rgba(46, 125, 50, 0.7)';
+                        if (cumPct <= 95) return 'rgba(245, 127, 23, 0.7)';
+                        return 'rgba(191, 54, 12, 0.7)';
+                    }),
+                    borderColor: chartData.amounts.map((_, i) => {
+                        var cumPct = chartData.cumulative[i];
+                        if (cumPct <= 80) return 'rgba(46, 125, 50, 1)';
+                        if (cumPct <= 95) return 'rgba(245, 127, 23, 1)';
+                        return 'rgba(191, 54, 12, 1)';
+                    }),
+                    borderWidth: 1,
+                    order: 2
+                }, {
+                    label: 'درصد تجمعی',
+                    data: chartData.cumulative,
+                    type: 'line',
+                    borderColor: 'rgba(198, 40, 40, 1)',
+                    backgroundColor: 'transparent',
+                    yAxisID: 'y1',
+                    tension: 0.3,
+                    pointRadius: 5,
+                    pointBackgroundColor: 'rgba(198, 40, 40, 1)',
+                    order: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        rtl: true
+                    },
+                    tooltip: {
+                        rtl: true,
+                        callbacks: {
+                            label: function(context) {
+                                if (context.datasetIndex === 0) {
+                                    return 'مبلغ: ' + context.raw.toLocaleString('fa-IR') + ' ریال';
+                                }
+                                return 'درصد تجمعی: ' + context.raw + '%';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'مبلغ (ریال)'
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return value.toLocaleString('fa-IR');
+                            }
+                        }
+                    },
+                    y1: {
+                        beginAtZero: true,
+                        position: 'left',
+                        max: 100,
+                        title: {
+                            display: true,
+                            text: 'درصد تجمعی'
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        }
+                    }
+                }
+            }
+        });
+    }
+</script>
+{% endblock %}

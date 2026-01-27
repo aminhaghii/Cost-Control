@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+
+{% block title %}ثبت‌نام{% endblock %}
+
+{% block extra_css %}
+<style>
+    body {
+        background-image: url("{{ url_for('static', filename='images/login-bg.webp') }}") !important;
+        background-size: cover !important;
+        background-position: center !important;
+        background-attachment: fixed !important;
+        background-repeat: no-repeat !important;
+    }
+
+    /* Dark overlay */
+    body::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, rgba(15, 23, 42, 0.8), rgba(15, 23, 42, 0.6));
+        z-index: -1;
+    }
+
+    .glass-card {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        border-radius: 24px;
+    }
+
+    .form-control,
+    .form-select {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: #fff;
+    }
+
+    .form-control:focus,
+    .form-select:focus {
+        background: rgba(255, 255, 255, 0.15);
+        border-color: rgba(255, 255, 255, 0.5);
+        color: #fff;
+        box-shadow: 0 0 0 0.25rem rgba(255, 255, 255, 0.1);
+    }
+
+    .form-control::placeholder {
+        color: rgba(255, 255, 255, 0.6);
+    }
+
+    .form-label {
+        color: rgba(255, 255, 255, 0.9);
+    }
+
+    .input-group-text {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: rgba(255, 255, 255, 0.8);
+    }
+
+    .btn-success {
+        background: linear-gradient(135deg, #10b981, #059669);
+        border: none;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+    }
+
+    .btn-success:hover {
+        background: linear-gradient(135deg, #059669, #047857);
+        transform: translateY(-1px);
+    }
+
+    .text-white-muted {
+        color: rgba(255, 255, 255, 0.6) !important;
+    }
+
+    /* Hide default navbar background if possible or blend it */
+    .navbar {
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+
+    .navbar-brand {
+        color: #fff !important;
+    }
+
+    /* Custom select styling for dark background */
+    .form-select option {
+        background-color: #1e293b;
+        color: #fff;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center align-items-center" style="min-height: 80vh;">
+        <div class="col-md-8 col-lg-5">
+            <div class="glass-card p-4 p-md-5">
+                <div class="text-center mb-4">
+                    <div class="d-inline-flex align-items-center justify-content-center bg-white bg-opacity-20 rounded-circle mb-3"
+                        style="width: 70px; height: 70px;">
+                        <i class="fas fa-user-plus fa-2x text-white"></i>
+                    </div>
+                    <h3 class="fw-bold text-white mb-1">ایجاد حساب کاربری</h3>
+                    <p class="text-white-muted">به خانواده بزرگ ما بپیوندید</p>
+                </div>
+
+                <form method="POST" action="{{ url_for('auth.register') }}" class="text-end">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">نام کاربری</label>
+                        <div class="input-group">
+                            <span class="input-group-text border-end-0"><i class="fas fa-user"></i></span>
+                            <input type="text" name="username" class="form-control border-start-0"
+                                placeholder="حداقل 3 کاراکتر" required minlength="3">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">نام و نام خانوادگی</label>
+                        <div class="input-group">
+                            <span class="input-group-text border-end-0"><i class="fas fa-id-card"></i></span>
+                            <input type="text" name="full_name" class="form-control border-start-0"
+                                placeholder="نام کامل خود را وارد کنید">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">ایمیل</label>
+                        <div class="input-group">
+                            <span class="input-group-text border-end-0"><i class="fas fa-envelope"></i></span>
+                            <input type="email" name="email" class="form-control border-start-0"
+                                placeholder="example@email.com" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">نقش کاربری</label>
+                        <div class="input-group">
+                            <span class="input-group-text border-end-0"><i class="fas fa-user-tag"></i></span>
+                            <select name="role" class="form-select border-start-0" required>
+                                <option value="admin">ادمین (دسترسی کامل)</option>
+                                <option value="manager">مدیر (گزارش و تایید)</option>
+                                <option value="staff" selected>کارکنان (ثبت تراکنش)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold small">رمز عبور</label>
+                            <div class="input-group">
+                                <span class="input-group-text border-end-0"><i class="fas fa-lock"></i></span>
+                                <input type="password" name="password" class="form-control border-start-0"
+                                    placeholder="رمز عبور" required minlength="4">
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold small">تکرار رمز</label>
+                            <div class="input-group">
+                                <span class="input-group-text border-end-0"><i class="fas fa-lock"></i></span>
+                                <input type="password" name="confirm_password" class="form-control border-start-0"
+                                    placeholder="تکرار رمز" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-success btn-lg w-100 py-3 mb-4 shadow-lg">
+                        ثبت‌نام <i class="fas fa-check ms-2"></i>
+                    </button>
+                </form>
+
+                <div class="border-top border-light border-opacity-25 pt-4 text-center">
+                    <p class="mb-0 text-white-muted small">
+                        قبلاً ثبت‌نام کرده‌اید؟
+                        <a href="{{ url_for('auth.login') }}" class="text-white fw-bold text-decoration-none ms-1">وارد
+                            شوید</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

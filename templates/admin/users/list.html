@@ -1,0 +1,226 @@
+{% extends 'base.html' %}
+
+{% block title %}مدیریت کاربران{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <h2><i class="fas fa-users me-2"></i> مدیریت کاربران</h2>
+    <a href="{{ url_for('admin.users_create') }}" class="btn btn-primary">
+        <i class="fas fa-user-plus me-1"></i> افزودن کاربر
+    </a>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">جستجو</label>
+                <input type="text" name="search" class="form-control" 
+                       placeholder="نام، ایمیل، نام کاربری..." value="{{ search }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">نقش</label>
+                <select name="role" class="form-select">
+                    <option value="">همه نقش‌ها</option>
+                    {% for role, label in role_labels.items() %}
+                    <option value="{{ role }}" {{ 'selected' if role_filter == role }}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">وضعیت</label>
+                <select name="status" class="form-select">
+                    <option value="">همه</option>
+                    <option value="active" {{ 'selected' if status_filter == 'active' }}>فعال</option>
+                    <option value="inactive" {{ 'selected' if status_filter == 'inactive' }}>غیرفعال</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-outline-primary w-100">
+                    <i class="fas fa-search me-1"></i> جستجو
+                </button>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <a href="{{ url_for('admin.users_list') }}" class="btn btn-outline-secondary w-100">
+                    <i class="fas fa-times me-1"></i> پاک کردن
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Users Table -->
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>#</th>
+                        <th>نام کاربری</th>
+                        <th>نام کامل</th>
+                        <th>ایمیل</th>
+                        <th>نقش</th>
+                        <th>بخش</th>
+                        <th>وضعیت</th>
+                        <th>آخرین ورود</th>
+                        <th>عملیات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users.items %}
+                    <tr class="{{ 'table-secondary' if not user.is_active }}">
+                        <td>{{ user.id }}</td>
+                        <td>
+                            <strong>{{ user.username }}</strong>
+                            {% if user.id == current_user.id %}
+                            <span class="badge bg-info ms-1">شما</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ user.full_name or '-' }}</td>
+                        <td><small>{{ user.email }}</small></td>
+                        <td>
+                            {% if user.role == 'admin' %}
+                            <span class="badge bg-danger">
+                                <i class="fas fa-user-shield me-1"></i>{{ user.role_label }}
+                            </span>
+                            {% elif user.role == 'manager' %}
+                            <span class="badge bg-primary">
+                                <i class="fas fa-user-tie me-1"></i>{{ user.role_label }}
+                            </span>
+                            {% else %}
+                            <span class="badge bg-secondary">
+                                <i class="fas fa-user me-1"></i>{{ user.role_label }}
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td>{{ user.department or '-' }}</td>
+                        <td>
+                            {% if user.is_active %}
+                            <span class="badge bg-success">فعال</span>
+                            {% else %}
+                            <span class="badge bg-danger">غیرفعال</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if user.last_login %}
+                            <small class="text-muted">{{ user.last_login.strftime('%Y/%m/%d %H:%M') }}</small>
+                            {% else %}
+                            <small class="text-muted">هرگز</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('admin.users_edit', user_id=user.id) }}" 
+                                   class="btn btn-outline-primary" title="ویرایش">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <a href="{{ url_for('admin.user_activity', user_id=user.id) }}" 
+                                   class="btn btn-outline-info" title="فعالیت‌ها">
+                                    <i class="fas fa-history"></i>
+                                </a>
+                                {% if user.id != current_user.id %}
+                                <form action="{{ url_for('admin.users_toggle_status', user_id=user.id) }}" 
+                                      method="POST" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-outline-{{ 'danger' if user.is_active else 'success' }}"
+                                            title="{{ 'غیرفعال کردن' if user.is_active else 'فعال کردن' }}">
+                                        <i class="fas fa-{{ 'ban' if user.is_active else 'check' }}"></i>
+                                    </button>
+                                </form>
+                                <button type="button" class="btn btn-outline-danger" 
+                                        onclick="confirmDelete({{ user.id }}, '{{ user.username }}')"
+                                        title="حذف">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="9" class="text-center text-muted py-4">
+                            <i class="fas fa-users-slash fa-2x mb-2 d-block"></i>
+                            کاربری یافت نشد
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    {% if users.pages > 1 %}
+    <div class="card-footer">
+        <nav>
+            <ul class="pagination mb-0 justify-content-center">
+                {% if users.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('admin.users_list', page=users.prev_num, role=role_filter, status=status_filter, search=search) }}">
+                        قبلی
+                    </a>
+                </li>
+                {% endif %}
+                
+                {% for p in users.iter_pages() %}
+                    {% if p %}
+                    <li class="page-item {{ 'active' if p == users.page }}">
+                        <a class="page-link" href="{{ url_for('admin.users_list', page=p, role=role_filter, status=status_filter, search=search) }}">{{ p }}</a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if users.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('admin.users_list', page=users.next_num, role=role_filter, status=status_filter, search=search) }}">
+                        بعدی
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Delete Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">تأیید حذف کاربر</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>آیا از حذف کاربر <strong id="deleteUserName"></strong> اطمینان دارید؟</p>
+                <p class="text-danger mb-0">
+                    <i class="fas fa-exclamation-triangle me-1"></i>
+                    این عملیات قابل بازگشت نیست!
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button>
+                <form id="deleteForm" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash me-1"></i> حذف کاربر
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function confirmDelete(userId, username) {
+    document.getElementById('deleteUserName').textContent = username;
+    document.getElementById('deleteForm').action = '/admin/users/' + userId + '/delete';
+    new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
+</script>
+{% endblock %}

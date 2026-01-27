@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}🛒 پیشنهادات سفارش خرید{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-shopping-cart me-2"></i>پیشنهادات سفارش خرید   </h2>
+    <div>
+        <a href="{{ url_for('dashboard.index') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-right me-1"></i>بازگشت به داشبورد
+        </a>
+    </div>
+</div>
+
+{% if not ai_available %}
+<div class="alert alert-warning">
+    <i class="fas fa-exclamation-triangle me-2"></i>
+    سرویس هوش مصنوعی در دسترس نیست. نتایج بر اساس تحلیل آفلاین است.
+</div>
+{% endif %}
+
+<!-- Filter Buttons -->
+<div class="btn-group mb-4" role="group">
+    <button type="button" class="btn btn-outline-primary active" onclick="filterPriority('all')">
+        <i class="fas fa-list me-1"></i>همه
+    </button>
+    <button type="button" class="btn btn-outline-danger" onclick="filterPriority('critical')">
+        <i class="fas fa-exclamation-circle me-1"></i>بحرانی
+    </button>
+    <button type="button" class="btn btn-outline-warning" onclick="filterPriority('normal')">
+        <i class="fas fa-minus-circle me-1"></i>عادی
+    </button>
+    <button type="button" class="btn btn-outline-secondary" onclick="filterPriority('low')">
+        <i class="fas fa-arrow-down me-1"></i>پایین
+    </button>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <i class="fas fa-table me-2"></i>لیست پیشنهادات
+    </div>
+    <div class="card-body p-0">
+        {% if suggestions %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" id="suggestionsTable">
+                <thead class="table-light">
+                    <tr>
+                        <th>کد کالا</th>
+                        <th>نام کالا</th>
+                        <th>مقدار پیشنهادی</th>
+                        <th>تاریخ پیشنهادی</th>
+                        <th>اولویت</th>
+                        <th>دلیل</th>
+                        <th>اقدام</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in suggestions %}
+                    {% if item.needs_reorder %}
+                    <tr class="suggestion-row priority-{{ item.priority }}" 
+                        data-priority="{{ item.priority }}"
+                        {% if item.priority == 'critical' %}style="background-color: #f8d7da;"
+                        {% elif item.priority == 'normal' %}style="background-color: #fff3cd;"
+                        {% else %}style="background-color: #f8f9fa;"{% endif %}>
+                        <td><code>{{ item.item_code }}</code></td>
+                        <td><strong>{{ item.item_name }}</strong></td>
+                        <td>{{ item.suggested_quantity }}</td>
+                        <td>{{ item.order_date }}</td>
+                        <td>
+                            {% if item.priority == 'critical' %}
+                            <span class="badge bg-danger"><i class="fas fa-exclamation-circle me-1"></i>بحرانی</span>
+                            {% elif item.priority == 'normal' %}
+                            <span class="badge bg-warning text-dark"><i class="fas fa-minus-circle me-1"></i>عادی</span>
+                            {% else %}
+                            <span class="badge bg-secondary"><i class="fas fa-arrow-down me-1"></i>پایین</span>
+                            {% endif %}
+                        </td>
+                        <td><small>{{ item.reason }}</small></td>
+                        <td>
+                            <a href="{{ url_for('transactions.create') }}" class="btn btn-sm btn-success">
+                                <i class="fas fa-check me-1"></i>ثبت سفارش
+                            </a>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+            <h5>همه موجودی‌ها کافی است</h5>
+            <p class="text-muted">در حال حاضر نیازی به سفارش جدید نیست.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card mt-4 bg-light">
+    <div class="card-body text-center">
+        <small class="text-muted">
+            <i class="fas fa-robot me-1"></i>
+            پیشنهادات بر اساس تحلیل هوش مصنوعی و داده‌های مصرف 30 روز اخیر تولید شده است.
+        </small>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function filterPriority(priority) {
+    const rows = document.querySelectorAll('.suggestion-row');
+    const buttons = document.querySelectorAll('.btn-group .btn');
+    
+    buttons.forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    rows.forEach(row => {
+        if (priority === 'all' || row.dataset.priority === priority) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+</script>
+{% endblock %}

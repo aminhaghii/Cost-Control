@@ -1,0 +1,584 @@
+{% extends 'base.html' %}
+
+{% block title %}داشبورد - سیستم مدیریت موجودی{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <h2><i class="fas fa-tachometer-alt me-2"></i> داشبورد</h2>
+    <div>
+        <a href="{{ url_for('transactions.create') }}" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i> ثبت تراکنش جدید
+        </a>
+    </div>
+</div>
+
+<!-- KPI Cards - UX #3: Interactive Cards -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <a href="{{ url_for('transactions.list_transactions') }}?date_from={{ today }}&date_to={{ today }}" class="kpi-card-link">
+            <div class="kpi-card primary">
+                <i class="fas fa-exchange-alt kpi-icon"></i>
+                <div class="kpi-value">{{ today_transactions }}</div>
+                <div class="kpi-label">تراکنش امروز</div>
+                <i class="fas fa-arrow-left kpi-arrow"></i>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3 mb-3">
+        <a href="{{ url_for('transactions.list_transactions') }}?type=خرید&date_from={{ today }}&date_to={{ today }}" class="kpi-card-link">
+            <div class="kpi-card success">
+                <i class="fas fa-shopping-cart kpi-icon"></i>
+                <div class="kpi-value number-fa">{{ "{:,.0f}".format(today_purchase) }}</div>
+                <div class="kpi-label">خرید امروز (ریال)</div>
+                <i class="fas fa-arrow-left kpi-arrow"></i>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3 mb-3">
+        <a href="{{ url_for('transactions.list_transactions') }}?type=ضایعات&date_from={{ today }}&date_to={{ today }}" class="kpi-card-link">
+            <div class="kpi-card danger">
+                <i class="fas fa-trash kpi-icon"></i>
+                <div class="kpi-value number-fa">{{ "{:,.0f}".format(today_waste) }}</div>
+                <div class="kpi-label">ضایعات امروز (ریال)</div>
+                <i class="fas fa-arrow-left kpi-arrow"></i>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3 mb-3">
+        <a href="{{ url_for('reports.abc') }}" class="kpi-card-link">
+            <div class="kpi-card info">
+                <i class="fas fa-boxes kpi-icon"></i>
+                <div class="kpi-value">{{ total_items }}</div>
+                <div class="kpi-label">تعداد کالاها</div>
+                <i class="fas fa-arrow-left kpi-arrow"></i>
+            </div>
+        </a>
+    </div>
+</div>
+
+<!-- AI Insights Section -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-primary">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-robot me-2"></i>پیشنهادات هوشمند امروز</span>
+                <!-- UX #2: Improved Refresh Button -->
+                <button class="btn btn-sm btn-light d-flex align-items-center gap-2" 
+                        onclick="refreshInsights()" 
+                        id="refreshBtn"
+                        title="به‌روزرسانی پیشنهادات"
+                        data-bs-toggle="tooltip">
+                    <i class="fas fa-sync-alt"></i>
+                    <span class="d-none d-md-inline">به‌روزرسانی</span>
+                </button>
+            </div>
+            <div class="card-body" id="aiInsightsContainer">
+                <div class="list-group list-group-flush" id="aiInsightsList">
+                    <!-- UX #1: Improved Loading State -->
+                    <div class="loading-container text-center py-5" id="insightsLoading">
+                        <div class="spinner-grow text-primary mb-3" style="width: 3rem; height: 3rem;" role="status">
+                            <span class="visually-hidden">در حال بارگذاری...</span>
+                        </div>
+                        <p class="text-muted mb-0">در حال دریافت پیشنهادات هوشمند...</p>
+                        <small class="text-muted">لطفاً چند لحظه صبر کنید</small>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer bg-light">
+                <div class="d-flex gap-2 flex-wrap">
+                    <a href="{{ url_for('ai_analysis.analyze_pareto') }}" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-chart-pie me-1"></i>تحلیل پارتو AI
+                    </a>
+                    <a href="{{ url_for('ai_analysis.reorder_suggestions') }}" class="btn btn-sm btn-outline-success">
+                        <i class="fas fa-shopping-cart me-1"></i>پیشنهاد سفارش
+                    </a>
+                    <a href="{{ url_for('ai_analysis.waste_analysis') }}" class="btn btn-sm btn-outline-danger">
+                        <i class="fas fa-trash-alt me-1"></i>تحلیل ضایعات
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row mb-4">
+    <div class="col-md-6 mb-3">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="fas fa-chart-bar me-2"></i>
+                نمودار پارتو - مواد غذایی (30 روز اخیر)
+            </div>
+            <div class="card-body">
+                <canvas id="paretoChartFood" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-3">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="fas fa-chart-line me-2"></i>
+                روند خرید 7 روز اخیر
+            </div>
+            <div class="card-body">
+                <canvas id="trendChart" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Transactions & Alerts -->
+<div class="row">
+    <div class="col-md-8 mb-3">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-history me-2"></i> آخرین تراکنش‌ها</span>
+                <div class="d-flex gap-2">
+                    <span class="badge bg-secondary" id="transactionCount">{{ recent_transactions|length }} مورد</span>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>تاریخ</th>
+                                <th>کالا</th>
+                                <th>نوع</th>
+                                <th>مقدار</th>
+                                <th>مبلغ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactionsTableBody">
+                            {% for trans in recent_transactions %}
+                            <tr>
+                                <td>{{ trans.transaction_date.strftime('%Y/%m/%d') }}</td>
+                                <td>{{ trans.item.item_name_fa if trans.item else '-' }}</td>
+                                <td>
+                                    {% if trans.transaction_type == 'خرید' %}
+                                        <span class="badge bg-success">{{ trans.transaction_type }}</span>
+                                    {% elif trans.transaction_type == 'ضایعات' %}
+                                        <span class="badge bg-danger">{{ trans.transaction_type }}</span>
+                                    {% elif trans.transaction_type == 'مصرف' %}
+                                        <span class="badge bg-info">{{ trans.transaction_type }}</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ trans.transaction_type }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="number-fa">{{ "{:,.2f}".format(trans.quantity) }}</td>
+                                <td class="number-fa">{{ "{:,.0f}".format(trans.total_amount) }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-4">
+                                    <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
+                                    تراکنشی ثبت نشده است
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <!-- UX #5: Load More Button -->
+            <div class="card-footer bg-light d-flex justify-content-between align-items-center">
+                <button class="btn btn-outline-primary btn-sm" id="loadMoreBtn" onclick="loadMoreTransactions()">
+                    <i class="fas fa-plus-circle me-1"></i>
+                    نمایش بیشتر
+                </button>
+                <a href="{{ url_for('transactions.list_transactions') }}" class="btn btn-link btn-sm">
+                    <i class="fas fa-list me-1"></i>مشاهده همه
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-bell me-2"></i> هشدارها
+            </div>
+            <div class="card-body">
+                {% for alert in alerts %}
+                <div class="alert alert-{{ alert.severity }} py-2 mb-2" role="alert">
+                    <small>
+                        <i class="fas fa-exclamation-circle me-1"></i>
+                        {{ alert.message }}
+                    </small>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="fas fa-check-circle fa-2x mb-2 d-block text-success"></i>
+                    هشداری وجود ندارد
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- Quick Links -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <i class="fas fa-link me-2"></i> دسترسی سریع
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('reports.executive_summary') }}" class="btn btn-warning">
+                        <i class="fas fa-briefcase me-2"></i> خلاصه مدیریتی
+                    </a>
+                    <a href="{{ url_for('reports.pareto') }}" class="btn btn-outline-primary">
+                        <i class="fas fa-chart-bar me-2"></i> گزارش پارتو
+                    </a>
+                    <a href="{{ url_for('reports.abc') }}" class="btn btn-outline-success">
+                        <i class="fas fa-layer-group me-2"></i> طبقه‌بندی ABC
+                    </a>
+                    <a href="{{ url_for('export.download_pareto_excel') }}" class="btn btn-outline-info">
+                        <i class="fas fa-file-excel me-2"></i> دانلود Excel
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    var chartDataFood = {{ chart_data_food | tojson }};
+    var last7Days = {{ last_7_days | tojson }};
+    
+    // UX #4: Enhanced Chart Tooltip Options (Persian)
+    const chartTooltipOptions = {
+        enabled: true,
+        mode: 'index',
+        intersect: false,
+        rtl: true,
+        textDirection: 'rtl',
+        callbacks: {
+            title: function(context) {
+                return context[0].label;
+            },
+            label: function(context) {
+                let label = context.dataset.label || '';
+                if (label) label += ': ';
+                if (context.dataset.yAxisID === 'y1') {
+                    label += context.parsed.y.toFixed(1) + '%';
+                } else {
+                    label += new Intl.NumberFormat('fa-IR').format(context.parsed.y) + ' ریال';
+                }
+                return label;
+            }
+        },
+        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        titleColor: '#fff',
+        bodyColor: '#fff',
+        titleFont: { family: 'Vazirmatn', size: 14, weight: 'bold' },
+        bodyFont: { family: 'Vazirmatn', size: 13 },
+        borderColor: '#1976D2',
+        borderWidth: 1,
+        padding: 12,
+        displayColors: true,
+        cornerRadius: 8
+    };
+    
+    // Pareto Chart - Food with Enhanced Tooltips
+    if (chartDataFood.labels.length > 0) {
+        var ctxFood = document.getElementById('paretoChartFood').getContext('2d');
+        new Chart(ctxFood, {
+            type: 'bar',
+            data: {
+                labels: chartDataFood.labels,
+                datasets: [{
+                    label: 'مبلغ (ریال)',
+                    data: chartDataFood.amounts,
+                    backgroundColor: 'rgba(25, 118, 210, 0.7)',
+                    borderColor: 'rgba(25, 118, 210, 1)',
+                    borderWidth: 1
+                }, {
+                    label: 'درصد تجمعی',
+                    data: chartDataFood.cumulative,
+                    type: 'line',
+                    borderColor: 'rgba(244, 67, 54, 1)',
+                    backgroundColor: 'transparent',
+                    yAxisID: 'y1',
+                    tension: 0.3,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { position: 'top', rtl: true },
+                    tooltip: chartTooltipOptions
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        position: 'right',
+                        ticks: {
+                            callback: function(value) {
+                                return value.toLocaleString('fa-IR');
+                            }
+                        }
+                    },
+                    y1: {
+                        beginAtZero: true,
+                        position: 'left',
+                        max: 100,
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Trend Chart with Enhanced Tooltips
+    var ctxTrend = document.getElementById('trendChart').getContext('2d');
+    new Chart(ctxTrend, {
+        type: 'line',
+        data: {
+            labels: last7Days.map(d => d.date),
+            datasets: [{
+                label: 'خرید روزانه (ریال)',
+                data: last7Days.map(d => d.amount),
+                borderColor: 'rgba(46, 125, 50, 1)',
+                backgroundColor: 'rgba(46, 125, 50, 0.1)',
+                fill: true,
+                tension: 0.4,
+                pointRadius: 5,
+                pointHoverRadius: 8,
+                pointBackgroundColor: 'rgba(46, 125, 50, 1)'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { position: 'top', rtl: true },
+                tooltip: chartTooltipOptions
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    position: 'right',
+                    ticks: {
+                        callback: function(value) {
+                            return value.toLocaleString('fa-IR');
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    // UX #2: Improved AI Insights with Toast Feedback
+    function refreshInsights() {
+        const container = document.getElementById('aiInsightsList');
+        const btn = document.getElementById('refreshBtn');
+        const btnIcon = btn.querySelector('i');
+        
+        btn.disabled = true;
+        btn.classList.add('opacity-75');
+        btnIcon.classList.add('fa-spin');
+        
+        container.innerHTML = `
+            <div class="loading-container text-center py-5">
+                <div class="spinner-grow text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
+                <p class="text-muted mb-0">در حال دریافت پیشنهادات هوشمند...</p>
+            </div>`;
+        
+        fetch('/ai/daily-insights')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.insights) {
+                    let html = '';
+                    data.insights.forEach(insight => {
+                        let typeClass = 'list-group-item-light';
+                        if (insight.type === 'warning') typeClass = 'list-group-item-warning';
+                        else if (insight.type === 'success') typeClass = 'list-group-item-success';
+                        else if (insight.type === 'info') typeClass = 'list-group-item-info';
+                        
+                        html += `<a href="${insight.link}" class="list-group-item list-group-item-action ${typeClass} d-flex align-items-center">
+                            <span class="me-2 fs-5">${insight.icon}</span>
+                            <span class="flex-grow-1">${insight.text}</span>
+                            <i class="fas fa-chevron-left text-muted"></i>
+                        </a>`;
+                    });
+                    container.innerHTML = html || '<div class="text-center py-4 text-muted"><i class="fas fa-inbox fa-2x mb-2 d-block"></i>بینشی یافت نشد</div>';
+                    showToast('پیشنهادات با موفقیت به‌روزرسانی شد', 'success');
+                } else {
+                    container.innerHTML = '<div class="text-center py-4 text-muted"><i class="fas fa-exclamation-circle fa-2x mb-2 d-block"></i>خطا در دریافت بینش‌ها</div>';
+                    showToast('خطا در دریافت پیشنهادات', 'danger');
+                }
+            })
+            .catch(err => {
+                container.innerHTML = '<div class="text-center py-4 text-muted"><i class="fas fa-wifi fa-2x mb-2 d-block"></i>خطا در ارتباط با سرور</div>';
+                showToast('خطا در ارتباط با سرور', 'danger');
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.classList.remove('opacity-75');
+                btnIcon.classList.remove('fa-spin');
+            });
+    }
+    
+    // UX #5: Load More Transactions
+    let transactionPage = 1;
+    const perPage = 10;
+    
+    function loadMoreTransactions() {
+        const btn = document.getElementById('loadMoreBtn');
+        const tbody = document.getElementById('transactionsTableBody');
+        const countBadge = document.getElementById('transactionCount');
+        
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>در حال بارگذاری...';
+        
+        transactionPage++;
+        
+        fetch(`/transactions/api/list?page=${transactionPage}&per_page=${perPage}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.transactions && data.transactions.length > 0) {
+                    data.transactions.forEach(trans => {
+                        let badgeClass = 'bg-secondary';
+                        if (trans.type === 'خرید') badgeClass = 'bg-success';
+                        else if (trans.type === 'ضایعات') badgeClass = 'bg-danger';
+                        else if (trans.type === 'مصرف') badgeClass = 'bg-info';
+                        
+                        const row = `<tr class="fade-in">
+                            <td>${trans.date}</td>
+                            <td>${trans.item_name}</td>
+                            <td><span class="badge ${badgeClass}">${trans.type}</span></td>
+                            <td class="number-fa">${trans.quantity}</td>
+                            <td class="number-fa">${trans.amount}</td>
+                        </tr>`;
+                        tbody.insertAdjacentHTML('beforeend', row);
+                    });
+                    
+                    // Update count
+                    const currentCount = parseInt(countBadge.textContent) + data.transactions.length;
+                    countBadge.textContent = currentCount + ' مورد';
+                    
+                    if (!data.has_more) {
+                        btn.style.display = 'none';
+                    }
+                } else {
+                    btn.style.display = 'none';
+                    showToast('تراکنش بیشتری وجود ندارد', 'info');
+                }
+            })
+            .catch(err => {
+                showToast('خطا در بارگذاری تراکنش‌ها', 'danger');
+                transactionPage--;
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-plus-circle me-1"></i>نمایش بیشتر';
+            });
+    }
+    
+    // Toast notification helper
+    function showToast(message, type = 'info') {
+        const toastContainer = document.getElementById('toastContainer') || createToastContainer();
+        const toastId = 'toast_' + Date.now();
+        
+        const icons = {
+            success: 'fa-check-circle',
+            danger: 'fa-exclamation-circle',
+            warning: 'fa-exclamation-triangle',
+            info: 'fa-info-circle'
+        };
+        
+        const toastHtml = `
+            <div id="${toastId}" class="toast align-items-center text-white bg-${type} border-0" role="alert">
+                <div class="d-flex">
+                    <div class="toast-body">
+                        <i class="fas ${icons[type]} me-2"></i>${message}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>
+            </div>`;
+        
+        toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+        const toast = new bootstrap.Toast(document.getElementById(toastId), { delay: 3000 });
+        toast.show();
+    }
+    
+    function createToastContainer() {
+        const container = document.createElement('div');
+        container.id = 'toastContainer';
+        container.className = 'toast-container position-fixed top-0 start-50 translate-middle-x p-3';
+        container.style.zIndex = '1100';
+        document.body.appendChild(container);
+        return container;
+    }
+    
+    // Initialize tooltips and load insights
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize Bootstrap tooltips
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function(el) { return new bootstrap.Tooltip(el); });
+        
+        // Load AI insights
+        refreshInsights();
+    });
+</script>
+
+<style>
+/* UX #3: Interactive KPI Cards */
+.kpi-card-link {
+    text-decoration: none;
+    display: block;
+}
+.kpi-card-link .kpi-card {
+    transition: all 0.3s ease;
+    cursor: pointer;
+    position: relative;
+}
+.kpi-card-link:hover .kpi-card {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+.kpi-card-link:active .kpi-card {
+    transform: translateY(-2px);
+}
+.kpi-card .kpi-arrow {
+    position: absolute;
+    bottom: 1rem;
+    left: 1rem;
+    opacity: 0;
+    transition: all 0.3s ease;
+    font-size: 1.2rem;
+}
+.kpi-card-link:hover .kpi-arrow {
+    opacity: 0.7;
+    left: 0.5rem;
+}
+
+/* Fade-in animation for new rows */
+.fade-in {
+    animation: fadeIn 0.5s ease;
+}
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Loading container */
+.loading-container {
+    min-height: 150px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}تنظیمات انبار{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="mb-4">
+        <h2><i class="fas fa-cog me-2"></i>تنظیمات انبار</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="{{ url_for('warehouse.dashboard', hotel_id=hotel_id) }}">انبار</a></li>
+                <li class="breadcrumb-item active">تنظیمات</li>
+            </ol>
+        </nav>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-body">
+                    <form method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        
+                        <h5 class="mb-3">حدود تایید</h5>
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label">حد تایید ضایعات (ریال)</label>
+                                <input type="number" name="waste_approval_threshold" class="form-control" 
+                                       value="{{ settings.waste_approval_threshold|int }}" min="0">
+                                <small class="text-muted">ضایعات بالای این مبلغ نیاز به تایید دارد</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">حد تایید اصلاحی (واحد)</label>
+                                <input type="number" name="adjustment_approval_threshold" class="form-control" 
+                                       value="{{ settings.adjustment_approval_threshold }}" min="0" step="0.1">
+                                <small class="text-muted">اصلاحی بالای این تعداد نیاز به تایید دارد</small>
+                            </div>
+                        </div>
+
+                        <h5 class="mb-3">هشدارها</h5>
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label">درصد هشدار ضایعات (%)</label>
+                                <input type="number" name="waste_alert_percentage" class="form-control" 
+                                       value="{{ settings.waste_alert_percentage }}" min="0" max="100" step="0.1">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">درصد هشدار مغایرت (%)</label>
+                                <input type="number" name="variance_alert_percentage" class="form-control" 
+                                       value="{{ settings.variance_alert_percentage }}" min="0" max="100" step="0.1">
+                            </div>
+                        </div>
+
+                        <h5 class="mb-3">شمارش موجودی</h5>
+                        <div class="mb-4">
+                            <label class="form-label">دوره شمارش (روز)</label>
+                            <input type="number" name="count_frequency_days" class="form-control" 
+                                   value="{{ settings.count_frequency_days }}" min="1" max="365">
+                            <small class="text-muted">هر چند روز یک‌بار باید شمارش انجام شود</small>
+                        </div>
+
+                        <h5 class="mb-3">اعلان‌ها</h5>
+                        <div class="mb-4">
+                            <div class="form-check mb-2">
+                                <input type="checkbox" name="notify_on_low_stock" class="form-check-input" id="notifyLowStock"
+                                       {% if settings.notify_on_low_stock %}checked{% endif %}>
+                                <label class="form-check-label" for="notifyLowStock">هشدار موجودی کم</label>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input type="checkbox" name="notify_on_high_waste" class="form-check-input" id="notifyHighWaste"
+                                       {% if settings.notify_on_high_waste %}checked{% endif %}>
+                                <label class="form-check-label" for="notifyHighWaste">هشدار ضایعات بالا</label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" name="notify_on_variance" class="form-check-input" id="notifyVariance"
+                                       {% if settings.notify_on_variance %}checked{% endif %}>
+                                <label class="form-check-label" for="notifyVariance">هشدار مغایرت موجودی</label>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i>ذخیره تنظیمات
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

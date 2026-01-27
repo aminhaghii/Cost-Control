@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}شمارش موجودی جدید{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-clipboard-check me-2"></i>شمارش موجودی جدید</h2>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="{{ url_for('warehouse.dashboard', hotel_id=hotel_id) }}">انبار</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('warehouse.count_list', hotel_id=hotel_id) }}">شمارش</a></li>
+                    <li class="breadcrumb-item active">جدید</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">ثبت شمارش فیزیکی</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="countForm">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        
+                        <div class="mb-3">
+                            <label for="item_id" class="form-label">کالا <span class="text-danger">*</span></label>
+                            <select name="item_id" id="item_id" class="form-select" required>
+                                <option value="">انتخاب کنید...</option>
+                                {% for item in items %}
+                                <option value="{{ item.id }}" data-stock="{{ item.current_stock }}" data-unit="{{ item.unit }}">
+                                    {{ item.item_name_fa }} (موجودی سیستم: {{ item.current_stock|round(2) }} {{ item.unit }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">موجودی سیستم</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="systemStock" readonly>
+                                    <span class="input-group-text" id="unitLabel">واحد</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="physical_quantity" class="form-label">موجودی فیزیکی <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <input type="number" step="0.001" min="0" name="physical_quantity" id="physical_quantity" 
+                                           class="form-control" required placeholder="مقدار شمارش شده">
+                                    <span class="input-group-text" id="unitLabel2">واحد</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="count_date" class="form-label">تاریخ شمارش</label>
+                            <input type="date" name="count_date" id="count_date" class="form-control" value="{{ today }}">
+                        </div>
+
+                        <!-- Variance Preview -->
+                        <div class="alert alert-info d-none" id="variancePreview">
+                            <strong>پیش‌نمایش مغایرت:</strong>
+                            <span id="varianceText"></span>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i>ثبت شمارش
+                            </button>
+                            <a href="{{ url_for('warehouse.count_list', hotel_id=hotel_id) }}" class="btn btn-outline-secondary">انصراف</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Items Needing Count -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h6 class="mb-0"><i class="fas fa-clock me-2"></i>نیاز به شمارش</h6>
+                </div>
+                <div class="card-body p-0">
+                    <ul class="list-group list-group-flush">
+                        {% for data in items_needing_count[:10] %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ data.item.item_name_fa }}</strong>
+                                <br>
+                                <small class="text-muted">
+                                    {% if data.days_since_count %}
+                                    {{ data.days_since_count }} روز پیش
+                                    {% else %}
+                                    هرگز شمارش نشده
+                                    {% endif %}
+                                </small>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-primary select-item" data-id="{{ data.item.id }}">
+                                انتخاب
+                            </button>
+                        </li>
+                        {% else %}
+                        <li class="list-group-item text-muted text-center">همه اقلام به‌روز هستند</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const itemSelect = document.getElementById('item_id');
+    const systemStock = document.getElementById('systemStock');
+    const physicalQty = document.getElementById('physical_quantity');
+    const unitLabel = document.getElementById('unitLabel');
+    const unitLabel2 = document.getElementById('unitLabel2');
+    const variancePreview = document.getElementById('variancePreview');
+    const varianceText = document.getElementById('varianceText');
+
+    function updatePreview() {
+        const selected = itemSelect.options[itemSelect.selectedIndex];
+        if (selected && selected.value) {
+            const stock = parseFloat(selected.dataset.stock) || 0;
+            const unit = selected.dataset.unit || 'واحد';
+            
+            systemStock.value = stock.toFixed(2);
+            unitLabel.textContent = unit;
+            unitLabel2.textContent = unit;
+
+            const physical = parseFloat(physicalQty.value) || 0;
+            const variance = physical - stock;
+            
+            if (physicalQty.value) {
+                variancePreview.classList.remove('d-none');
+                if (variance === 0) {
+                    variancePreview.className = 'alert alert-success';
+                    varianceText.textContent = 'بدون مغایرت ✓';
+                } else if (variance > 0) {
+                    variancePreview.className = 'alert alert-info';
+                    varianceText.textContent = `+${variance.toFixed(2)} ${unit} (اضافه موجودی)`;
+                } else {
+                    variancePreview.className = 'alert alert-warning';
+                    varianceText.textContent = `${variance.toFixed(2)} ${unit} (کسری موجودی)`;
+                }
+            } else {
+                variancePreview.classList.add('d-none');
+            }
+        } else {
+            systemStock.value = '';
+            variancePreview.classList.add('d-none');
+        }
+    }
+
+    itemSelect.addEventListener('change', updatePreview);
+    physicalQty.addEventListener('input', updatePreview);
+
+    // Quick select from sidebar
+    document.querySelectorAll('.select-item').forEach(btn => {
+        btn.addEventListener('click', function() {
+            itemSelect.value = this.dataset.id;
+            updatePreview();
+            physicalQty.focus();
+        });
+    });
+});
+</script>
+{% endblock %}

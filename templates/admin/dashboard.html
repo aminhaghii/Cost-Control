@@ -1,0 +1,231 @@
+{% extends 'base.html' %}
+
+{% block title %}پنل مدیریت - داشبورد{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <h2><i class="fas fa-shield-alt me-2"></i> پنل مدیریت سیستم</h2>
+    <span class="badge bg-danger fs-6">
+        <i class="fas fa-user-shield me-1"></i> {{ current_user.role_label }}
+    </span>
+</div>
+
+<!-- Admin Stats Cards -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card bg-primary text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title mb-0">کاربران</h6>
+                        <h2 class="mb-0">{{ total_users }}</h2>
+                        <small>{{ active_users }} فعال</small>
+                    </div>
+                    <i class="fas fa-users fa-3x opacity-50"></i>
+                </div>
+            </div>
+            <div class="card-footer bg-transparent border-0">
+                <a href="{{ url_for('admin.users_list') }}" class="text-white">
+                    <i class="fas fa-arrow-left me-1"></i> مدیریت کاربران
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card bg-success text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title mb-0">کالاها</h6>
+                        <h2 class="mb-0">{{ total_items }}</h2>
+                        <small>در سیستم</small>
+                    </div>
+                    <i class="fas fa-boxes fa-3x opacity-50"></i>
+                </div>
+            </div>
+            <div class="card-footer bg-transparent border-0">
+                <a href="{{ url_for('admin.items_list') }}" class="text-white">
+                    <i class="fas fa-arrow-left me-1"></i> مدیریت کالاها
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card bg-info text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title mb-0">تراکنش‌ها</h6>
+                        <h2 class="mb-0">{{ total_transactions }}</h2>
+                        <small>ثبت شده</small>
+                    </div>
+                    <i class="fas fa-exchange-alt fa-3x opacity-50"></i>
+                </div>
+            </div>
+            <div class="card-footer bg-transparent border-0">
+                <a href="{{ url_for('transactions.list_transactions') }}" class="text-white">
+                    <i class="fas fa-arrow-left me-1"></i> مشاهده تراکنش‌ها
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card bg-warning text-dark h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title mb-0">فعالیت ۲۴ ساعته</h6>
+                        <h2 class="mb-0">{{ recent_logs }}</h2>
+                        <small>رویداد</small>
+                    </div>
+                    <i class="fas fa-history fa-3x opacity-50"></i>
+                </div>
+            </div>
+            <div class="card-footer bg-transparent border-0">
+                <a href="{{ url_for('admin.logs_list') }}" class="text-dark">
+                    <i class="fas fa-arrow-left me-1"></i> مشاهده لاگ‌ها
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Users by Role -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="fas fa-user-tag me-2"></i> کاربران بر اساس نقش
+            </div>
+            <div class="card-body">
+                <div class="list-group list-group-flush">
+                    {% for role, count in users_by_role.items() %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>
+                            {% if role == 'admin' %}
+                            <i class="fas fa-user-shield text-danger me-2"></i>
+                            {% elif role == 'manager' %}
+                            <i class="fas fa-user-tie text-primary me-2"></i>
+                            {% else %}
+                            <i class="fas fa-user text-secondary me-2"></i>
+                            {% endif %}
+                            {{ role_labels.get(role, role) }}
+                        </span>
+                        <span class="badge bg-secondary rounded-pill">{{ count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-clock me-2"></i> آخرین فعالیت‌ها</span>
+                <a href="{{ url_for('admin.logs_list') }}" class="btn btn-sm btn-outline-primary">
+                    مشاهده همه
+                </a>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>زمان</th>
+                                <th>کاربر</th>
+                                <th>عملیات</th>
+                                <th>منبع</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in recent_activity %}
+                            <tr>
+                                <td>
+                                    <small class="text-muted">
+                                        {{ log.created_at.strftime('%H:%M:%S') }}
+                                    </small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{{ 'danger' if log.user_role == 'admin' else 'primary' if log.user_role == 'manager' else 'secondary' }}">
+                                        {{ log.username }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if log.action == 'create' %}
+                                    <span class="text-success"><i class="fas fa-plus-circle me-1"></i></span>
+                                    {% elif log.action == 'update' %}
+                                    <span class="text-warning"><i class="fas fa-edit me-1"></i></span>
+                                    {% elif log.action == 'delete' %}
+                                    <span class="text-danger"><i class="fas fa-trash me-1"></i></span>
+                                    {% elif log.action == 'login' %}
+                                    <span class="text-info"><i class="fas fa-sign-in-alt me-1"></i></span>
+                                    {% else %}
+                                    <span class="text-muted"><i class="fas fa-circle me-1"></i></span>
+                                    {% endif %}
+                                    {{ log.action_label }}
+                                </td>
+                                <td>
+                                    {{ log.resource_label }}
+                                    {% if log.resource_name %}
+                                    <small class="text-muted">({{ log.resource_name }})</small>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-4">
+                                    فعالیتی ثبت نشده است
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-bolt me-2"></i> دسترسی سریع
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <a href="{{ url_for('admin.users_create') }}" class="btn btn-outline-primary w-100 py-3">
+                            <i class="fas fa-user-plus fa-2x d-block mb-2"></i>
+                            افزودن کاربر جدید
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{{ url_for('admin.items_create') }}" class="btn btn-outline-success w-100 py-3">
+                            <i class="fas fa-plus-circle fa-2x d-block mb-2"></i>
+                            افزودن کالای جدید
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{{ url_for('admin.logs_list') }}" class="btn btn-outline-warning w-100 py-3">
+                            <i class="fas fa-file-alt fa-2x d-block mb-2"></i>
+                            گزارش فعالیت‌ها
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{{ url_for('admin.logs_export') }}" class="btn btn-outline-info w-100 py-3">
+                            <i class="fas fa-download fa-2x d-block mb-2"></i>
+                            خروجی لاگ‌ها
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

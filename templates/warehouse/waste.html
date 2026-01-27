@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+
+{% block title %}تحلیل ضایعات{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-chart-pie me-2"></i>تحلیل ضایعات</h2>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="{{ url_for('warehouse.dashboard', hotel_id=hotel_id) }}">انبار</a></li>
+                    <li class="breadcrumb-item active">ضایعات</li>
+                </ol>
+            </nav>
+        </div>
+        <div>
+            <form method="GET" class="d-flex gap-2">
+                <input type="hidden" name="hotel_id" value="{{ hotel_id }}">
+                <select name="days" class="form-select" onchange="this.form.submit()">
+                    <option value="7" {% if days == 7 %}selected{% endif %}>۷ روز</option>
+                    <option value="30" {% if days == 30 %}selected{% endif %}>۳۰ روز</option>
+                    <option value="90" {% if days == 90 %}selected{% endif %}>۹۰ روز</option>
+                    <option value="365" {% if days == 365 %}selected{% endif %}>۱ سال</option>
+                </select>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <h3 class="{% if summary.status == 'critical' %}text-danger{% elif summary.status == 'warning' %}text-warning{% else %}text-success{% endif %}">
+                        {{ summary.waste_rate }}%
+                    </h3>
+                    <p class="text-muted mb-0">نرخ ضایعات</p>
+                    <small class="text-muted">(هدف: زیر {{ summary.target_rate }}%)</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <h3>{{ "{:,.0f}".format(summary.total_waste) }}</h3>
+                    <p class="text-muted mb-0">مجموع ضایعات (ریال)</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <h3>{{ "{:,.0f}".format(summary.total_purchase) }}</h3>
+                    <p class="text-muted mb-0">مجموع خرید (ریال)</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100 {% if summary.savings_potential > 0 %}border-success{% endif %}">
+                <div class="card-body text-center">
+                    <h3 class="text-success">{{ "{:,.0f}".format(summary.savings_potential) }}</h3>
+                    <p class="text-muted mb-0">پتانسیل صرفه‌جویی</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Waste by Reason -->
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-list-ul me-2"></i>ضایعات به تفکیک دلیل</h5>
+                </div>
+                <div class="card-body">
+                    {% if by_reason %}
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>دلیل</th>
+                                    <th>مبلغ</th>
+                                    <th>تعداد</th>
+                                    <th>درصد</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for r in by_reason %}
+                                <tr>
+                                    <td>{{ r.reason_label }}</td>
+                                    <td>{{ "{:,.0f}".format(r.amount) }}</td>
+                                    <td>{{ r.count }}</td>
+                                    <td>
+                                        <div class="progress" style="height: 20px;">
+                                            <div class="progress-bar bg-danger" style="width: {{ r.percentage }}%">
+                                                {{ r.percentage }}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center">داده‌ای وجود ندارد</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Wasted Items -->
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-sort-amount-down me-2"></i>پرضایعات‌ترین اقلام</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if top_wasted %}
+                    <ul class="list-group list-group-flush">
+                        {% for data in top_wasted %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ data.item.item_name_fa }}</strong>
+                                <br>
+                                <small class="text-muted">{{ data.waste_count }} بار - {{ data.waste_quantity|round(2) }} {{ data.item.unit }}</small>
+                            </div>
+                            <span class="badge bg-danger">{{ "{:,.0f}".format(data.waste_amount) }} ریال</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted text-center py-3">داده‌ای وجود ندارد</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Trend Chart -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>روند ضایعات ماهانه</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="wasteTrendChart" height="100"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/chart.umd.min.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('wasteTrendChart').getContext('2d');
+    
+    const trendData = {{ trend|tojson }};
+    
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: trendData.map(d => d.month),
+            datasets: [{
+                label: 'نرخ ضایعات (%)',
+                data: trendData.map(d => d.waste_rate),
+                borderColor: 'rgb(220, 53, 69)',
+                backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'top',
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'درصد ضایعات'
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

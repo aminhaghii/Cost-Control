@@ -1,0 +1,290 @@
+{% extends 'base.html' %}
+
+{% block title %}خلاصه اجرایی مدیریتی{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <h2><i class="fas fa-briefcase me-2"></i> خلاصه اجرایی مدیریتی</h2>
+    <div class="d-flex gap-2">
+        <select id="daysFilter" class="form-select form-select-sm" style="width: auto;" onchange="changeDays(this.value)">
+            <option value="7" {% if days == 7 %}selected{% endif %}>۷ روز</option>
+            <option value="30" {% if days == 30 %}selected{% endif %}>۳۰ روز</option>
+            <option value="90" {% if days == 90 %}selected{% endif %}>۹۰ روز</option>
+        </select>
+        <button onclick="window.print()" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-print me-1"></i> چاپ
+        </button>
+    </div>
+</div>
+
+<!-- Hero Stats -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card bg-primary text-white h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-shopping-cart fa-2x mb-2"></i>
+                <h3 class="mb-0">{{ "{:,.0f}".format(total_purchase) }}</h3>
+                <small>کل خرید (ریال)</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card bg-danger text-white h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-trash fa-2x mb-2"></i>
+                <h3 class="mb-0">{{ "{:,.0f}".format(total_waste) }}</h3>
+                <small>کل ضایعات ({{ "{:.1f}".format(waste_ratio) }}%)</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card bg-success text-white h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-piggy-bank fa-2x mb-2"></i>
+                <h3 class="mb-0">{{ "{:,.0f}".format(potential_savings) }}</h3>
+                <small>فرصت صرفه‌جویی</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card {% if change_percentage > 0 %}bg-warning{% else %}bg-info{% endif %} text-white h-100">
+            <div class="card-body text-center">
+                <i class="fas {% if change_percentage > 0 %}fa-arrow-up{% else %}fa-arrow-down{% endif %} fa-2x mb-2"></i>
+                <h3 class="mb-0">{{ "{:.1f}".format(change_percentage|abs) }}%</h3>
+                <small>{% if change_percentage > 0 %}افزایش{% else %}کاهش{% endif %} نسبت به قبل</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Pareto Validation Cards -->
+<div class="row mb-4">
+    <div class="col-md-6 mb-3">
+        <div class="card h-100 {% if food_stats.pareto_valid %}border-success{% else %}border-warning{% endif %}">
+            <div class="card-header {% if food_stats.pareto_valid %}bg-success{% else %}bg-warning{% endif %} text-white">
+                <i class="fas fa-utensils me-2"></i> تحلیل پارتو - مواد غذایی
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-4">
+                        <div class="display-6 text-primary">{{ food_stats.class_a_pct_items }}%</div>
+                        <small class="text-muted">اقلام حیاتی</small>
+                    </div>
+                    <div class="col-4">
+                        <div class="display-6 text-success">{{ food_stats.class_a_pct_value }}%</div>
+                        <small class="text-muted">سهم ارزش</small>
+                    </div>
+                    <div class="col-4">
+                        <div class="display-6 {% if food_stats.pareto_valid %}text-success{% else %}text-warning{% endif %}">
+                            {% if food_stats.pareto_valid %}✅{% else %}⚠️{% endif %}
+                        </div>
+                        <small class="text-muted">قانون 80/20</small>
+                    </div>
+                </div>
+                <hr>
+                <div class="d-flex justify-content-between">
+                    <span>نسبت پارتو:</span>
+                    <strong>{{ food_stats.pareto_ratio }}x</strong>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span>ضریب جینی:</span>
+                    <strong>{{ food_stats.gini_coefficient }}</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-3">
+        <div class="card h-100 {% if nonfood_stats.pareto_valid %}border-success{% else %}border-warning{% endif %}">
+            <div class="card-header {% if nonfood_stats.pareto_valid %}bg-success{% else %}bg-warning{% endif %} text-white">
+                <i class="fas fa-box me-2"></i> تحلیل پارتو - مواد غیرغذایی
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-4">
+                        <div class="display-6 text-primary">{{ nonfood_stats.class_a_pct_items|default(0) }}%</div>
+                        <small class="text-muted">اقلام حیاتی</small>
+                    </div>
+                    <div class="col-4">
+                        <div class="display-6 text-success">{{ nonfood_stats.class_a_pct_value|default(0) }}%</div>
+                        <small class="text-muted">سهم ارزش</small>
+                    </div>
+                    <div class="col-4">
+                        <div class="display-6 {% if nonfood_stats.pareto_valid %}text-success{% else %}text-warning{% endif %}">
+                            {% if nonfood_stats.pareto_valid %}✅{% else %}⚠️{% endif %}
+                        </div>
+                        <small class="text-muted">قانون 80/20</small>
+                    </div>
+                </div>
+                <hr>
+                <div class="d-flex justify-content-between">
+                    <span>نسبت پارتو:</span>
+                    <strong>{{ nonfood_stats.pareto_ratio|default(0) }}x</strong>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span>ضریب جینی:</span>
+                    <strong>{{ nonfood_stats.gini_coefficient|default(0) }}</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Action Items -->
+{% if action_items %}
+<div class="card mb-4 border-primary">
+    <div class="card-header bg-primary text-white">
+        <i class="fas fa-tasks me-2"></i> پیشنهادات عملی برای مدیریت
+    </div>
+    <div class="card-body p-0">
+        <div class="list-group list-group-flush">
+            {% for item in action_items %}
+            <div class="list-group-item list-group-item-{{ item.type }}">
+                <div class="d-flex align-items-start">
+                    <span class="fs-3 me-3">{{ item.icon }}</span>
+                    <div class="flex-grow-1">
+                        <h6 class="mb-1 fw-bold">{{ item.title }}</h6>
+                        <p class="mb-1 small">{{ item.description }}</p>
+                        <span class="badge bg-dark">{{ "{:,.0f}".format(item.amount) }} ریال</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Top Items -->
+<div class="row">
+    <!-- Top Food Items -->
+    <div class="col-md-4 mb-3">
+        <div class="card h-100">
+            <div class="card-header bg-success text-white">
+                <i class="fas fa-medal me-2"></i> ۵ قلم برتر غذایی (کلاس A)
+            </div>
+            <div class="card-body p-0">
+                <ol class="list-group list-group-flush list-group-numbered">
+                    {% for item in top_food %}
+                    <li class="list-group-item d-flex justify-content-between align-items-start">
+                        <div class="ms-2 me-auto">
+                            <div class="fw-bold">{{ item.item_name }}</div>
+                            <small class="text-muted">{{ item.percentage }}% سهم</small>
+                        </div>
+                        <span class="badge bg-success rounded-pill">{{ "{:,.0f}".format(item.amount) }}</span>
+                    </li>
+                    {% else %}
+                    <li class="list-group-item text-center text-muted">داده‌ای موجود نیست</li>
+                    {% endfor %}
+                </ol>
+            </div>
+            <div class="card-footer">
+                <a href="{{ url_for('reports.pareto', mode='خرید', category='Food', days=days) }}" class="btn btn-sm btn-outline-success w-100">
+                    مشاهده کامل <i class="fas fa-arrow-left ms-1"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Top NonFood Items -->
+    <div class="col-md-4 mb-3">
+        <div class="card h-100">
+            <div class="card-header bg-info text-white">
+                <i class="fas fa-medal me-2"></i> ۵ قلم برتر غیرغذایی (کلاس A)
+            </div>
+            <div class="card-body p-0">
+                <ol class="list-group list-group-flush list-group-numbered">
+                    {% for item in top_nonfood %}
+                    <li class="list-group-item d-flex justify-content-between align-items-start">
+                        <div class="ms-2 me-auto">
+                            <div class="fw-bold">{{ item.item_name }}</div>
+                            <small class="text-muted">{{ item.percentage }}% سهم</small>
+                        </div>
+                        <span class="badge bg-info rounded-pill">{{ "{:,.0f}".format(item.amount) }}</span>
+                    </li>
+                    {% else %}
+                    <li class="list-group-item text-center text-muted">داده‌ای موجود نیست</li>
+                    {% endfor %}
+                </ol>
+            </div>
+            <div class="card-footer">
+                <a href="{{ url_for('reports.pareto', mode='خرید', category='NonFood', days=days) }}" class="btn btn-sm btn-outline-info w-100">
+                    مشاهده کامل <i class="fas fa-arrow-left ms-1"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Top Waste Items -->
+    <div class="col-md-4 mb-3">
+        <div class="card h-100">
+            <div class="card-header bg-danger text-white">
+                <i class="fas fa-exclamation-triangle me-2"></i> ۵ قلم برتر ضایعات
+            </div>
+            <div class="card-body p-0">
+                <ol class="list-group list-group-flush list-group-numbered">
+                    {% for item in top_waste %}
+                    <li class="list-group-item d-flex justify-content-between align-items-start">
+                        <div class="ms-2 me-auto">
+                            <div class="fw-bold">{{ item.item_name }}</div>
+                            <small class="text-muted">{{ item.percentage }}% سهم</small>
+                        </div>
+                        <span class="badge bg-danger rounded-pill">{{ "{:,.0f}".format(item.amount) }}</span>
+                    </li>
+                    {% else %}
+                    <li class="list-group-item text-center text-muted">ضایعاتی ثبت نشده</li>
+                    {% endfor %}
+                </ol>
+            </div>
+            <div class="card-footer">
+                <a href="{{ url_for('reports.pareto', mode='ضایعات', category='Food', days=days) }}" class="btn btn-sm btn-outline-danger w-100">
+                    مشاهده کامل <i class="fas fa-arrow-left ms-1"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Pareto Principle Explanation -->
+<div class="card mt-4 border-info">
+    <div class="card-header bg-info text-white">
+        <i class="fas fa-graduation-cap me-2"></i> قانون پارتو 80/20 چیست؟
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <h5>🎯 اصل پارتو</h5>
+                <p>قانون 80/20 می‌گوید: <strong>حدود 80% نتایج از 20% علت‌ها ناشی می‌شود.</strong></p>
+                <ul>
+                    <li><strong>20% اقلام</strong> → <strong>80% هزینه‌ها</strong> را تشکیل می‌دهند</li>
+                    <li>این اقلام (کلاس A) نیاز به <strong>کنترل روزانه</strong> دارند</li>
+                    <li>با تمرکز بر 20% اقلام حیاتی، 80% بهبود حاصل می‌شود</li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <h5>📊 کاربرد در هتل شما</h5>
+                <div class="alert alert-light">
+                    <p class="mb-2"><strong>کلاس A (0-80% تجمعی):</strong> کنترل روزانه، ذخیره ایمنی بالا</p>
+                    <p class="mb-2"><strong>کلاس B (80-95% تجمعی):</strong> کنترل هفتگی</p>
+                    <p class="mb-0"><strong>کلاس C (95-100% تجمعی):</strong> کنترل ماهانه</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function changeDays(days) {
+    window.location.href = '{{ url_for("reports.executive_summary") }}?days=' + days;
+}
+</script>
+
+<style>
+@media print {
+    .btn, .form-select, .page-header .d-flex.gap-2 { display: none !important; }
+    .card { break-inside: avoid; }
+}
+.display-6 { font-size: 1.75rem; font-weight: bold; }
+</style>
+{% endblock %}

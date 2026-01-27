@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}هشدارها{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="mb-4">
+        <h2><i class="fas fa-bell me-2"></i>هشدارهای انبار</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="{{ url_for('warehouse.dashboard', hotel_id=hotel_id) }}">انبار</a></li>
+                <li class="breadcrumb-item active">هشدارها</li>
+            </ol>
+        </nav>
+    </div>
+
+    {% if alerts %}
+    <div class="card">
+        <div class="card-body p-0">
+            <ul class="list-group list-group-flush">
+                {% for alert in alerts %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="fas fa-{% if alert.severity == 'danger' %}exclamation-circle text-danger{% elif alert.severity == 'warning' %}exclamation-triangle text-warning{% else %}info-circle text-info{% endif %} me-2"></i>
+                        <strong>{{ alert.message }}</strong>
+                        {% if alert.item %}
+                        <br><small class="text-muted">کالا: {{ alert.item.item_name_fa }}</small>
+                        {% endif %}
+                        <br><small class="text-muted">{{ alert.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                    </div>
+                    <div class="btn-group">
+                        {% if alert.status == 'active' %}
+                        <form method="POST" action="{{ url_for('warehouse.acknowledge_alert', alert_id=alert.id) }}" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">مشاهده شد</button>
+                        </form>
+                        {% endif %}
+                        <form method="POST" action="{{ url_for('warehouse.resolve_alert', alert_id=alert.id) }}" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-outline-success">حل شد</button>
+                        </form>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-success">
+        <i class="fas fa-check-circle me-2"></i>هشدار فعالی وجود ندارد.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

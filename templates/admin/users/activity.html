@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+
+{% block title %}فعالیت‌های کاربر - {{ user.username }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <h2><i class="fas fa-history me-2"></i> فعالیت‌های کاربر: {{ user.username }}</h2>
+    <a href="{{ url_for('admin.users_edit', user_id=user.id) }}" class="btn btn-outline-primary">
+        <i class="fas fa-edit me-1"></i> ویرایش کاربر
+    </a>
+</div>
+
+<!-- Stats Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <h3 class="mb-0">{{ total_actions }}</h3>
+                <small>کل فعالیت‌ها</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <h3 class="mb-0">{{ actions_today }}</h3>
+                <small>فعالیت امروز</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="card-title mb-2">توزیع فعالیت‌ها</h6>
+                <div class="d-flex flex-wrap gap-2">
+                    {% for action, count in actions_by_type.items() %}
+                    <span class="badge bg-secondary">
+                        {{ action_labels.get(action, action) }}: {{ count }}
+                    </span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- User Info -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-2">
+                <div class="text-center">
+                    <i class="fas fa-user-circle fa-5x text-muted"></i>
+                </div>
+            </div>
+            <div class="col-md-10">
+                <h4>{{ user.full_name or user.username }}</h4>
+                <p class="mb-1">
+                    <span class="badge bg-{{ 'danger' if user.role == 'admin' else 'primary' if user.role == 'manager' else 'secondary' }}">
+                        {{ user.role_label }}
+                    </span>
+                    {% if user.is_active %}
+                    <span class="badge bg-success">فعال</span>
+                    {% else %}
+                    <span class="badge bg-danger">غیرفعال</span>
+                    {% endif %}
+                </p>
+                <small class="text-muted">
+                    <i class="fas fa-envelope me-1"></i> {{ user.email }} |
+                    <i class="fas fa-building me-1"></i> {{ user.department or 'بدون بخش' }} |
+                    <i class="fas fa-calendar me-1"></i> عضویت: {{ user.created_at.strftime('%Y/%m/%d') }}
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Activity Log -->
+<div class="card">
+    <div class="card-header">
+        <i class="fas fa-list me-2"></i> تاریخچه فعالیت‌ها
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>زمان</th>
+                        <th>عملیات</th>
+                        <th>نوع منبع</th>
+                        <th>نام منبع</th>
+                        <th>توضیحات</th>
+                        <th>IP</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs.items %}
+                    <tr>
+                        <td>
+                            <small>{{ log.created_at.strftime('%Y/%m/%d %H:%M:%S') }}</small>
+                        </td>
+                        <td>
+                            {% if log.action == 'create' %}
+                            <span class="badge bg-success">{{ log.action_label }}</span>
+                            {% elif log.action == 'update' %}
+                            <span class="badge bg-warning text-dark">{{ log.action_label }}</span>
+                            {% elif log.action == 'delete' %}
+                            <span class="badge bg-danger">{{ log.action_label }}</span>
+                            {% elif log.action == 'login' %}
+                            <span class="badge bg-info">{{ log.action_label }}</span>
+                            {% else %}
+                            <span class="badge bg-secondary">{{ log.action_label }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ log.resource_label }}</td>
+                        <td>{{ log.resource_name or '-' }}</td>
+                        <td><small>{{ log.description or '-' }}</small></td>
+                        <td><small class="text-muted">{{ log.ip_address or '-' }}</small></td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">
+                            فعالیتی ثبت نشده است
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    {% if logs.pages > 1 %}
+    <div class="card-footer">
+        <nav>
+            <ul class="pagination mb-0 justify-content-center">
+                {% if logs.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('admin.user_activity', user_id=user.id, page=logs.prev_num) }}">قبلی</a>
+                </li>
+                {% endif %}
+                
+                {% for p in logs.iter_pages() %}
+                    {% if p %}
+                    <li class="page-item {{ 'active' if p == logs.page }}">
+                        <a class="page-link" href="{{ url_for('admin.user_activity', user_id=user.id, page=p) }}">{{ p }}</a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if logs.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('admin.user_activity', user_id=user.id, page=logs.next_num) }}">بعدی</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

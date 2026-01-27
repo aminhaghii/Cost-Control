@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}در انتظار تایید{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-check-circle me-2"></i>در انتظار تایید</h2>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="{{ url_for('warehouse.dashboard', hotel_id=hotel_id) }}">انبار</a></li>
+                    <li class="breadcrumb-item active">تاییدها</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    {% if pending %}
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>نوع</th>
+                            <th>کالا</th>
+                            <th>مقدار</th>
+                            <th>مبلغ</th>
+                            <th>دلیل</th>
+                            <th>کاربر</th>
+                            <th>تاریخ</th>
+                            <th>عملیات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tx in pending %}
+                        <tr>
+                            <td>{{ tx.id }}</td>
+                            <td>
+                                {% if tx.transaction_type == 'ضایعات' %}
+                                <span class="badge bg-danger">ضایعات</span>
+                                {% else %}
+                                <span class="badge bg-secondary">{{ tx.transaction_type }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ tx.item.item_name_fa if tx.item else '-' }}</td>
+                            <td>{{ tx.quantity }} {{ tx.unit or '' }}</td>
+                            <td>{{ "{:,.0f}".format(tx.total_amount) }} ریال</td>
+                            <td>
+                                {% if tx.waste_reason %}
+                                {{ WASTE_REASONS.get(tx.waste_reason, tx.waste_reason) }}
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                            <td>{{ tx.user.username if tx.user else '-' }}</td>
+                            <td>{{ tx.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>
+                                <form method="POST" action="{{ url_for('warehouse.approve_transaction', tx_id=tx.id) }}" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('تایید این تراکنش؟')">
+                                        <i class="fas fa-check"></i> تایید
+                                    </button>
+                                </form>
+                                <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#rejectModal{{ tx.id }}">
+                                    <i class="fas fa-times"></i> رد
+                                </button>
+                                
+                                <!-- Reject Modal -->
+                                <div class="modal fade" id="rejectModal{{ tx.id }}" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <form method="POST" action="{{ url_for('warehouse.reject_transaction', tx_id=tx.id) }}">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">رد تراکنش #{{ tx.id }}</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">دلیل رد</label>
+                                                        <textarea name="reason" class="form-control" rows="3" placeholder="دلیل رد تراکنش..."></textarea>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button>
+                                                    <button type="submit" class="btn btn-danger">رد تراکنش</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i>
+        هیچ تراکنشی در انتظار تایید نیست.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,148 @@
+{% extends 'base.html' %}
+
+{% block title %}افزودن کاربر جدید{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2><i class="fas fa-user-plus me-2"></i> افزودن کاربر جدید</h2>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <form method="POST" class="needs-validation" novalidate>
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-user me-1"></i> نام کاربری <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" name="username" class="form-control" required
+                                   pattern="[a-zA-Z0-9_]+" placeholder="فقط حروف انگلیسی و اعداد">
+                            <div class="form-text">فقط حروف انگلیسی، اعداد و _ مجاز است</div>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-envelope me-1"></i> ایمیل <span class="text-danger">*</span>
+                            </label>
+                            <input type="email" name="email" class="form-control" required
+                                   placeholder="example@domain.com">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-id-card me-1"></i> نام کامل
+                            </label>
+                            <input type="text" name="full_name" class="form-control"
+                                   placeholder="نام و نام خانوادگی">
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-lock me-1"></i> رمز عبور <span class="text-danger">*</span>
+                            </label>
+                            <input type="password" name="password" class="form-control" required
+                                   minlength="8" placeholder="حداقل 8 کاراکتر">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-user-tag me-1"></i> نقش <span class="text-danger">*</span>
+                            </label>
+                            <select name="role" class="form-select" required>
+                                {% for role, label in role_labels.items() %}
+                                <option value="{{ role }}" {{ 'selected' if role == 'staff' }}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-building me-1"></i> بخش/واحد
+                            </label>
+                            <input type="text" name="department" class="form-control"
+                                   placeholder="مثال: انبار، آشپزخانه">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-phone me-1"></i> تلفن
+                            </label>
+                            <input type="tel" name="phone" class="form-control"
+                                   placeholder="09123456789">
+                        </div>
+                        
+                        <div class="col-md-6 mb-3 d-flex align-items-end">
+                            <div class="form-check form-switch">
+                                <input type="checkbox" name="is_active" class="form-check-input" 
+                                       id="isActive" checked>
+                                <label class="form-check-label" for="isActive">
+                                    <i class="fas fa-check-circle me-1"></i> کاربر فعال باشد
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-save me-2"></i> ذخیره کاربر
+                        </button>
+                        <a href="{{ url_for('admin.users_list') }}" class="btn btn-outline-secondary btn-lg">
+                            <i class="fas fa-times me-2"></i> انصراف
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <i class="fas fa-info-circle me-2"></i> راهنمای نقش‌ها
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <h6><span class="badge bg-danger">مدیر سیستم (admin)</span></h6>
+                    <ul class="small text-muted mb-0">
+                        <li>دسترسی کامل به همه بخش‌ها</li>
+                        <li>مدیریت کاربران و نقش‌ها</li>
+                        <li>مشاهده لاگ فعالیت‌ها</li>
+                        <li>تنظیمات سیستم</li>
+                    </ul>
+                </div>
+                
+                <div class="mb-3">
+                    <h6><span class="badge bg-primary">مدیر انبار (manager)</span></h6>
+                    <ul class="small text-muted mb-0">
+                        <li>مدیریت کالاها</li>
+                        <li>مشاهده گزارش‌ها</li>
+                        <li>ثبت و ویرایش تراکنش‌ها</li>
+                        <li>بدون دسترسی به مدیریت کاربران</li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h6><span class="badge bg-secondary">کارمند (staff)</span></h6>
+                    <ul class="small text-muted mb-0">
+                        <li>ثبت تراکنش جدید</li>
+                        <li>مشاهده داشبورد</li>
+                        <li>مشاهده گزارش‌های پایه</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

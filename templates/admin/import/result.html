@@ -1,0 +1,165 @@
+{% extends 'base.html' %}
+
+{% block title %}نتیجه ورود داده{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-check-circle text-success me-2"></i> نتیجه ورود داده</h2>
+    <div>
+        <a href="{{ url_for('admin.data_import') }}" class="btn btn-outline-primary me-2">
+            <i class="fas fa-upload me-1"></i> ورود فایل دیگر
+        </a>
+        <a href="{{ url_for('admin.items_list') }}" class="btn btn-primary">
+            <i class="fas fa-boxes me-1"></i> مشاهده کالاها
+        </a>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <h3 class="mb-0">{{ result.total_items }}</h3>
+                <small>کالای وارد شده</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <h3 class="mb-0">{{ result.sheets | length }}</h3>
+                <small>شیت پردازش شده</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-dark">
+            <div class="card-body text-center">
+                <h3 class="mb-0">{{ result.warnings | length }}</h3>
+                <small>هشدار</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-danger text-white">
+            <div class="card-body text-center">
+                <h3 class="mb-0">{{ result.errors | length }}</h3>
+                <small>خطا</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sheet Details -->
+<div class="card mb-4">
+    <div class="card-header">
+        <i class="fas fa-list me-2"></i> جزئیات شیت‌ها
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>نام شیت</th>
+                        <th>وضعیت</th>
+                        <th>تعداد کالا</th>
+                        <th>دسته‌بندی</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sheet in result.sheets %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td><strong>{{ sheet.sheet }}</strong></td>
+                        <td>
+                            {% if sheet.status == 'success' %}
+                            <span class="badge bg-success"><i class="fas fa-check me-1"></i> موفق</span>
+                            {% elif sheet.status == 'empty' %}
+                            <span class="badge bg-secondary"><i class="fas fa-minus me-1"></i> خالی</span>
+                            {% elif sheet.status == 'no_name_column' %}
+                            <span class="badge bg-warning"><i class="fas fa-exclamation me-1"></i> بدون ستون نام</span>
+                            {% else %}
+                            <span class="badge bg-danger"><i class="fas fa-times me-1"></i> خطا</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ sheet.items }}</td>
+                        <td>
+                            {% if sheet.category == 'Food' %}
+                            <span class="badge bg-success">مواد غذایی</span>
+                            {% elif sheet.category == 'NonFood' %}
+                            <span class="badge bg-info">غیر غذایی</span>
+                            {% else %}
+                            <span class="badge bg-secondary">ترکیبی</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Warnings -->
+{% if result.warnings %}
+<div class="card mb-4 border-warning">
+    <div class="card-header bg-warning text-dark">
+        <i class="fas fa-exclamation-triangle me-2"></i> هشدارها
+    </div>
+    <div class="card-body">
+        <ul class="mb-0">
+            {% for warning in result.warnings %}
+            <li>{{ warning }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endif %}
+
+<!-- Errors -->
+{% if result.errors %}
+<div class="card mb-4 border-danger">
+    <div class="card-header bg-danger text-white">
+        <i class="fas fa-times-circle me-2"></i> خطاها
+    </div>
+    <div class="card-body">
+        <ul class="mb-0">
+            {% for error in result.errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endif %}
+
+<!-- Next Steps -->
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <i class="fas fa-forward me-2"></i> مراحل بعدی
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4">
+                <a href="{{ url_for('admin.items_list') }}" class="btn btn-outline-primary btn-lg w-100">
+                    <i class="fas fa-boxes fa-2x mb-2 d-block"></i>
+                    مشاهده کالاها
+                </a>
+            </div>
+            <div class="col-md-4">
+                <a href="{{ url_for('transactions.create') }}" class="btn btn-outline-success btn-lg w-100">
+                    <i class="fas fa-plus-circle fa-2x mb-2 d-block"></i>
+                    ثبت تراکنش
+                </a>
+            </div>
+            <div class="col-md-4">
+                <a href="{{ url_for('reports.pareto') }}" class="btn btn-outline-info btn-lg w-100">
+                    <i class="fas fa-chart-bar fa-2x mb-2 d-block"></i>
+                    گزارش پارتو
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

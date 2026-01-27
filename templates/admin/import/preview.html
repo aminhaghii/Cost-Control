@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+
+{% block title %}پیش‌نمایش فایل{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-eye me-2"></i> پیش‌نمایش: {{ filename }}</h2>
+    <div>
+        <a href="{{ url_for('admin.data_import') }}" class="btn btn-outline-secondary me-2">
+            <i class="fas fa-arrow-right me-1"></i> بازگشت
+        </a>
+        <a href="{{ url_for('admin.import_existing_file', filename=filename) }}" class="btn btn-success">
+            <i class="fas fa-file-import me-1"></i> وارد کردن داده‌ها
+        </a>
+    </div>
+</div>
+
+<div class="alert alert-info">
+    <i class="fas fa-info-circle me-2"></i>
+    این فایل شامل <strong>{{ sheets | length }}</strong> شیت است. 
+    نمونه‌ای از ۵ سطر اول هر شیت نمایش داده شده است.
+</div>
+
+{% for sheet in sheets %}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>
+            <i class="fas fa-table me-2"></i>
+            <strong>{{ sheet.name }}</strong>
+        </span>
+        <span class="badge bg-primary">{{ sheet.rows }} سطر</span>
+    </div>
+    <div class="card-body">
+        <div class="mb-3">
+            <strong>ستون‌ها:</strong>
+            {% for col in sheet.columns %}
+            <span class="badge bg-secondary me-1">{{ col }}</span>
+            {% endfor %}
+        </div>
+        
+        {% if sheet.preview %}
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered table-hover">
+                <thead class="table-light">
+                    <tr>
+                        {% for col in sheet.columns %}
+                        <th>{{ col }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in sheet.preview %}
+                    <tr>
+                        {% for col in sheet.columns %}
+                        <td>{{ row.get(col, '') }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted">داده‌ای برای نمایش وجود ندارد</p>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+
+<div class="text-center mt-4">
+    <a href="{{ url_for('admin.import_existing_file', filename=filename) }}" class="btn btn-success btn-lg">
+        <i class="fas fa-file-import me-2"></i> تایید و وارد کردن همه داده‌ها
+    </a>
+</div>
+{% endblock %}

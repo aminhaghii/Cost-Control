@@ -1,0 +1,174 @@
+{% extends 'base.html' %}
+
+{% block title %}ویرایش کاربر - {{ user.username }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2><i class="fas fa-user-edit me-2"></i> ویرایش کاربر: {{ user.username }}</h2>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <form method="POST" class="needs-validation" novalidate>
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-user me-1"></i> نام کاربری <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" name="username" class="form-control" required
+                                   value="{{ user.username }}" pattern="[a-zA-Z0-9_]+">
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-envelope me-1"></i> ایمیل <span class="text-danger">*</span>
+                            </label>
+                            <input type="email" name="email" class="form-control" required
+                                   value="{{ user.email }}">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-id-card me-1"></i> نام کامل
+                            </label>
+                            <input type="text" name="full_name" class="form-control"
+                                   value="{{ user.full_name or '' }}">
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-lock me-1"></i> رمز عبور جدید
+                            </label>
+                            <input type="password" name="new_password" class="form-control"
+                                   minlength="8" placeholder="خالی بگذارید اگر نمی‌خواهید تغییر دهید">
+                            <div class="form-text">فقط در صورت نیاز به تغییر رمز پر کنید</div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-user-tag me-1"></i> نقش <span class="text-danger">*</span>
+                            </label>
+                            <select name="role" class="form-select" required
+                                    {% if user.id == current_user.id %}disabled{% endif %}>
+                                {% for role, label in role_labels.items() %}
+                                <option value="{{ role }}" {{ 'selected' if user.role == role }}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                            {% if user.id == current_user.id %}
+                            <input type="hidden" name="role" value="{{ user.role }}">
+                            <div class="form-text text-warning">
+                                <i class="fas fa-exclamation-triangle me-1"></i>
+                                نمی‌توانید نقش خود را تغییر دهید
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-building me-1"></i> بخش/واحد
+                            </label>
+                            <input type="text" name="department" class="form-control"
+                                   value="{{ user.department or '' }}">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-phone me-1"></i> تلفن
+                            </label>
+                            <input type="tel" name="phone" class="form-control"
+                                   value="{{ user.phone or '' }}">
+                        </div>
+                        
+                        <div class="col-md-6 mb-3 d-flex align-items-end">
+                            <div class="form-check form-switch">
+                                <input type="checkbox" name="is_active" class="form-check-input" 
+                                       id="isActive" {{ 'checked' if user.is_active }}
+                                       {% if user.id == current_user.id %}disabled{% endif %}>
+                                <label class="form-check-label" for="isActive">
+                                    <i class="fas fa-check-circle me-1"></i> کاربر فعال باشد
+                                </label>
+                                {% if user.id == current_user.id %}
+                                <input type="hidden" name="is_active" value="on">
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-save me-2"></i> ذخیره تغییرات
+                        </button>
+                        <a href="{{ url_for('admin.users_list') }}" class="btn btn-outline-secondary btn-lg">
+                            <i class="fas fa-times me-2"></i> انصراف
+                        </a>
+                        <a href="{{ url_for('admin.user_activity', user_id=user.id) }}" class="btn btn-outline-info btn-lg">
+                            <i class="fas fa-history me-2"></i> تاریخچه فعالیت
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-header">
+                <i class="fas fa-info-circle me-2"></i> اطلاعات کاربر
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr>
+                        <th>شناسه:</th>
+                        <td>{{ user.id }}</td>
+                    </tr>
+                    <tr>
+                        <th>تاریخ ایجاد:</th>
+                        <td>{{ user.created_at.strftime('%Y/%m/%d %H:%M') }}</td>
+                    </tr>
+                    <tr>
+                        <th>آخرین بروزرسانی:</th>
+                        <td>{{ user.updated_at.strftime('%Y/%m/%d %H:%M') if user.updated_at else '-' }}</td>
+                    </tr>
+                    <tr>
+                        <th>آخرین ورود:</th>
+                        <td>{{ user.last_login.strftime('%Y/%m/%d %H:%M') if user.last_login else 'هرگز' }}</td>
+                    </tr>
+                    <tr>
+                        <th>ایجاد توسط:</th>
+                        <td>{{ user.created_by.username if user.created_by else 'سیستم' }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <i class="fas fa-shield-alt me-2"></i> راهنمای نقش‌ها
+            </div>
+            <div class="card-body">
+                <div class="mb-2">
+                    <span class="badge bg-danger">admin</span> = دسترسی کامل
+                </div>
+                <div class="mb-2">
+                    <span class="badge bg-primary">manager</span> = مدیریت کالا و گزارش
+                </div>
+                <div>
+                    <span class="badge bg-secondary">staff</span> = ثبت تراکنش
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

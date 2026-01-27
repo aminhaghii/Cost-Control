@@ -1,0 +1,196 @@
+{% extends 'base.html' %}
+
+{% block title %}مدیریت کالاها{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <h2><i class="fas fa-boxes me-2"></i> مدیریت کالاها</h2>
+    <a href="{{ url_for('admin.items_create') }}" class="btn btn-success">
+        <i class="fas fa-plus me-1"></i> افزودن کالا
+    </a>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">جستجو</label>
+                <input type="text" name="search" class="form-control" 
+                       placeholder="کد یا نام کالا..." value="{{ search }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">دسته‌بندی</label>
+                <select name="category" class="form-select">
+                    <option value="">همه</option>
+                    <option value="Food" {{ 'selected' if category_filter == 'Food' }}>مواد غذایی</option>
+                    <option value="NonFood" {{ 'selected' if category_filter == 'NonFood' }}>غیرغذایی</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">وضعیت</label>
+                <select name="status" class="form-select">
+                    <option value="">همه</option>
+                    <option value="active" {{ 'selected' if status_filter == 'active' }}>فعال</option>
+                    <option value="inactive" {{ 'selected' if status_filter == 'inactive' }}>غیرفعال</option>
+                    <option value="low_stock" {{ 'selected' if status_filter == 'low_stock' }}>موجودی کم</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-outline-primary w-100">
+                    <i class="fas fa-search me-1"></i> جستجو
+                </button>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <a href="{{ url_for('admin.items_list') }}" class="btn btn-outline-secondary w-100">
+                    <i class="fas fa-times me-1"></i> پاک کردن
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Items Table -->
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>کد</th>
+                        <th>نام کالا</th>
+                        <th>دسته‌بندی</th>
+                        <th>واحد</th>
+                        <th>موجودی</th>
+                        <th>حداقل</th>
+                        <th>حداکثر</th>
+                        <th>وضعیت</th>
+                        <th>عملیات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items.items %}
+                    <tr class="{{ 'table-warning' if item.current_stock < item.min_stock else '' }}{{ 'table-secondary' if not item.is_active else '' }}">
+                        <td><code>{{ item.item_code }}</code></td>
+                        <td><strong>{{ item.item_name_fa }}</strong></td>
+                        <td>
+                            {% if item.category == 'Food' %}
+                            <span class="badge bg-success">غذایی</span>
+                            {% else %}
+                            <span class="badge bg-info">غیرغذایی</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ item.unit }}</td>
+                        <td class="number-fa">
+                            {% if item.current_stock < item.min_stock %}
+                            <span class="text-danger fw-bold">{{ "{:,.2f}".format(item.current_stock) }}</span>
+                            <i class="fas fa-exclamation-triangle text-warning ms-1"></i>
+                            {% else %}
+                            {{ "{:,.2f}".format(item.current_stock) }}
+                            {% endif %}
+                        </td>
+                        <td class="number-fa">{{ "{:,.2f}".format(item.min_stock) }}</td>
+                        <td class="number-fa">{{ "{:,.2f}".format(item.max_stock) }}</td>
+                        <td>
+                            {% if item.is_active %}
+                            <span class="badge bg-success">فعال</span>
+                            {% else %}
+                            <span class="badge bg-danger">غیرفعال</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('admin.items_edit', item_id=item.id) }}" 
+                                   class="btn btn-outline-primary" title="ویرایش">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <button type="button" class="btn btn-outline-danger" 
+                                        onclick="confirmDelete({{ item.id }}, '{{ item.item_name_fa }}')"
+                                        title="حذف">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="9" class="text-center text-muted py-4">
+                            <i class="fas fa-box-open fa-2x mb-2 d-block"></i>
+                            کالایی یافت نشد
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    {% if items.pages > 1 %}
+    <div class="card-footer">
+        <nav>
+            <ul class="pagination mb-0 justify-content-center">
+                {% if items.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('admin.items_list', page=items.prev_num, category=category_filter, status=status_filter, search=search) }}">قبلی</a>
+                </li>
+                {% endif %}
+                
+                {% for p in items.iter_pages() %}
+                    {% if p %}
+                    <li class="page-item {{ 'active' if p == items.page }}">
+                        <a class="page-link" href="{{ url_for('admin.items_list', page=p, category=category_filter, status=status_filter, search=search) }}">{{ p }}</a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if items.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('admin.items_list', page=items.next_num, category=category_filter, status=status_filter, search=search) }}">بعدی</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Delete Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">تأیید حذف کالا</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>آیا از حذف کالای <strong id="deleteItemName"></strong> اطمینان دارید؟</p>
+                <p class="text-warning mb-0">
+                    <i class="fas fa-exclamation-triangle me-1"></i>
+                    کالاهایی که تراکنش دارند قابل حذف نیستند
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button>
+                <form id="deleteForm" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash me-1"></i> حذف کالا
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function confirmDelete(itemId, itemName) {
+    document.getElementById('deleteItemName').textContent = itemName;
+    document.getElementById('deleteForm').action = '/admin/items/' + itemId + '/delete';
+    new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
+</script>
+{% endblock %}

@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+
+{% block title %}فعال‌سازی احراز هویت دو مرحله‌ای{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2><i class="fas fa-mobile-alt me-2"></i> فعال‌سازی احراز هویت دو مرحله‌ای</h2>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 text-center border-end">
+                        <h5 class="mb-3">مرحله ۱: اسکن QR Code</h5>
+                        <p class="text-muted small">
+                            با استفاده از اپلیکیشن Google Authenticator یا مشابه، کد QR زیر را اسکن کنید:
+                        </p>
+                        <div class="my-4">
+                            <img src="data:image/png;base64,{{ qr_code }}" alt="QR Code" class="img-fluid border rounded" style="max-width: 200px;">
+                        </div>
+                        <div class="alert alert-secondary small">
+                            <strong>کلید دستی:</strong><br>
+                            <code class="user-select-all">{{ secret }}</code>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <h5 class="mb-3">مرحله ۲: تأیید کد</h5>
+                        <p class="text-muted small">
+                            کد ۶ رقمی نمایش داده شده در اپلیکیشن را وارد کنید:
+                        </p>
+                        
+                        <form method="POST" class="mt-4">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">کد تأیید:</label>
+                                <input type="text" name="token" class="form-control form-control-lg text-center" 
+                                       placeholder="۰۰۰۰۰۰" maxlength="6" pattern="[0-9]{6}" 
+                                       required autocomplete="off" inputmode="numeric"
+                                       style="letter-spacing: 0.5em; font-size: 1.5rem;">
+                            </div>
+                            
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-success btn-lg">
+                                    <i class="fas fa-check me-2"></i> تأیید و فعال‌سازی
+                                </button>
+                                <a href="{{ url_for('security.security_settings') }}" class="btn btn-outline-secondary">
+                                    انصراف
+                                </a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header bg-info text-white">
+                <i class="fas fa-info-circle me-2"></i> راهنما
+            </div>
+            <div class="card-body">
+                <h6>اپلیکیشن‌های پیشنهادی:</h6>
+                <ul>
+                    <li><strong>Google Authenticator</strong> - Android / iOS</li>
+                    <li><strong>Microsoft Authenticator</strong> - Android / iOS</li>
+                    <li><strong>Authy</strong> - Android / iOS / Desktop</li>
+                </ul>
+                <div class="alert alert-warning small mb-0">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>مهم:</strong> کلید دستی را در جای امنی ذخیره کنید. در صورت از دست دادن دسترسی به اپلیکیشن، به این کلید نیاز خواهید داشت.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

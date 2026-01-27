@@ -1,0 +1,210 @@
+{% extends 'base.html' %}
+
+{% block title %}لیست تراکنش‌ها{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <h2><i class="fas fa-exchange-alt me-2"></i> لیست تراکنش‌ها</h2>
+    <a href="{{ url_for('transactions.create') }}" class="btn btn-primary">
+        <i class="fas fa-plus me-1"></i> ثبت تراکنش جدید
+    </a>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-2">
+                <label class="form-label">گروه</label>
+                <select name="category" class="form-select">
+                    <option value="">همه</option>
+                    <option value="Food" {% if category_filter == 'Food' %}selected{% endif %}>مواد غذایی</option>
+                    <option value="NonFood" {% if category_filter == 'NonFood' %}selected{% endif %}>مواد غیرغذایی</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">نوع تراکنش</label>
+                <select name="type" class="form-select">
+                    <option value="">همه</option>
+                    <option value="خرید" {% if type_filter == 'خرید' %}selected{% endif %}>خرید</option>
+                    <option value="مصرف" {% if type_filter == 'مصرف' %}selected{% endif %}>مصرف</option>
+                    <option value="ضایعات" {% if type_filter == 'ضایعات' %}selected{% endif %}>ضایعات</option>
+                    <option value="اصلاحی" {% if type_filter == 'اصلاحی' %}selected{% endif %}>اصلاحی</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">از تاریخ</label>
+                <input type="date" name="date_from" class="form-control" value="{{ date_from }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">تا تاریخ</label>
+                <input type="date" name="date_to" class="form-control" value="{{ date_to }}">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary me-2">
+                    <i class="fas fa-search me-1"></i> جستجو
+                </button>
+                <a href="{{ url_for('transactions.list_transactions') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-times"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Transactions Table -->
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>تاریخ</th>
+                        <th>کالا</th>
+                        <th>گروه</th>
+                        <th>نوع</th>
+                        <th>مقدار</th>
+                        <th>قیمت واحد</th>
+                        <th>مبلغ کل</th>
+                        <th>کاربر</th>
+                        <th>عملیات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for trans in transactions.items %}
+                    <tr>
+                        <td>{{ trans.id }}</td>
+                        <td>{{ trans.transaction_date.strftime('%Y/%m/%d') }}</td>
+                        <td>{{ trans.item.item_name_fa if trans.item else '-' }}</td>
+                        <td>
+                            {% if trans.category == 'Food' %}
+                                <span class="badge bg-success">غذایی</span>
+                            {% else %}
+                                <span class="badge bg-info">غیرغذایی</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if trans.transaction_type == 'خرید' %}
+                                <span class="badge bg-success">{{ trans.transaction_type }}</span>
+                            {% elif trans.transaction_type == 'ضایعات' %}
+                                <span class="badge bg-danger">{{ trans.transaction_type }}</span>
+                            {% elif trans.transaction_type == 'مصرف' %}
+                                <span class="badge bg-info">{{ trans.transaction_type }}</span>
+                            {% else %}
+                                <span class="badge bg-secondary">{{ trans.transaction_type }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="number-fa">{{ "{:,.2f}".format(trans.quantity) }}</td>
+                        <td class="number-fa">{{ "{:,.0f}".format(trans.unit_price) }}</td>
+                        <td class="number-fa fw-bold">{{ "{:,.0f}".format(trans.total_amount) }}</td>
+                        <td>{{ trans.user.username if trans.user else '-' }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('transactions.edit', id=trans.id) }}" 
+                                   class="btn btn-outline-primary" title="ویرایش">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <button type="button" class="btn btn-outline-danger" title="حذف"
+                                        onclick="confirmDelete({{ trans.id }}, '{{ trans.item.item_name_fa if trans.item else 'نامشخص' }}', '{{ "{:,.0f}".format(trans.total_amount) }}')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="10" class="text-center text-muted py-5">
+                            <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
+                            تراکنشی یافت نشد
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    {% if transactions.pages > 1 %}
+    <div class="card-footer">
+        <nav aria-label="Page navigation">
+            <ul class="pagination justify-content-center mb-0">
+                {% if transactions.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('transactions.list_transactions', page=transactions.prev_num, category=category_filter, type=type_filter, date_from=date_from, date_to=date_to) }}">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                </li>
+                {% endif %}
+                
+                {% for page_num in transactions.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                    {% if page_num %}
+                        <li class="page-item {% if page_num == transactions.page %}active{% endif %}">
+                            <a class="page-link" href="{{ url_for('transactions.list_transactions', page=page_num, category=category_filter, type=type_filter, date_from=date_from, date_to=date_to) }}">
+                                {{ page_num }}
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if transactions.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('transactions.list_transactions', page=transactions.next_num, category=category_filter, type=type_filter, date_from=date_from, date_to=date_to) }}">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Delete Confirmation Modal (Bug #5) -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteModalLabel">
+                    <i class="fas fa-exclamation-triangle me-2"></i>تأیید حذف تراکنش
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <i class="fas fa-trash-alt fa-3x text-danger mb-3"></i>
+                <p class="mb-2">آیا از حذف این تراکنش اطمینان دارید؟</p>
+                <p class="text-muted small mb-0">کالا: <strong id="deleteItemName"></strong></p>
+                <p class="text-muted small">مبلغ: <strong id="deleteAmount"></strong> ریال</p>
+                <div class="alert alert-warning small mt-3 mb-0">
+                    <i class="fas fa-info-circle me-1"></i>
+                    این عملیات قابل بازگشت نیست و موجودی کالا نیز اصلاح خواهد شد.
+                </div>
+            </div>
+            <div class="modal-footer justify-content-center">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i>انصراف
+                </button>
+                <form id="deleteForm" method="POST" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash me-1"></i>حذف تراکنش
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function confirmDelete(transactionId, itemName, amount) {
+    document.getElementById('deleteItemName').textContent = itemName;
+    document.getElementById('deleteAmount').textContent = amount;
+    document.getElementById('deleteForm').action = '/transactions/delete/' + transactionId;
+    new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
+</script>
+{% endblock %}

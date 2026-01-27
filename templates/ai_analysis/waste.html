@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+
+{% block title %}🗑️ تحلیل ضایعات{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-trash-alt me-2"></i>تحلیل هوشمند ضایعات</h2>
+    <div>
+        <a href="{{ url_for('dashboard.index') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-right me-1"></i>بازگشت به داشبورد
+        </a>
+    </div>
+</div>
+
+{% if not ai_available %}
+<div class="alert alert-warning">
+    <i class="fas fa-exclamation-triangle me-2"></i>
+    سرویس هوش مصنوعی در دسترس نیست. نتایج بر اساس تحلیل آفلاین است.
+</div>
+{% endif %}
+
+<!-- Summary Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card bg-danger text-white">
+            <div class="card-body text-center">
+                <i class="fas fa-money-bill-wave fa-2x mb-2"></i>
+                <h3>{{ "{:,.0f}".format(total_amount) }}</h3>
+                <small>مبلغ کل ضایعات (ریال)</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-warning text-dark">
+            <div class="card-body text-center">
+                <i class="fas fa-boxes fa-2x mb-2"></i>
+                <h3>{{ "{:,.1f}".format(total_quantity) }}</h3>
+                <small>مقدار کل ضایعات</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <i class="fas fa-calendar-alt fa-2x mb-2"></i>
+                <h3>{{ days }} روز</h3>
+                <small>دوره بررسی</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Waste Summary -->
+    <div class="col-md-6">
+        <div class="card border-danger h-100">
+            <div class="card-header bg-danger text-white">
+                <i class="fas fa-chart-pie me-2"></i>خلاصه وضعیت ضایعات
+            </div>
+            <div class="card-body">
+                <p>{{ analysis.waste_summary | default('تحلیل ضایعات در حال پردازش...') }}</p>
+                
+                {% if analysis.patterns %}
+                <hr>
+                <h6>الگوهای شناسایی شده:</h6>
+                <div class="list-group list-group-flush">
+                    {% for pattern in analysis.patterns %}
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between">
+                            <strong>{{ pattern.item }}</strong>
+                            <span class="badge bg-danger">{{ pattern.waste_percentage }}</span>
+                        </div>
+                        <small class="text-muted">{{ pattern.cause }}</small>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Reduction Strategies -->
+    <div class="col-md-6">
+        <div class="card border-success h-100">
+            <div class="card-header bg-success text-white">
+                <i class="fas fa-leaf me-2"></i>راهکارهای کاهش ضایعات
+            </div>
+            <div class="card-body">
+                {% if analysis.reduction_strategies %}
+                <ol class="mb-0">
+                    {% for strategy in analysis.reduction_strategies %}
+                    <li class="mb-2">{{ strategy }}</li>
+                    {% endfor %}
+                </ol>
+                {% else %}
+                <p class="text-muted mb-0">راهکاری یافت نشد.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Priority Actions -->
+    <div class="col-12">
+        <div class="card border-primary">
+            <div class="card-header bg-primary text-white">
+                <i class="fas fa-tasks me-2"></i>اقدامات اولویت‌دار
+            </div>
+            <div class="card-body">
+                {% if analysis.priority_actions %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>اقدام</th>
+                                <th>اولویت</th>
+                                <th>تأثیر مورد انتظار</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for action in analysis.priority_actions %}
+                            <tr>
+                                <td><strong>{{ action.action }}</strong></td>
+                                <td>
+                                    {% if action.priority == 'high' %}
+                                    <span class="badge bg-danger">بالا</span>
+                                    {% elif action.priority == 'medium' %}
+                                    <span class="badge bg-warning text-dark">متوسط</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">پایین</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ action.expected_impact }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center mb-0">اقدام خاصی پیشنهاد نشده است.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Waste Transactions -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-history me-2"></i>آخرین تراکنش‌های ضایعات
+            </div>
+            <div class="card-body p-0">
+                {% if waste_data %}
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>تاریخ</th>
+                                <th>کد</th>
+                                <th>نام کالا</th>
+                                <th>مقدار</th>
+                                <th>مبلغ (ریال)</th>
+                                <th>توضیحات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in waste_data[:10] %}
+                            <tr>
+                                <td>{{ item.date }}</td>
+                                <td><code>{{ item.code }}</code></td>
+                                <td>{{ item.name }}</td>
+                                <td>{{ "{:,.1f}".format(item.quantity) }}</td>
+                                <td>{{ "{:,.0f}".format(item.amount) }}</td>
+                                <td><small>{{ item.notes or '-' }}</small></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                    <h5>بدون ضایعات!</h5>
+                    <p class="text-muted">در این دوره ضایعاتی ثبت نشده است.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-4 bg-light">
+    <div class="card-body text-center">
+        <small class="text-muted">
+        </small>
+    </div>
+</div>
+{% endblock %}
