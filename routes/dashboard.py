@@ -5,13 +5,14 @@ from sqlalchemy import func
 from datetime import date, timedelta
 from services import ParetoService
 from services.hotel_scope_service import get_allowed_hotel_ids
+from utils.timezone import get_iran_today
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/')
 
 @dashboard_bp.route('/')
 @login_required
 def index():
-    today = date.today()
+    today = get_iran_today()
     
     # BUG-FIX: Get allowed hotel IDs for scoping
     allowed_hotel_ids = get_allowed_hotel_ids(current_user)

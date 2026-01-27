@@ -121,6 +121,9 @@ class User(UserMixin, db.Model):
         # Lock account after max failed attempts
         if self.failed_login_attempts >= max_attempts:
             from datetime import timedelta
+            # Admin accounts should have shorter lock (3 minutes)
+            if self.is_admin():
+                lockout_seconds = min(lockout_seconds, 180)
             self.locked_until = datetime.utcnow() + timedelta(seconds=lockout_seconds)
     
     def clear_failed_logins(self):
