@@ -1,0 +1,130 @@
+[
+  {
+    "ip": "1.1.1.1",
+    "tcp443": false
+  },
+  {
+    "ip": "1.0.0.1",
+    "tcp443": false
+  },
+  {
+    "ip": "8.8.8.8",
+    "tcp443": false
+  },
+  {
+    "ip": "8.8.4.4",
+    "tcp443": false
+  },
+  {
+    "ip": "9.9.9.9",
+    "tcp443": false
+  },
+  {
+    "ip": "208.67.222.222",
+    "tcp443": false
+  },
+  {
+    "ip": "104.16.0.0",
+    "tcp443": false
+  },
+  {
+    "ip": "104.17.0.0",
+    "tcp443": false
+  },
+  {
+    "ip": "151.101.1.69",
+    "tcp443": false
+  },
+  {
+    "ip": "151.101.65.69",
+    "tcp443": false
+  },
+  {
+    "ip": "23.235.33.141",
+    "tcp443": false
+  },
+  {
+    "ip": "52.84.0.1",
+    "tcp443": false
+  },
+  {
+    "ip": "34.120.0.1",
+    "tcp443": false
+  },
+  {
+    "domain": "google.com",
+    "dns": "216.239.38.120",
+    "tcp443": true,
+    "tls": "TLSv1.3",
+    "https": null
+  },
+  {
+    "domain": "cloudflare.com",
+    "dns": null
+  },
+  {
+    "domain": "github.com",
+    "dns": null
+  },
+  {
+    "domain": "openai.com",
+    "dns": "104.18.32.47",
+    "tcp443": true,
+    "tls": "TLSv1.3",
+    "https": null
+  },
+  {
+    "domain": "wikipedia.org",
+    "dns": null
+  },
+  {
+    "domain": "amazon.com",
+    "dns": null
+  },
+  {
+    "domain": "youtube.com",
+    "dns": "10.10.34.36",
+    "tcp443": false,
+    "tls": null,
+    "https": null
+  },
+  {
+    "domain": "bbc.com",
+    "dns": "10.10.34.36",
+    "tcp443": false,
+    "tls": null,
+    "https": null
+  },
+  {
+    "domain": "telegram.org",
+    "dns": "10.10.34.36",
+    "tcp443": false,
+    "tls": null,
+    "https": null
+  },
+  {
+    "domain": "twitter.com",
+    "dns": "10.10.34.36",
+    "tcp443": false,
+    "tls": null,
+    "https": null
+  },
+  {
+    "domain": "bing.com",
+    "dns": "204.79.197.220",
+    "tcp443": false,
+    "tls": null,
+    "https": null
+  },
+  {
+    "domain": "duckduckgo.com",
+    "dns": "52.250.41.2",
+    "tcp443": false,
+    "tls": null,
+    "https": null
+  },
+  {
+    "domain": "fast.com",
+    "dns": null
+  }
+]

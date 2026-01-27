@@ -127,12 +127,15 @@ class Transaction(db.Model):
         """
         P0-2: Centralized signed_quantity calculation
         This is the ONLY place where signed_quantity should be set.
+        P1-FIX: Properly handles unit conversion factor lookup
         
         Rules:
         - quantity is always positive (abs value)
         - direction is determined by transaction_type (except for adjustments)
-        - signed_quantity = quantity * direction
+        - signed_quantity = quantity * direction * conversion_factor
         """
+        from .item import Item
+        
         # Ensure quantity is positive
         self.quantity = abs(self.quantity) if self.quantity else 0
         
@@ -143,8 +146,32 @@ class Transaction(db.Model):
             # For other types, derive direction from type
             self.direction = TRANSACTION_DIRECTION.get(self.transaction_type, 1)
         
-        # Determine conversion factor (defaults to 1.0 if not set)
-        factor = self.conversion_factor_to_base or 1.0
+        # P1-FIX: Properly determine conversion factor
+        factor = self.conversion_factor_to_base
+        
+        if factor is None:
+            # Try to get conversion factor from Item model
+            if self.unit:
+                factor = Item.get_conversion_factor(self.unit)
+            
+            # If still None, check if unit matches base unit (factor = 1.0)
+            if factor is None:
+                item = Item.query.get(self.item_id) if self.item_id else None
+                if item:
+                    base_unit = item.get_base_unit() if hasattr(item, 'get_base_unit') else item.unit
+                    if self.unit == base_unit or self.unit is None:
+                        factor = 1.0
+                    else:
+                        # P1-FIX: Raise error instead of silently defaulting to 1.0
+                        raise ValueError(
+                            f"Cannot determine conversion factor for unit '{self.unit}' to base unit '{base_unit}'. "
+                            f"Please specify conversion_factor_to_base explicitly."
+                        )
+                else:
+                    # No item context, default to 1.0 only if no unit specified
+                    factor = 1.0
+        
+        self.conversion_factor_to_base = factor
 
         # P0-2 / Phase 3.1: signed_quantity ALWAYS in base units
         self.signed_quantity = self.quantity * factor * self.direction

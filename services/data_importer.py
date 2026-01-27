@@ -232,6 +232,8 @@ class DataImporter:
         self.row_errors = []  # P0-5: Row-level error logging
         self.import_batch = None
         self.sheet_to_hotel_map = self._build_hotel_mapping()
+        # P3-FIX: Track affected item IDs during import for initial stock transactions
+        self.affected_item_ids = set()
     
     def _build_hotel_mapping(self):
         """
@@ -268,6 +270,7 @@ class DataImporter:
     def import_excel(self, file_path, selected_sheets=None, allow_replace=False):
         """
         Import data from Excel file with P0-2 idempotency check
+        P1-FIX: Uses nested transaction for proper rollback on failure
         
         Args:
             file_path: Path to Excel file
@@ -280,123 +283,140 @@ class DataImporter:
         if not os.path.exists(file_path):
             return {'success': False, 'error': f'File not found: {file_path}'}
         
-        try:
-            # P0-2: Compute file hash for idempotency
-            file_hash = compute_file_hash(file_path)
-            file_size = os.path.getsize(file_path)
-            filename = os.path.basename(file_path)
-            
-            # Check if already imported
-            existing_batch = check_import_exists(file_hash)
-            if existing_batch and not allow_replace:
-                return {
-                    'success': False,
-                    'error': f'This file has already been imported (batch #{existing_batch.id} on {existing_batch.created_at})',
-                    'existing_batch_id': existing_batch.id,
-                    'already_imported': True
-                }
-            
-            # P0-1 Fix: Improved replace mode with is_active flag
-            old_batch_id = None
-            if existing_batch and allow_replace:
-                old_batch_id = existing_batch.id
-                # Deactivate old batch
-                existing_batch.is_active = False
-                existing_batch.status = 'replaced'
-                existing_batch.replaced_at = datetime.utcnow()
-
-                # Calculate stock deltas BEFORE soft delete to keep snapshot
-                stock_deltas = db.session.query(
-                    Transaction.item_id,
-                    func.coalesce(func.sum(Transaction.signed_quantity), 0)
-                ).filter(
-                    Transaction.import_batch_id == existing_batch.id,
-                    Transaction.is_deleted != True
-                ).group_by(Transaction.item_id).all()
-
-                # Soft-delete old transactions (only ones still active)
-                Transaction.query.filter(
-                    Transaction.import_batch_id == existing_batch.id,
-                    Transaction.is_deleted != True
-                ).update({
-                    'is_deleted': True,
-                    'deleted_at': datetime.utcnow()
-                }, synchronize_session=False)
-
-                # Apply stock rollback per affected item
-                if stock_deltas:
-                    affected_ids = [item_id for item_id, _ in stock_deltas]
-                    for item_id, signed_qty in stock_deltas:
-                        if not signed_qty:
-                            continue
-                        item = Item.query.get(item_id)
-                        if item:
-                            item.current_stock = (item.current_stock or 0) - float(signed_qty)
-
-                db.session.flush()
-            
-            # Create new ImportBatch (active by default)
-            self.import_batch = ImportBatch(
-                filename=filename,
-                file_hash=file_hash,
-                file_size=file_size,
-                hotel_id=self.hotel_id,
-                uploaded_by_id=self.user_id,
-                status='pending',
-                is_active=True,
-                replaces_batch_id=old_batch_id  # P0-1: Track what this replaces
-            )
-            db.session.add(self.import_batch)
-            db.session.flush()  # Get ID
-            
-            # P0-1: Link old batch to new one
-            if existing_batch and allow_replace:
-                existing_batch.replaced_by_id = self.import_batch.id
-            
-            # Read all sheets
-            excel_file = pd.ExcelFile(file_path)
-            sheet_names = excel_file.sheet_names
-            
-            if selected_sheets:
-                sheet_names = [s for s in sheet_names if s in selected_sheets]
-            
-            results = []
-            
-            for sheet_name in sheet_names:
-                result = self._import_sheet(excel_file, sheet_name)
-                results.append(result)
-            
-            # Update batch stats
-            self.import_batch.status = 'completed'
-            self.import_batch.items_created = self.imported_items
-            self.import_batch.items_updated = self.updated_items
-            self.import_batch.transactions_created = self.imported_transactions
-            self.import_batch.errors_count = len(self.row_errors)
-            if self.row_errors:
-                self.import_batch.error_details = json.dumps(self.row_errors[:100], ensure_ascii=False)
-            
-            # P0-1/P0-2: Create initial stock transactions for imported stock
-            self.create_initial_stock_transactions(self.user_id or 1)
-            
-            db.session.commit()
-            
+        # P0-2: Compute file hash for idempotency (outside transaction)
+        file_hash = compute_file_hash(file_path)
+        file_size = os.path.getsize(file_path)
+        filename = os.path.basename(file_path)
+        
+        # Check if already imported (outside transaction)
+        existing_batch = check_import_exists(file_hash)
+        if existing_batch and not allow_replace:
             return {
-                'success': True,
-                'batch_id': self.import_batch.id,
-                'total_items': self.imported_items,
-                'items_updated': self.updated_items,
-                'total_transactions': self.imported_transactions,
-                'sheets': results,
-                'errors': self.errors,
-                'warnings': self.warnings,
-                'row_errors': self.row_errors[:20]  # First 20 row errors
+                'success': False,
+                'error': f'This file has already been imported (batch #{existing_batch.id} on {existing_batch.created_at})',
+                'existing_batch_id': existing_batch.id,
+                'already_imported': True
             }
+        
+        # P1-FIX: Use nested transaction (savepoint) for atomic import
+        # If anything fails, the entire import rolls back including soft-deletes
+        try:
+            # Start a savepoint for the entire import operation
+            nested = db.session.begin_nested()
+            
+            try:
+                # P0-1 Fix: Improved replace mode with is_active flag
+                old_batch_id = None
+                if existing_batch and allow_replace:
+                    old_batch_id = existing_batch.id
+                    # Deactivate old batch
+                    existing_batch.is_active = False
+                    existing_batch.status = 'replaced'
+                    existing_batch.replaced_at = datetime.utcnow()
+
+                    # Calculate stock deltas BEFORE soft delete to keep snapshot
+                    stock_deltas = db.session.query(
+                        Transaction.item_id,
+                        func.coalesce(func.sum(Transaction.signed_quantity), 0)
+                    ).filter(
+                        Transaction.import_batch_id == existing_batch.id,
+                        Transaction.is_deleted != True
+                    ).group_by(Transaction.item_id).all()
+
+                    # Soft-delete old transactions (only ones still active)
+                    Transaction.query.filter(
+                        Transaction.import_batch_id == existing_batch.id,
+                        Transaction.is_deleted != True
+                    ).update({
+                        'is_deleted': True,
+                        'deleted_at': datetime.utcnow()
+                    }, synchronize_session=False)
+
+                    # Apply stock rollback per affected item
+                    if stock_deltas:
+                        for item_id, signed_qty in stock_deltas:
+                            if not signed_qty:
+                                continue
+                            item = Item.query.get(item_id)
+                            if item:
+                                item.current_stock = (item.current_stock or 0) - float(signed_qty)
+
+                    db.session.flush()
+                
+                # Create new ImportBatch (active by default)
+                self.import_batch = ImportBatch(
+                    filename=filename,
+                    file_hash=file_hash,
+                    file_size=file_size,
+                    hotel_id=self.hotel_id,
+                    uploaded_by_id=self.user_id,
+                    status='pending',
+                    is_active=True,
+                    replaces_batch_id=old_batch_id  # P0-1: Track what this replaces
+                )
+                db.session.add(self.import_batch)
+                db.session.flush()  # Get ID
+                
+                # P0-1: Link old batch to new one
+                if existing_batch and allow_replace:
+                    existing_batch.replaced_by_id = self.import_batch.id
+                
+                # Read all sheets
+                excel_file = pd.ExcelFile(file_path)
+                sheet_names = excel_file.sheet_names
+                
+                if selected_sheets:
+                    sheet_names = [s for s in sheet_names if s in selected_sheets]
+                
+                results = []
+                
+                for sheet_name in sheet_names:
+                    result = self._import_sheet(excel_file, sheet_name)
+                    results.append(result)
+                
+                # Update batch stats
+                self.import_batch.status = 'completed'
+                self.import_batch.items_created = self.imported_items
+                self.import_batch.items_updated = self.updated_items
+                self.import_batch.transactions_created = self.imported_transactions
+                self.import_batch.errors_count = len(self.row_errors)
+                if self.row_errors:
+                    self.import_batch.error_details = json.dumps(self.row_errors[:100], ensure_ascii=False)
+                
+                # P0-1/P0-2: Create initial stock transactions for imported stock
+                self.create_initial_stock_transactions(self.user_id or 1)
+                
+                # Commit the nested transaction (savepoint)
+                nested.commit()
+                # Commit the outer transaction
+                db.session.commit()
+                
+                return {
+                    'success': True,
+                    'batch_id': self.import_batch.id,
+                    'total_items': self.imported_items,
+                    'items_updated': self.updated_items,
+                    'total_transactions': self.imported_transactions,
+                    'sheets': results,
+                    'errors': self.errors,
+                    'warnings': self.warnings,
+                    'row_errors': self.row_errors[:20]  # First 20 row errors
+                }
+                
+            except Exception as inner_e:
+                # P1-FIX: Rollback to savepoint - this reverts soft-deletes too
+                nested.rollback()
+                raise inner_e
             
         except Exception as e:
-            if self.import_batch:
-                self.import_batch.status = 'failed'
-                self.import_batch.error_details = str(e)
-                db.session.commit()
+            # Full rollback of any partial changes
+            db.session.rollback()
+            
+            # Log the failure but don't persist failed batch state
+            # (since we rolled back, the batch doesn't exist)
+            import logging
+            logging.getLogger(__name__).error(f"Import failed and rolled back: {str(e)}")
+            
             return {'success': False, 'error': str(e)}
     
     def _import_sheet(self, excel_file, sheet_name):
@@ -557,6 +577,8 @@ class DataImporter:
             # P1-5: Ensure base_unit is set
             if not existing.base_unit:
                 existing.base_unit = existing.get_base_unit()
+            # P3-FIX: Track affected item for initial stock transactions
+            self.affected_item_ids.add(existing.id)
             return existing
         
         # Generate new item code
@@ -593,18 +615,32 @@ class DataImporter:
         )
         
         db.session.add(new_item)
+        db.session.flush()  # Get ID for tracking
+        # P3-FIX: Track new item for initial stock transactions
+        self.affected_item_ids.add(new_item.id)
         return new_item
     
     def create_initial_stock_transactions(self, user_id=1):
-        """Create initial stock transactions for items with current_stock > 0
-        P0-2: Mark as opening balance with proper fields"""
-        items_with_stock = Item.query.filter(Item.current_stock > 0).all()
+        """
+        Create initial stock transactions for items with current_stock > 0
+        P0-2: Mark as opening balance with proper fields
+        P3-FIX: Only process items from current import batch (tracked via affected_item_ids)
+        """
+        # P3-FIX: Only process items that were created/updated in THIS import
+        if not self.affected_item_ids:
+            return 0
+        
+        items_with_stock = Item.query.filter(
+            Item.id.in_(self.affected_item_ids),
+            Item.current_stock > 0
+        ).all()
         
         for item in items_with_stock:
-            # Check if initial transaction exists
+            # Check if initial transaction exists for this batch
             existing = Transaction.query.filter_by(
                 item_id=item.id,
-                is_opening_balance=True
+                is_opening_balance=True,
+                import_batch_id=self.import_batch.id if self.import_batch else None
             ).first()
             
             if not existing and item.current_stock > 0:

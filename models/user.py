@@ -101,14 +101,27 @@ class User(UserMixin, db.Model):
         return False
     
     def record_failed_login(self):
-        """Record a failed login attempt"""
+        """
+        Record a failed login attempt
+        P2-FIX: Use config value for lockout duration instead of hardcoded 15 minutes
+        """
         self.failed_login_attempts = (self.failed_login_attempts or 0) + 1
         self.last_failed_login = datetime.utcnow()
         
-        # Lock account after 5 failed attempts
-        if self.failed_login_attempts >= 5:
+        # P2-FIX: Get config values from app config
+        try:
+            from flask import current_app
+            max_attempts = current_app.config.get('MAX_LOGIN_ATTEMPTS', 5)
+            lockout_seconds = current_app.config.get('LOGIN_LOCKOUT_DURATION', 300)
+        except RuntimeError:
+            # Outside app context, use defaults
+            max_attempts = 5
+            lockout_seconds = 300  # 5 minutes
+        
+        # Lock account after max failed attempts
+        if self.failed_login_attempts >= max_attempts:
             from datetime import timedelta
-            self.locked_until = datetime.utcnow() + timedelta(minutes=15)
+            self.locked_until = datetime.utcnow() + timedelta(seconds=lockout_seconds)
     
     def clear_failed_logins(self):
         """Clear failed login attempts on successful login"""

@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, abort
 from flask_login import login_required, current_user
+from sqlalchemy import update
 from models import db, Transaction, Item, Alert, WarehouseSettings
 from models.transaction import WASTE_REASONS, DEPARTMENTS
 from datetime import date, datetime, timedelta, timezone
@@ -305,8 +306,14 @@ def create():
             
             # P0-2: Update stock using signed_quantity from transaction
             # Only update stock if approval NOT required
+            # P1-FIX: Use atomic database update to prevent race conditions
             if not requires_approval:
-                item.current_stock = (item.current_stock or 0) + transaction.signed_quantity
+                db.session.execute(
+                    update(Item).where(Item.id == item.id)
+                    .values(current_stock=Item.current_stock + transaction.signed_quantity)
+                )
+                db.session.flush()  # Ensure update is applied before alert check
+                db.session.refresh(item)  # Refresh to get updated stock value
                 # Bug #9: Check and create stock alerts (only if stock updated)
                 check_and_create_stock_alert(item)
             

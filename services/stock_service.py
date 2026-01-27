@@ -6,7 +6,7 @@ Provides functions for recalculating and rebuilding stock from transactions
 """
 
 from datetime import datetime
-from sqlalchemy import func
+from sqlalchemy import func, update
 from models import db, Item, Transaction, TRANSACTION_DIRECTION
 
 
@@ -137,8 +137,11 @@ def adjust_stock(item_id, delta_quantity, reason, user_id, hotel_id=None):
     
     db.session.add(tx)
     
-    # Update cache (delta_quantity is already signed)
-    item.current_stock = (item.current_stock or 0) + delta_quantity
+    # P1-FIX: Atomic stock update to prevent race conditions
+    db.session.execute(
+        update(Item).where(Item.id == item_id)
+        .values(current_stock=Item.current_stock + delta_quantity)
+    )
     
     db.session.commit()
     return tx
@@ -188,8 +191,11 @@ def create_stock_transaction(item_id, transaction_type, quantity, unit_price,
     
     db.session.add(tx)
     
-    # Update cache
-    item.current_stock = (item.current_stock or 0) + tx.signed_quantity
+    # P1-FIX: Atomic stock update to prevent race conditions
+    db.session.execute(
+        update(Item).where(Item.id == item_id)
+        .values(current_stock=Item.current_stock + tx.signed_quantity)
+    )
     
     return tx
 

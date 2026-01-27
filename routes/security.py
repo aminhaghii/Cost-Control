@@ -11,6 +11,15 @@ import base64
 
 security_bp = Blueprint('security', __name__, url_prefix='/security')
 
+# P2-FIX: Import limiter for rate limiting (initialized in app.py)
+def get_limiter():
+    """Get the rate limiter instance from app module"""
+    try:
+        from app import limiter
+        return limiter
+    except ImportError:
+        return None
+
 
 @security_bp.route('/2fa/setup', methods=['GET', 'POST'])
 @login_required
@@ -101,7 +110,10 @@ def disable_2fa():
 
 @security_bp.route('/2fa/verify', methods=['GET', 'POST'])
 def verify_2fa():
-    """Verify 2FA token during login"""
+    """
+    Verify 2FA token during login
+    P2-FIX: Rate limited to prevent brute-force attacks on TOTP codes
+    """
     user_id = session.get('pending_2fa_user_id')
     if not user_id:
         return redirect(url_for('auth.login'))
@@ -112,6 +124,41 @@ def verify_2fa():
         return redirect(url_for('auth.login'))
     
     if request.method == 'POST':
+        # P2-FIX: Apply rate limiting to POST requests only (5 attempts per minute)
+        limiter = get_limiter()
+        if limiter:
+            try:
+                # Check rate limit manually for this specific endpoint
+                from flask import current_app
+                key = f"2fa_verify:{request.remote_addr}"
+                
+                # Use in-memory tracking as fallback
+                from datetime import timedelta
+                attempts_key = f'2fa_attempts_{request.remote_addr}'
+                attempts_time_key = f'2fa_attempts_time_{request.remote_addr}'
+                
+                current_attempts = session.get(attempts_key, 0)
+                last_attempt_time = session.get(attempts_time_key)
+                
+                # Reset counter if more than 1 minute has passed
+                if last_attempt_time:
+                    from datetime import datetime as dt
+                    if isinstance(last_attempt_time, str):
+                        last_attempt_time = dt.fromisoformat(last_attempt_time)
+                    if (datetime.utcnow() - last_attempt_time) > timedelta(minutes=1):
+                        current_attempts = 0
+                
+                if current_attempts >= 5:
+                    flash('تعداد تلاش‌های شما بیش از حد مجاز است. لطفاً یک دقیقه صبر کنید.', 'danger')
+                    return render_template('security/verify_2fa.html'), 429
+                
+                # Increment attempt counter
+                session[attempts_key] = current_attempts + 1
+                session[attempts_time_key] = datetime.utcnow().isoformat()
+                
+            except Exception:
+                pass  # Don't block login if rate limiting fails
+        
         token = request.form.get('token', '').strip()
         
         if user.verify_totp(token):
@@ -132,9 +179,11 @@ def verify_2fa():
             )
             db.session.commit()
             
-            # Clear session data
+            # Clear session data including rate limit counters
             session.pop('pending_2fa_user_id', None)
             session.pop('pending_2fa_remember', None)
+            session.pop(f'2fa_attempts_{request.remote_addr}', None)
+            session.pop(f'2fa_attempts_time_{request.remote_addr}', None)
             
             flash('خوش آمدید!', 'success')
             next_page = session.pop('pending_2fa_next', None)

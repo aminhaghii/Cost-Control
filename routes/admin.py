@@ -825,9 +825,10 @@ def data_import():
             file.save(filepath)
             
             # Import the data
+            # P3-FIX: Pass user context to DataImporter for proper auditing
             from services.data_importer import DataImporter
             
-            importer = DataImporter()
+            importer = DataImporter(user_id=current_user.id, hotel_id=None)
             result = importer.import_excel(filepath)
             
             if result['success']:
@@ -882,9 +883,10 @@ def import_existing_file(filename):
         flash('فایل یافت نشد', 'danger')
         return redirect(url_for('admin.data_import'))
     
+    # P3-FIX: Pass user context to DataImporter for proper auditing
     from services.data_importer import DataImporter
     
-    importer = DataImporter()
+    importer = DataImporter(user_id=current_user.id, hotel_id=None)
     result = importer.import_excel(filepath)
     
     if result['success']:
