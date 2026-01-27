@@ -1963,25 +1963,7 @@ SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
 
 ---
 
-## 📄 License
 
-[Your License Here]
-
----
-
-## 👥 Contributors
-
-[Your Team/Contributors Here]
-
----
-
-## 📞 Support
-
-For issues or questions:
-- Check this README first
-- Review `IMPLEMENTATION_CHANGES.md`
-- Check application logs
-- Open an issue in repository
 
 ---
 
