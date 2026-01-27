@@ -66,9 +66,11 @@ class Transaction(db.Model):
     
     # P0-3: quantity is ALWAYS positive (>= 0)
     quantity = db.Column(db.Float, nullable=False)
-    # P0-4: Money columns use Numeric for precision (12 digits, 2 decimal places)
-    unit_price = db.Column(db.Numeric(12, 2), nullable=False, default=0)
-    total_amount = db.Column(db.Numeric(12, 2), nullable=False, default=0)
+    # BUG-FIX #4: Increase Numeric precision to prevent overflow
+    # Old: Numeric(12, 2) = max 999,999,999,999.99 (1 trillion - 1)
+    # New: Numeric(18, 2) = max 999,999,999,999,999,999.99 (1 quintillion - 1)
+    unit_price = db.Column(db.Numeric(18, 2), nullable=False, default=0)
+    total_amount = db.Column(db.Numeric(18, 2), nullable=False, default=0)
     description = db.Column(db.Text, nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     
@@ -126,8 +128,7 @@ class Transaction(db.Model):
     def calculate_signed_quantity(self):
         """
         P0-2: Centralized signed_quantity calculation
-        This is the ONLY place where signed_quantity should be set.
-        P1-FIX: Properly handles unit conversion factor lookup
+        BUG-FIX #13: Improved error messages with full context
         
         Rules:
         - quantity is always positive (abs value)
@@ -157,19 +158,25 @@ class Transaction(db.Model):
             # If still None, check if unit matches base unit (factor = 1.0)
             if factor is None:
                 item = Item.query.get(self.item_id) if self.item_id else None
-                if item:
-                    base_unit = item.get_base_unit() if hasattr(item, 'get_base_unit') else item.unit
-                    if self.unit == base_unit or self.unit is None:
-                        factor = 1.0
-                    else:
-                        # P1-FIX: Raise error instead of silently defaulting to 1.0
-                        raise ValueError(
-                            f"Cannot determine conversion factor for unit '{self.unit}' to base unit '{base_unit}'. "
-                            f"Please specify conversion_factor_to_base explicitly."
-                        )
-                else:
-                    # No item context, default to 1.0 only if no unit specified
+                
+                # BUG-FIX #13: Better error message when item not found
+                if not item:
+                    raise ValueError(
+                        f"Cannot calculate signed_quantity: Item with ID {self.item_id} does not exist. "
+                        f"Transaction ID: {self.id}, Type: {self.transaction_type}"
+                    )
+                
+                base_unit = item.get_base_unit() if hasattr(item, 'get_base_unit') else item.unit
+                if self.unit == base_unit or self.unit is None:
                     factor = 1.0
+                else:
+                    # BUG-FIX #13: Include all context in error
+                    raise ValueError(
+                        f"Cannot convert unit '{self.unit}' to base unit '{base_unit}' "
+                        f"for item '{item.item_name_fa}' (ID: {item.id}). "
+                        f"Transaction ID: {self.id}. "
+                        f"Please add '{self.unit}' to UNIT_CONVERSIONS in models/item.py"
+                    )
         
         self.conversion_factor_to_base = factor
 
@@ -182,9 +189,11 @@ class Transaction(db.Model):
                            unit_price=None, direction=None, description=None, source='manual', 
                            is_opening_balance=False, import_batch_id=None, unit=None, 
                            conversion_factor_to_base=None, price_override_reason=None, 
-                           requires_approval=False):
+                           requires_approval=False, allow_price_override=False):
         """
         P0-2/P0-3/P0-4: Centralized transaction creation
+        BUG-FIX #2: Removed current_user dependency - now uses allow_price_override parameter
+        
         Use this factory method instead of direct instantiation.
         Ensures money calculations use Decimal with proper rounding.
         
@@ -202,20 +211,17 @@ class Transaction(db.Model):
         if quantity is None or float(quantity) <= 0:
             raise ValueError(f"Quantity must be greater than zero, got: {quantity}")
 
-        # PRICE CONTROL: Use item's base price unless override is provided
+        # BUG-FIX #2: PRICE CONTROL without current_user dependency
+        # Now relies on allow_price_override parameter (set by caller after auth check)
         if unit_price is not None:
-            # Price override - check if user has permission
-            from flask_login import current_user
-            if current_user.role not in ['admin', 'manager', 'accountant']:
-                raise ValueError("Only admin/manager/accountant can override item prices")
+            # Price override - check permission via parameter
+            if not allow_price_override:
+                raise ValueError("Price override requires admin/manager/accountant permission")
             
             if not price_override_reason:
                 raise ValueError("Price override requires a reason")
             
-            # Mark for approval if not admin
-            if current_user.role != 'admin':
-                requires_approval = True
-            
+            # Mark for approval if not admin (caller should set this)
             final_price = Decimal(str(unit_price))
         else:
             # Use item's base price

@@ -4,42 +4,12 @@ from models import db, User, AuditLog
 from datetime import datetime, timedelta
 import logging
 
+# BUG-FIX #3: Import database-backed rate limiting
+from services.rate_limit_service import LoginAttempt
+
 logger = logging.getLogger(__name__)
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
-
-# In-memory store for login attempts (use Redis in production)
-login_attempts = {}
-
-def check_login_lockout(username):
-    """Check if user is locked out due to too many failed attempts"""
-    if username not in login_attempts:
-        return False
-    
-    attempts, lockout_time = login_attempts[username]
-    max_attempts = current_app.config.get('MAX_LOGIN_ATTEMPTS', 5)
-    lockout_duration = current_app.config.get('LOGIN_LOCKOUT_DURATION', 300)
-    
-    if attempts >= max_attempts:
-        if datetime.utcnow() < lockout_time + timedelta(seconds=lockout_duration):
-            return True
-        else:
-            # Reset after lockout period
-            del login_attempts[username]
-    return False
-
-def record_failed_login(username):
-    """Record a failed login attempt"""
-    if username not in login_attempts:
-        login_attempts[username] = (1, datetime.utcnow())
-    else:
-        attempts, _ = login_attempts[username]
-        login_attempts[username] = (attempts + 1, datetime.utcnow())
-
-def clear_login_attempts(username):
-    """Clear login attempts after successful login"""
-    if username in login_attempts:
-        del login_attempts[username]
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -55,9 +25,11 @@ def login():
             flash('لطفاً نام کاربری و رمز عبور را وارد کنید', 'danger')
             return render_template('auth/login.html')
         
-        # Check for brute force lockout
-        if check_login_lockout(username):
-            logger.warning(f'Login attempt blocked for locked user: {username}')
+        # BUG-FIX #3: Use database-backed rate limiting
+        identifier = f"{username}:{request.remote_addr}"
+        
+        if LoginAttempt.is_locked(identifier):
+            logger.warning(f'Login attempt blocked for locked identifier: {identifier}')
             flash('حساب شما به دلیل تلاش‌های ناموفق متعدد موقتاً قفل شده است. لطفاً ۵ دقیقه صبر کنید.', 'danger')
             return render_template('auth/login.html')
         
@@ -95,7 +67,7 @@ def login():
             login_user(user, remember=remember)
             user.last_login = datetime.utcnow()
             user.clear_failed_logins()
-            clear_login_attempts(username)  # Clear lockout on success
+            LoginAttempt.clear_attempts(identifier)  # BUG-FIX #3
             
             # Log successful login
             AuditLog.log(
@@ -122,8 +94,9 @@ def login():
                 return redirect(next_page)
             return redirect(url_for('dashboard.index'))
         else:
-            # Record failed login attempt for brute force protection
-            record_failed_login(username)
+            # BUG-FIX #3: Record failed attempt in database
+            is_locked, remaining = LoginAttempt.record_failed_attempt(identifier)
+            
             logger.warning(f'Failed login attempt for user: {username}')
             
             # Log failed login attempt and update user lockout
@@ -139,7 +112,11 @@ def login():
                     request=request
                 )
                 db.session.commit()
-            flash('نام کاربری یا رمز عبور اشتباه است', 'danger')
+            
+            if is_locked:
+                flash('حساب شما به دلیل تلاش‌های ناموفق قفل شد. لطفاً ۵ دقیقه صبر کنید.', 'danger')
+            else:
+                flash(f'نام کاربری یا رمز عبور اشتباه است. {remaining} تلاش باقی‌مانده.', 'danger')
     
     return render_template('auth/login.html')
 

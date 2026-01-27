@@ -273,6 +273,9 @@ def create():
                 if settings.check_waste_approval_needed(total_float):
                     requires_approval = True
             
+            # BUG-FIX #2: Check permission before calling create_transaction
+            allow_override = current_user.role in ['admin', 'manager', 'accountant']
+            
             # P0-2/P0-3: Use centralized transaction creation
             transaction = Transaction.create_transaction(
                 item_id=item.id,
@@ -283,7 +286,9 @@ def create():
                 hotel_id=item.hotel_id,
                 user_id=current_user.id,
                 description=description,
-                source='manual'
+                source='manual',
+                allow_price_override=allow_override,
+                price_override_reason=request.form.get('price_override_reason')
             )
             transaction.transaction_date = transaction_date
             

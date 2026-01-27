@@ -83,16 +83,28 @@ class Item(db.Model):
     def get_conversion_factor(from_unit, to_unit=None):
         """
         P1-5: Get conversion factor between units
+        BUG-FIX #1 & #14: Raise error for unknown units instead of defaulting to 1.0
         
         Args:
             from_unit: Source unit
             to_unit: Target unit (if None, converts to base unit)
         
         Returns:
-            Conversion factor or None if incompatible
+            Conversion factor
+        
+        Raises:
+            ValueError: If from_unit is not recognized or units are incompatible
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
         if from_unit not in UNIT_CONVERSIONS:
-            return 1.0  # Unknown unit, no conversion
+            # BUG-FIX #1 & #14: Log and raise error instead of defaulting to 1.0
+            logger.warning(
+                f"Unknown unit '{from_unit}' encountered in conversion. "
+                f"Valid units: {', '.join(list(UNIT_CONVERSIONS.keys())[:10])}..."
+            )
+            raise ValueError(f"Unknown unit: '{from_unit}'. Valid units: {', '.join(UNIT_CONVERSIONS.keys())}")
         
         from_type, from_factor = UNIT_CONVERSIONS[from_unit]
         
@@ -101,11 +113,13 @@ class Item(db.Model):
             return from_factor
         
         if to_unit not in UNIT_CONVERSIONS:
-            return None  # Can't convert to unknown unit
+            logger.warning(f"Unknown target unit '{to_unit}' in conversion")
+            raise ValueError(f"Unknown target unit: '{to_unit}'")
         
         to_type, to_factor = UNIT_CONVERSIONS[to_unit]
         
         if from_type != to_type:
-            return None  # Incompatible units
+            logger.error(f"Incompatible unit types: {from_type} vs {to_type} ({from_unit} -> {to_unit})")
+            raise ValueError(f"Cannot convert between incompatible unit types: {from_type} vs {to_type}")
         
         return from_factor / to_factor
