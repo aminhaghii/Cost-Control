@@ -76,7 +76,7 @@
                     </div>
                     <div class="col-4">
                         <div class="display-6 {% if food_stats.pareto_valid %}text-success{% else %}text-warning{% endif %}">
-                            {% if food_stats.pareto_valid %}✅{% else %}⚠️{% endif %}
+                            {% if food_stats.pareto_valid %}✓{% else %}!{% endif %}
                         </div>
                         <small class="text-muted">قانون 80/20</small>
                     </div>
@@ -110,7 +110,7 @@
                     </div>
                     <div class="col-4">
                         <div class="display-6 {% if nonfood_stats.pareto_valid %}text-success{% else %}text-warning{% endif %}">
-                            {% if nonfood_stats.pareto_valid %}✅{% else %}⚠️{% endif %}
+                            {% if nonfood_stats.pareto_valid %}✓{% else %}!{% endif %}
                         </div>
                         <small class="text-muted">قانون 80/20</small>
                     </div>
@@ -261,7 +261,7 @@
                 </ul>
             </div>
             <div class="col-md-6">
-                <h5>📊 کاربرد در هتل شما</h5>
+                <h5>کاربرد در هتل شما</h5>
                 <div class="alert alert-light">
                     <p class="mb-2"><strong>کلاس A (0-80% تجمعی):</strong> کنترل روزانه، ذخیره ایمنی بالا</p>
                     <p class="mb-2"><strong>کلاس B (80-95% تجمعی):</strong> کنترل هفتگی</p>

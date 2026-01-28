@@ -113,7 +113,7 @@
                 <div class="chat-header">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h4>🤖 چت‌بات تحلیلی هوشمند</h4>
+                            <h4>چت‌بات تحلیلی هوشمند</h4>
                             <div class="stats">
                                 پاسخ‌دهی real-time با حافظه مکالمه
                             </div>
@@ -140,7 +140,7 @@
                 <div class="chat-messages" id="chatMessages">
                     <!-- Welcome Message -->
                     <div class="welcome-message" id="welcomeMessage">
-                        <div class="icon">🏨</div>
+                        <div class="icon"></div>
                         <h5>به چت‌بات تحلیلی خوش آمدید!</h5>
                         <p>هر سوالی درباره موجودی، خرید، مصرف، ضایعات یا تحلیل پارتو دارید بپرسید.</p>
                         <div class="suggestions" id="initialSuggestions">
@@ -152,7 +152,7 @@
                 <!-- Typing Indicator -->
                 <div class="typing-indicator" id="typingIndicator">
                     <div class="message-avatar" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); width: 30px; height: 30px; margin-left: 10px;">
-                        🤖
+                        AI
                     </div>
                     <div style="display: flex; align-items: center; padding: 10px;">
                         <div class="typing-dot"></div>
@@ -206,7 +206,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!confirm('آیا از پاک کردن تاریخچه مکالمات مطمئن هستید؟')) return;
         
         try {
-            const response = await fetch('/chat/api/clear-history', { method: 'POST' });
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            const response = await fetch('/chat/api/clear-history', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken
+                }
+            });
             const data = await response.json();
             if (data.success) {
                 // Clear messages and show welcome
@@ -267,7 +273,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message message-${type}`;
         
-        const avatar = type === 'bot' ? '🤖' : '👤';
+        const avatar = type === 'bot' ? 'AI' : '';
         const time = timestamp || new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' });
         
         // Convert markdown-like formatting

@@ -88,6 +88,8 @@ def items_list():
     hotel_id = request.args.get('hotel_id', type=int) or get_user_hotel_id()
     category = request.args.get('category')
     status_filter = request.args.get('status')
+    page = request.args.get('page', 1, type=int)
+    per_page = 50
     
     if not hotel_id or not user_can_access_hotel(current_user, hotel_id):
         flash('دسترسی غیرمجاز', 'danger')
@@ -98,8 +100,19 @@ def items_list():
     if status_filter:
         items = [i for i in items if i['status'] == status_filter]
     
+    # Pagination
+    total_items = len(items)
+    total_pages = (total_items + per_page - 1) // per_page
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    items_page = items[start_idx:end_idx]
+    
     return render_template('warehouse/items.html',
-                         items=items,
+                         items=items_page,
+                         total_items=total_items,
+                         page=page,
+                         total_pages=total_pages,
+                         per_page=per_page,
                          hotel_id=hotel_id,
                          category=category,
                          status_filter=status_filter)

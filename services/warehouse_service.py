@@ -54,7 +54,7 @@ class WarehouseService:
         active_alerts = Alert.query.filter_by(
             hotel_id=hotel_id,
             status='active'
-        ).order_by(Alert.created_at.desc()).limit(10).all()
+        ).order_by(Alert.created_at.desc()).all()
         
         # Recent movements
         recent_movements = Transaction.query.filter_by(
@@ -179,10 +179,35 @@ class WarehouseService:
         
         waste_rate = (float(total_waste) / float(total_purchase) * 100) if total_purchase else 0
         
+        # Current month waste rate
+        from utils.timezone import get_iran_today
+        today = get_iran_today()
+        month_start = today.replace(day=1)
+        
+        month_purchase = db.session.query(func.sum(Transaction.total_amount)).filter(
+            Transaction.hotel_id == hotel_id,
+            Transaction.transaction_type == 'خرید',
+            Transaction.transaction_date >= month_start,
+            Transaction.is_deleted == False,
+            Transaction.is_opening_balance == False
+        ).scalar() or Decimal(0)
+        
+        month_waste = db.session.query(func.sum(Transaction.total_amount)).filter(
+            Transaction.hotel_id == hotel_id,
+            Transaction.transaction_type == 'ضایعات',
+            Transaction.transaction_date >= month_start,
+            Transaction.is_deleted == False
+        ).scalar() or Decimal(0)
+        
+        month_waste_rate = (float(month_waste) / float(month_purchase) * 100) if month_purchase else 0
+        
         return {
             'total_purchase': float(total_purchase),
             'total_waste': float(total_waste),
             'waste_rate': round(waste_rate, 2),
+            'month_purchase': float(month_purchase),
+            'month_waste': float(month_waste),
+            'month_waste_rate': round(month_waste_rate, 2),
             'status': 'good' if waste_rate < 3 else ('warning' if waste_rate < 5 else 'critical')
         }
     

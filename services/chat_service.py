@@ -127,6 +127,9 @@ class ChatService:
 - از ایموجی برای خوانایی بهتر استفاده کن (📦, 📊, ⚠️, ✅)
 - به فارسی و صمیمی پاسخ بده
 - از تاریخچه مکالمه برای درک بهتر استفاده کن
+- پاسخ را در دو بخش بده:
+  1) «پاسخ نهایی»
+  2) «خلاصه استدلال» در حد متوسط (۲ تا ۴ bullet) بدون نمایش مراحل محاسبه یا chain-of-thought
 
 نکات مهم:
 - کلاس A: اقلام حیاتی (80% ارزش) - نیاز به کنترل روزانه
@@ -241,7 +244,9 @@ class ChatService:
             waste_dec = to_decimal(waste_raw)
             waste_ratio = (waste_dec / purchases_dec * Decimal('100')) if purchases_dec > 0 else Decimal('0')
             
-            today_filter = [func.date(Transaction.transaction_date) == datetime.now().date()]
+            from utils.timezone import get_iran_today
+            iran_today = get_iran_today()
+            today_filter = [func.date(Transaction.transaction_date) == iran_today]
             if allowed_hotel_ids is not None:
                 today_filter.append(Transaction.hotel_id.in_(allowed_hotel_ids))
             today_trans = Transaction.query.filter(*today_filter).count()
@@ -254,14 +259,18 @@ class ChatService:
             food_abc = self.abc_service.get_abc_classification('خرید', 'Food', 30, user=user)
             nonfood_abc = self.abc_service.get_abc_classification('خرید', 'NonFood', 30, user=user)
             
-            # Format class items
-            class_a_items = self._format_class_items(food_abc.get('A', [])[:5])
+            # Format class items (show top 10 for Class A, 5 for B/C)
+            class_a_items = self._format_class_items(food_abc.get('A', [])[:10])
             class_b_items = self._format_class_items(food_abc.get('B', [])[:5])
             class_c_items = self._format_class_items(food_abc.get('C', [])[:5])
             
             # Top items
             top_purchases = self._get_top_items('خرید', 5)
             top_waste = self._get_top_items('ضایعات', 5)
+            
+            # ═══ ADD ITEM INVENTORY DETAILS ═══
+            # Get top 20 items with their current stock for AI context
+            top_items_with_stock = self._get_items_with_stock(items_query, limit=20)
             
             # ═══ ADD WAREHOUSE CONTEXT ═══
             warehouse_ctx = self._get_warehouse_context(user, allowed_hotel_ids)
@@ -306,7 +315,12 @@ class ChatService:
 {top_waste}
 
 ═══════════════════════════════════════════
-📦 وضعیت انبار (Warehouse Status)
+� موجودی کالاهای اصلی (Top Items Inventory)
+═══════════════════════════════════════════
+{top_items_with_stock}
+
+═══════════════════════════════════════════
+�� وضعیت انبار (Warehouse Status)
 ═══════════════════════════════════════════
 موجودی بحرانی: {warehouse_ctx['stock_status']['critical_count']} قلم
 موجودی اضافی: {warehouse_ctx['stock_status']['overstocked_count']} قلم
@@ -382,6 +396,36 @@ class ChatService:
             lines = [f"- {r['item_name']}: {r['amount']:,.0f} ریال" for _, r in top.iterrows()]
             return '\n'.join(lines)
         except Exception:
+            return "داده‌ای موجود نیست"
+    
+    def _get_items_with_stock(self, items_query, limit: int = 20) -> str:
+        """Get top items with their current stock for AI context"""
+        try:
+            items = items_query.filter(Item.is_active == True).order_by(
+                Item.current_stock.desc()
+            ).limit(limit).all()
+            
+            if not items:
+                return "داده‌ای موجود نیست"
+            
+            lines = []
+            for item in items:
+                stock = float(item.current_stock or 0)
+                min_stock = float(item.min_stock or 0)
+                max_stock = float(item.max_stock or 0)
+                unit = item.unit or ''
+                
+                status = "عادی"
+                if min_stock > 0 and stock <= min_stock:
+                    status = "⚠️ کم"
+                elif max_stock > 0 and stock >= max_stock:
+                    status = "📈 زیاد"
+                
+                lines.append(f"  - {item.item_name_fa}: {stock:.1f} {unit} (حداقل: {min_stock:.1f}, حداکثر: {max_stock:.1f}) [{status}]")
+            
+            return '\n'.join(lines)
+        except Exception as e:
+            print(f"Error getting items with stock: {e}")
             return "داده‌ای موجود نیست"
     
     def _get_avg_daily_consumption(self, item_id: int, days: int = 30) -> float:
@@ -461,26 +505,54 @@ class ChatService:
             month_start = today.replace(day=1)
             
             waste_service = WasteAnalysisService()
+            # For waste analysis, use first hotel or skip if None (admin without hotel selection)
             first_hotel_id = hotel_ids[0] if hotel_ids and len(hotel_ids) > 0 else None
             
-            current_waste = waste_service.get_waste_summary(
-                hotel_id=first_hotel_id,
-                start_date=month_start,
-                end_date=today
-            )
-            
-            waste_by_reason = waste_service.get_waste_by_reason(
-                hotel_id=first_hotel_id,
-                start_date=month_start,
-                end_date=today
-            )
-            
-            top_wasted = waste_service.get_top_wasted_items(
-                hotel_id=first_hotel_id,
-                start_date=month_start,
-                end_date=today,
-                limit=5
-            )
+            if first_hotel_id:
+                current_waste = waste_service.get_waste_summary(
+                    hotel_id=first_hotel_id,
+                    start_date=month_start,
+                    end_date=today
+                )
+                
+                waste_by_reason = waste_service.get_waste_by_reason(
+                    hotel_id=first_hotel_id,
+                    start_date=month_start,
+                    end_date=today
+                )
+                
+                top_wasted = waste_service.get_top_wasted_items(
+                    hotel_id=first_hotel_id,
+                    start_date=month_start,
+                    end_date=today,
+                    limit=5
+                )
+            else:
+                # Admin without hotel filter - aggregate across all hotels
+                from models.hotel import Hotel
+                all_hotels = Hotel.query.all()
+                if all_hotels:
+                    first_hotel_id = all_hotels[0].id
+                    current_waste = waste_service.get_waste_summary(
+                        hotel_id=first_hotel_id,
+                        start_date=month_start,
+                        end_date=today
+                    )
+                    waste_by_reason = waste_service.get_waste_by_reason(
+                        hotel_id=first_hotel_id,
+                        start_date=month_start,
+                        end_date=today
+                    )
+                    top_wasted = waste_service.get_top_wasted_items(
+                        hotel_id=first_hotel_id,
+                        start_date=month_start,
+                        end_date=today,
+                        limit=5
+                    )
+                else:
+                    current_waste = {'waste_rate': 0, 'total_waste': 0, 'status': 'unknown'}
+                    waste_by_reason = []
+                    top_wasted = []
             
             context["waste_analysis"] = {
                 "current_month": {

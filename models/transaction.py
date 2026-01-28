@@ -213,19 +213,26 @@ class Transaction(db.Model):
 
         # BUG-FIX #2: PRICE CONTROL without current_user dependency
         # Now relies on allow_price_override parameter (set by caller after auth check)
-        if unit_price is not None:
-            # Price override - check permission via parameter
-            if not allow_price_override:
-                raise ValueError("Price override requires admin/manager/accountant permission")
-            
-            if not price_override_reason:
-                raise ValueError("Price override requires a reason")
-            
-            # Mark for approval if not admin (caller should set this)
-            final_price = Decimal(str(unit_price))
+        item_price_decimal = Decimal(str(item.unit_price)) if item.unit_price is not None else Decimal('0')
+        submitted_price_decimal = Decimal(str(unit_price)) if unit_price is not None else None
+
+        if submitted_price_decimal is not None:
+            price_changed = submitted_price_decimal != item_price_decimal
+            if price_changed:
+                # Price override - check permission via parameter
+                if not allow_price_override:
+                    raise ValueError("Price override requires admin/manager/accountant permission")
+
+                if not price_override_reason:
+                    raise ValueError("Price override requires a reason")
+
+                final_price = submitted_price_decimal
+            else:
+                # No actual change, treat as standard price usage
+                final_price = item_price_decimal
         else:
-            # Use item's base price
-            final_price = item.unit_price or Decimal('0')
+            # Use item's base price when no price is submitted
+            final_price = item_price_decimal
 
         # Ensure hotel consistency
         item_hotel_id = item.hotel_id

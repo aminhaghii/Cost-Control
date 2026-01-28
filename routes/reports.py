@@ -77,7 +77,7 @@ def executive_summary():
     if top_food:
         action_items.append({
             'type': 'warning',
-            'icon': '🥩',
+            'icon': '',
             'title': f'کنترل ویژه {top_food[0]["item_name"]}',
             'description': f'این قلم {top_food[0]["percentage"]:.1f}% کل هزینه غذایی را تشکیل می‌دهد. مذاکره با تأمین‌کننده برای تخفیف حجمی پیشنهاد می‌شود.',
             'amount': top_food[0]['amount']
@@ -87,7 +87,7 @@ def executive_summary():
     if waste_ratio > 5:
         action_items.append({
             'type': 'danger',
-            'icon': '⚠️',
+            'icon': '',
             'title': 'نسبت ضایعات بالا',
             'description': f'ضایعات {waste_ratio:.1f}% از کل خرید است. هدف‌گذاری برای کاهش به زیر ۵% ضروری است.',
             'amount': total_waste
@@ -97,7 +97,7 @@ def executive_summary():
     if potential_savings > 0:
         action_items.append({
             'type': 'success',
-            'icon': '💰',
+            'icon': '',
             'title': 'فرصت صرفه‌جویی',
             'description': f'با ۱۰% کاهش در اقلام کلاس A، ماهانه {potential_savings:,.0f} ریال صرفه‌جویی ممکن است.',
             'amount': potential_savings
@@ -107,7 +107,7 @@ def executive_summary():
     if change_percentage > 10:
         action_items.append({
             'type': 'warning',
-            'icon': '📈',
+            'icon': '',
             'title': 'افزایش هزینه‌ها',
             'description': f'هزینه‌ها نسبت به دوره قبل {change_percentage:.1f}% افزایش یافته. بررسی علل توصیه می‌شود.',
             'amount': current_total - previous_total
@@ -115,7 +115,7 @@ def executive_summary():
     elif change_percentage < -5:
         action_items.append({
             'type': 'success',
-            'icon': '📉',
+            'icon': '',
             'title': 'کاهش هزینه‌ها',
             'description': f'هزینه‌ها نسبت به دوره قبل {abs(change_percentage):.1f}% کاهش یافته. عملکرد خوب!',
             'amount': abs(current_total - previous_total)
@@ -142,6 +142,8 @@ def pareto():
     mode = request.args.get('mode', 'خرید')
     category = request.args.get('category', 'Food')
     days = request.args.get('days', 30, type=int)
+    page = request.args.get('page', 1, type=int)
+    per_page = 50
     
     # Bug #11: Validate days parameter
     if days <= 0 or days > 365:
@@ -155,10 +157,20 @@ def pareto():
     
     pareto_data = df.to_dict('records') if not df.empty else []
     
+    # Pagination
+    total_items = len(pareto_data)
+    total_pages = (total_items + per_page - 1) // per_page
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    pareto_page = pareto_data[start_idx:end_idx]
+    
     return render_template('reports/pareto.html',
-                         pareto_data=pareto_data,
+                         pareto_data=pareto_page,
                          chart_data=chart_data,
                          stats=stats,
+                         total_items=total_items,
+                         page=page,
+                         total_pages=total_pages,
                          mode=mode,
                          category=category,
                          days=days)
@@ -169,6 +181,8 @@ def abc():
     mode = request.args.get('mode', 'خرید')
     category = request.args.get('category', 'Food')
     days = request.args.get('days', 30, type=int)
+    page = request.args.get('page', 1, type=int)
+    per_page = 50
     
     # Bug #11: Validate days parameter
     if days <= 0 or days > 365:
@@ -180,6 +194,17 @@ def abc():
     classified = abc_service.get_abc_classification(mode, category, days)
     stats = pareto_service.get_summary_stats(mode, category, days)
     
+    # Pagination for each class
+    for abc_class in ['A', 'B', 'C']:
+        items = classified.get(abc_class, [])
+        total = len(items)
+        total_pages = (total + per_page - 1) // per_page
+        start = (page - 1) * per_page
+        end = start + per_page
+        classified[f'{abc_class}_page'] = items[start:end]
+        classified[f'{abc_class}_total'] = total
+        classified[f'{abc_class}_pages'] = total_pages
+    
     recommendations = {
         'A': abc_service.get_recommendations('A'),
         'B': abc_service.get_recommendations('B'),
@@ -190,6 +215,8 @@ def abc():
                          classified=classified,
                          recommendations=recommendations,
                          stats=stats,
+                         page=page,
+                         per_page=per_page,
                          mode=mode,
                          category=category,
                          days=days)

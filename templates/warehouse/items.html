@@ -113,8 +113,29 @@
                 </table>
             </div>
         </div>
-        <div class="card-footer">
-            <small class="text-muted">{{ items|length }} قلم</small>
+        <div class="card-footer d-flex justify-content-between align-items-center">
+            <small class="text-muted">نمایش {{ ((page-1) * per_page) + 1 }} تا {{ [page * per_page, total_items]|min }} از {{ total_items }} قلم</small>
+            {% if total_pages > 1 %}
+            <nav>
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item {% if page == 1 %}disabled{% endif %}">
+                        <a class="page-link" href="?hotel_id={{ hotel_id }}&page={{ page - 1 }}{% if category %}&category={{ category }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">قبلی</a>
+                    </li>
+                    {% for p in range(1, total_pages + 1) %}
+                        {% if p == page or p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
+                        <li class="page-item {% if p == page %}active{% endif %}">
+                            <a class="page-link" href="?hotel_id={{ hotel_id }}&page={{ p }}{% if category %}&category={{ category }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">{{ p }}</a>
+                        </li>
+                        {% elif p == page - 3 or p == page + 3 %}
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                        {% endif %}
+                    {% endfor %}
+                    <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+                        <a class="page-link" href="?hotel_id={{ hotel_id }}&page={{ page + 1 }}{% if category %}&category={{ category }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">بعدی</a>
+                    </li>
+                </ul>
+            </nav>
+            {% endif %}
         </div>
     </div>
 </div>

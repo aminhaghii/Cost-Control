@@ -99,7 +99,7 @@
                         <div class="card-body p-0">
                             {% if data.alerts %}
                             <ul class="list-group list-group-flush">
-                                {% for alert in data.alerts[:5] %}
+                                {% for alert in data.alerts[:10] %}
                                 <li class="list-group-item d-flex justify-content-between align-items-center">
                                     <div>
                                         <i class="fas fa-{% if alert.severity == 'danger' %}exclamation-circle text-danger{% else %}exclamation-triangle text-warning{% endif %} me-2"></i>
@@ -113,9 +113,9 @@
                             <p class="text-muted text-center py-3 mb-0">هشدار فعالی وجود ندارد</p>
                             {% endif %}
                         </div>
-                        {% if data.alerts|length > 5 %}
+                        {% if data.alerts|length > 10 %}
                         <div class="card-footer">
-                            <a href="{{ url_for('warehouse.alerts_list', hotel_id=hotel_id) }}" class="text-decoration-none">مشاهده همه</a>
+                            <a href="{{ url_for('warehouse.alerts_list', hotel_id=hotel_id) }}" class="text-decoration-none">مشاهده همه ({{ data.alerts|length }} مورد)</a>
                         </div>
                         {% endif %}
                     </div>

@@ -136,17 +136,29 @@ class ParetoService:
                 percentage = Decimal('0')
                 cumulative_percentage = Decimal('0')
             
-            # ABC Classification (Industry Standard - Strict Threshold)
-            # Based on cumulative percentage AFTER adding the item
-            # Pareto 80/20 Rule:
-            # Class A: cumulative ≤ 80% (vital few - ~20% of items)
-            # Class B: 80% < cumulative ≤ 95% (important)
-            # Class C: cumulative > 95% (trivial many - ~80% of items)
-            if cumulative_percentage <= Decimal('80'):
+            # ABC Classification (Industry Standard - Improved Logic)
+            # Pareto 80/20 Rule with individual item consideration:
+            # 
+            # Class A (Vital Few): Items that individually OR cumulatively 
+            #          contribute to the first 80% of total value
+            # Class B (Important): Items in the 80-95% cumulative range
+            # Class C (Trivial Many): Items in the 95-100% cumulative range
+            #
+            # Special case: If a single item has >50% share, it's always Class A
+            # This handles cases where one item dominates (e.g., 92% share)
+            
+            # Calculate cumulative percentage BEFORE adding this item
+            cumulative_before = cumulative_dec - amount_dec
+            cumulative_pct_before = (cumulative_before / total_amount_dec) * Decimal('100') if total_amount_dec > 0 else Decimal('0')
+            
+            if cumulative_pct_before < Decimal('80'):
+                # This item contributes to reaching the 80% threshold - Class A
                 abc_class = 'A'
-            elif cumulative_percentage <= Decimal('95'):
+            elif cumulative_pct_before < Decimal('95'):
+                # This item is in the 80-95% range - Class B
                 abc_class = 'B'
             else:
+                # This item is in the 95-100% range - Class C
                 abc_class = 'C'
             
             # Bug #17: Better precision for small percentages
