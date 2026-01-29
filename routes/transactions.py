@@ -428,10 +428,13 @@ def edit(id):
                 flash(stock_error, 'danger')
                 return render_template('transactions/edit.html', transaction=transaction, items=items)
             
-            # P0-2: Revert old signed_quantity from stock
+            # BUG #1 FIX: Use atomic update to prevent race condition
+            if transaction.signed_quantity:
+                db.session.execute(
+                    db.update(Item).where(Item.id == old_item_id)
+                    .values(current_stock=Item.current_stock - transaction.signed_quantity)
+                )
             old_item = Item.query.get(old_item_id)
-            if old_item and transaction.signed_quantity:
-                old_item.current_stock = (old_item.current_stock or 0) - transaction.signed_quantity
             
             # Bug #8: Auto-set category from item
             category = auto_set_category(new_item)
@@ -453,8 +456,13 @@ def edit(id):
             # P0-2: Recalculate signed_quantity
             transaction.calculate_signed_quantity()
             
-            # P0-2: Apply new signed_quantity to stock
-            new_item.current_stock = (new_item.current_stock or 0) + transaction.signed_quantity
+            # BUG #1 FIX: Use atomic update to prevent race condition
+            db.session.execute(
+                db.update(Item).where(Item.id == new_item.id)
+                .values(current_stock=Item.current_stock + transaction.signed_quantity)
+            )
+            # Refresh to get updated stock
+            db.session.refresh(new_item)
             
             # Bug #9: Check and create stock alerts for both items
             if old_item:
@@ -484,19 +492,34 @@ def delete(id):
     try:
         item = Item.query.get(transaction.item_id)
         if item:
-            # P0-2: Soft delete - mark as deleted and revert signed_quantity from stock
+            # P0-2: Soft delete - mark as deleted
             transaction.is_deleted = True
             transaction.deleted_at = datetime.utcnow()
-            item.current_stock = (item.current_stock or 0) - transaction.signed_quantity
             
-            # Bug #9: Check and create stock alerts after delete
-            check_and_create_stock_alert(item)
-        
-        db.session.commit()
+            # BUG #4 FIX: Use atomic update for stock
+            db.session.execute(
+                db.update(Item).where(Item.id == item.id)
+                .values(current_stock=Item.current_stock - transaction.signed_quantity)
+            )
+            
+            # First commit: transaction and stock update
+            db.session.commit()
+            
+            # BUG #4 FIX: After successful commit, check alerts separately
+            try:
+                db.session.refresh(item)
+                check_and_create_stock_alert(item)
+                db.session.commit()
+            except Exception as alert_error:
+                logger.warning(f'Alert creation failed after delete: {alert_error}')
+                # Don't fail the whole operation if alert fails
+        else:
+            db.session.commit()
         
         flash('تراکنش با موفقیت حذف شد', 'success')
     except Exception as e:
         db.session.rollback()
+        logger.error(f'Transaction delete failed: {e}')
         flash(f'خطا در حذف تراکنش: {str(e)}', 'danger')
     
     return redirect(url_for('transactions.list_transactions'))

@@ -472,7 +472,7 @@ def items_create():
                 item_id=item.id,
                 transaction_type='خرید', # Or 'اصلاحی' with opening balance flag
                 quantity=current_stock,
-                unit_price=0,
+                unit_price=item.unit_price or 0,
                 category=category,
                 hotel_id=item.hotel_id,
                 user_id=current_user.id,
@@ -818,6 +818,16 @@ def data_import():
         
         if file.filename == '':
             flash('فایلی انتخاب نشده است', 'danger')
+            return redirect(request.url)
+        
+        # BUG #5 FIX: Check file size before saving (max 16MB)
+        MAX_UPLOAD_SIZE = 16 * 1024 * 1024  # 16 MB
+        file.seek(0, os.SEEK_END)
+        file_size = file.tell()
+        file.seek(0)  # Reset to beginning
+        
+        if file_size > MAX_UPLOAD_SIZE:
+            flash(f'حجم فایل نباید بیشتر از {MAX_UPLOAD_SIZE/1024/1024:.0f} مگابایت باشد', 'danger')
             return redirect(request.url)
         
         if file and '.' in file.filename and file.filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS:

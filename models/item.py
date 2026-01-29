@@ -118,6 +118,11 @@ class Item(db.Model):
         
         to_type, to_factor = UNIT_CONVERSIONS[to_unit]
         
+        # BUG #3 FIX: Check for zero division
+        if to_factor == 0:
+            logger.error(f"Invalid zero conversion factor for unit: {to_unit}")
+            raise ValueError(f"Invalid zero conversion factor for unit: {to_unit}")
+        
         if from_type != to_type:
             logger.error(f"Incompatible unit types: {from_type} vs {to_type} ({from_unit} -> {to_unit})")
             raise ValueError(f"Cannot convert between incompatible unit types: {from_type} vs {to_type}")

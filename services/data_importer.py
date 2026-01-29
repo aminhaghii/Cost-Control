@@ -88,7 +88,12 @@ def check_import_exists(file_hash):
     """
     P0-1 Fix: Check if file has an ACTIVE import batch
     Returns the active batch if exists, None otherwise
+    BUG #2 FIX: Validate file_hash format to prevent SQL injection
     """
+    # SHA256 hash must be exactly 64 hexadecimal characters
+    if not re.match(r'^[a-f0-9]{64}$', file_hash):
+        raise ValueError(f"Invalid file hash format: {file_hash}")
+    
     return ImportBatch.query.filter_by(
         file_hash=file_hash, 
         is_active=True,
@@ -419,51 +424,61 @@ class DataImporter:
                 if existing_batch and allow_replace:
                     existing_batch.replaced_by_id = self.import_batch.id
                 
-                # Read all sheets
-                excel_file = pd.ExcelFile(file_path)
-                sheet_names = excel_file.sheet_names
-                
-                if selected_sheets:
-                    sheet_names = [s for s in sheet_names if s in selected_sheets]
-                
-                results = []
-                
-                for sheet_name in sheet_names:
-                    result = self._import_sheet(excel_file, sheet_name)
-                    results.append(result)
-                
-                # Update batch stats
-                self.import_batch.status = 'completed'
-                self.import_batch.items_created = self.imported_items
-                self.import_batch.items_updated = self.updated_items
-                self.import_batch.transactions_created = self.imported_transactions
-                self.import_batch.errors_count = len(self.row_errors)
-                if self.row_errors:
-                    self.import_batch.error_details = json.dumps(self.row_errors[:100], ensure_ascii=False)
-                
-                # P0-1/P0-2: Create initial stock transactions for imported stock
-                self.create_initial_stock_transactions(self.user_id or 1)
-                
-                # Commit the nested transaction (savepoint)
-                nested.commit()
-                # Commit the outer transaction
-                db.session.commit()
-                
-                return {
-                    'success': True,
-                    'batch_id': self.import_batch.id,
-                    'total_items': self.imported_items,
-                    'items_updated': self.updated_items,
-                    'total_transactions': self.imported_transactions,
-                    'sheets': results,
-                    'errors': self.errors,
-                    'warnings': self.warnings,
-                    'row_errors': self.row_errors[:20]  # First 20 row errors
-                }
+                # BUG #11 FIX: Use try-finally to ensure file handle is closed
+                excel_file = None
+                try:
+                    excel_file = pd.ExcelFile(file_path)
+                    sheet_names = excel_file.sheet_names
+                    
+                    if selected_sheets:
+                        sheet_names = [s for s in sheet_names if s in selected_sheets]
+                    
+                    results = []
+                    
+                    for sheet_name in sheet_names:
+                        result = self._import_sheet(excel_file, sheet_name)
+                        results.append(result)
+                    
+                    # Update batch stats
+                    self.import_batch.status = 'completed'
+                    self.import_batch.items_created = self.imported_items
+                    self.import_batch.items_updated = self.updated_items
+                    self.import_batch.transactions_created = self.imported_transactions
+                    self.import_batch.errors_count = len(self.row_errors)
+                    if self.row_errors:
+                        self.import_batch.error_details = json.dumps(self.row_errors[:100], ensure_ascii=False)
+                    
+                    # P0-1/P0-2: Create initial stock transactions for imported stock
+                    self.create_initial_stock_transactions(self.user_id or 1)
+                    
+                    # Commit the nested transaction (savepoint)
+                    nested.commit()
+                    # Commit the outer transaction
+                    db.session.commit()
+                    
+                    return {
+                        'success': True,
+                        'batch_id': self.import_batch.id,
+                        'total_items': self.imported_items,
+                        'items_updated': self.updated_items,
+                        'total_transactions': self.imported_transactions,
+                        'sheets': results,
+                        'errors': self.errors,
+                        'warnings': self.warnings,
+                        'row_errors': self.row_errors[:20]  # First 20 row errors
+                    }
+                finally:
+                    # BUG #11 FIX: Always close the Excel file handle
+                    if excel_file is not None:
+                        excel_file.close()
                 
             except Exception as inner_e:
-                # P1-FIX: Rollback to savepoint - this reverts soft-deletes too
-                nested.rollback()
+                # BUG #9 FIX: Safe nested rollback with error handling
+                try:
+                    nested.rollback()
+                except Exception as rollback_e:
+                    import logging
+                    logging.getLogger(__name__).error(f'Nested rollback failed: {rollback_e}')
                 raise inner_e
             
         except Exception as e:

@@ -57,6 +57,15 @@ class Transaction(db.Model):
     """
     __tablename__ = 'transactions'
     
+    # BUG #6 FIX: Add composite indexes for Pareto and report queries
+    __table_args__ = (
+        db.CheckConstraint('direction IN (1, -1)', name='ck_transaction_direction'),
+        db.CheckConstraint('quantity >= 0', name='ck_transaction_quantity_positive'),
+        db.Index('idx_tx_hotel_type_date', 'hotel_id', 'transaction_type', 'transaction_date'),
+        db.Index('idx_tx_opening_deleted', 'is_opening_balance', 'is_deleted'),
+        db.Index('idx_tx_item_date', 'item_id', 'transaction_date'),
+    )
+    
     id = db.Column(db.Integer, primary_key=True)
     transaction_date = db.Column(db.Date, nullable=False, default=date.today, index=True)
     item_id = db.Column(db.Integer, db.ForeignKey('items.id'), nullable=False, index=True)

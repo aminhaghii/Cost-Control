@@ -18,6 +18,10 @@
                         <div class="col-md-6 mb-3">
                             <label class="form-label fw-bold">
                                 <i class="fas fa-calendar me-1"></i> تاریخ
+                                <i class="fas fa-info-circle text-muted" 
+                                   data-bs-toggle="tooltip" 
+                                   data-bs-placement="top"
+                                   title="تاریخ تراکنش - نمی‌تواند در آینده باشد"></i>
                             </label>
                             <!-- UX #6: Date field with proper validation -->
                             <input type="date" name="transaction_date" id="transactionDate" 
@@ -81,6 +85,10 @@
                         <div class="col-md-4 mb-3">
                             <label class="form-label fw-bold">
                                 <i class="fas fa-sort-numeric-up me-1"></i> مقدار
+                                <i class="fas fa-info-circle text-muted" 
+                                   data-bs-toggle="tooltip" 
+                                   data-bs-placement="top"
+                                   title="مقدار کالا به واحد مشخص شده - باید بزرگتر از صفر باشد"></i>
                             </label>
                             <!-- BUG-VALIDATION-001: Prevent negative/zero input -->
                             <input type="number" step="0.001" name="quantity" id="quantityInput"
@@ -92,6 +100,10 @@
                         <div class="col-md-4 mb-3">
                             <label class="form-label fw-bold">
                                 <i class="fas fa-money-bill me-1"></i> قیمت واحد (ریال)
+                                <i class="fas fa-info-circle text-muted" 
+                                   data-bs-toggle="tooltip" 
+                                   data-bs-placement="top"
+                                   title="قیمت هر واحد کالا به ریال - برای تغییر نیاز به دسترسی مدیریت دارید"></i>
                                 {% if current_user.role not in ['admin', 'manager', 'accountant'] %}
                                 <span class="badge bg-secondary ms-1">خودکار</span>
                                 {% endif %}

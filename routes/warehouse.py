@@ -6,7 +6,7 @@ from flask_login import login_required, current_user
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
-from models import db, Item, Transaction, Alert, InventoryCount, WarehouseSettings
+from models import db, Item, Transaction, Alert, InventoryCount, WarehouseSettings, Hotel
 from models.transaction import WASTE_REASONS, DEPARTMENTS
 from models.inventory_count import VARIANCE_REASONS
 from services.warehouse_service import WarehouseService
@@ -27,7 +27,9 @@ def get_user_hotel_id():
     
     # Admin has access to all hotels (returns None)
     if hotel_ids is None:
-        from models import Hotel
+        main_hotel = Hotel.query.filter_by(hotel_code='MAIN').first()
+        if main_hotel:
+            return main_hotel.id
         first_hotel = Hotel.query.filter_by(is_active=True).first()
         return first_hotel.id if first_hotel else None
     
@@ -46,15 +48,10 @@ def dashboard():
     
     try:
         data = WarehouseService.get_warehouse_dashboard(hotel_id, current_user)
-        hotels = get_allowed_hotel_ids(current_user)
-        
-        from models import Hotel
-        available_hotels = Hotel.query.filter(Hotel.id.in_(hotels)).all() if hotels else []
         
         return render_template('warehouse/dashboard.html',
                              data=data,
                              hotel_id=hotel_id,
-                             available_hotels=available_hotels,
                              WASTE_REASONS=WASTE_REASONS,
                              DEPARTMENTS=DEPARTMENTS)
     except PermissionError as e:
@@ -88,6 +85,7 @@ def items_list():
     hotel_id = request.args.get('hotel_id', type=int) or get_user_hotel_id()
     category = request.args.get('category')
     status_filter = request.args.get('status')
+    search_query = request.args.get('search', '').strip()
     page = request.args.get('page', 1, type=int)
     per_page = 50
     
@@ -97,8 +95,17 @@ def items_list():
     
     items = WarehouseService.get_stock_status(hotel_id, category)
     
+    # Apply status filter
     if status_filter:
         items = [i for i in items if i['status'] == status_filter]
+    
+    # Apply search filter
+    if search_query:
+        search_lower = search_query.lower()
+        items = [i for i in items if 
+                 search_lower in i['item'].item_name_fa.lower() or 
+                 (i['item'].item_name_en and search_lower in i['item'].item_name_en.lower()) or
+                 search_lower in i['item'].item_code.lower()]
     
     # Pagination
     total_items = len(items)

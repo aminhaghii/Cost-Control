@@ -50,7 +50,7 @@ logger = logging.getLogger(__name__)
 # Global CSRF instance for reuse in other modules (e.g., chat API exemptions)
 csrf = CSRFProtect()
 
-# Rate limiter (optional - only if flask-limiter is installed)
+# BUG #15 FIX: Rate limiter - required for production
 limiter = None
 try:
     from flask_limiter import Limiter
@@ -58,6 +58,10 @@ try:
     limiter = Limiter(key_func=get_remote_address, default_limits=["200 per minute"])
 except ImportError:
     logger.warning("flask-limiter not installed. Rate limiting disabled.")
+    # BUG #15 FIX: In production, limiter is required
+    import os
+    if os.environ.get('FLASK_ENV') == 'production':
+        raise RuntimeError("flask-limiter is required for production deployment. Install with: pip install flask-limiter")
 
 def create_app(config_class=Config):
     app = Flask(__name__)
