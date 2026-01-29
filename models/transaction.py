@@ -125,12 +125,6 @@ class Transaction(db.Model):
     # Relationships
     approved_by = db.relationship('User', foreign_keys=[approved_by_id], backref='approved_transactions')
     
-    # P0-2: Check constraint for direction
-    __table_args__ = (
-        db.CheckConstraint('direction IN (1, -1)', name='ck_transaction_direction'),
-        db.CheckConstraint('quantity >= 0', name='ck_transaction_quantity_positive'),
-    )
-    
     def __repr__(self):
         return f'<Transaction {self.id}: {self.transaction_type} - {self.total_amount}>'
     

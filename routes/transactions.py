@@ -265,11 +265,16 @@ def create():
             destination_department = request.form.get('destination_department')
             reference_number = request.form.get('reference_number', '').strip()
             
-            # Waste transactions MUST have waste_reason
-            if transaction_type == 'ضایعات' and not waste_reason:
-                flash('انتخاب دلیل ضایعات الزامی است', 'danger')
-                return render_template('transactions/create.html', items=items, today=today,
-                                     WASTE_REASONS=WASTE_REASONS, DEPARTMENTS=DEPARTMENTS)
+            # BUG #22 FIX: Waste transactions MUST have valid waste_reason
+            if transaction_type == 'ضایعات':
+                if not waste_reason:
+                    flash('انتخاب دلیل ضایعات الزامی است', 'danger')
+                    return render_template('transactions/create.html', items=items, today=today,
+                                         WASTE_REASONS=WASTE_REASONS, DEPARTMENTS=DEPARTMENTS)
+                if waste_reason not in WASTE_REASONS:
+                    flash('دلیل ضایعات نامعتبر است', 'danger')
+                    return render_template('transactions/create.html', items=items, today=today,
+                                         WASTE_REASONS=WASTE_REASONS, DEPARTMENTS=DEPARTMENTS)
             
             # ═══ Warehouse Management: Check if approval needed ═══
             requires_approval = False

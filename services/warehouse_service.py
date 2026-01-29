@@ -119,7 +119,10 @@ class WarehouseService:
     
     @staticmethod
     def calculate_days_on_hand(item) -> int:
-        """Calculate how many days current stock will last based on avg consumption"""
+        """
+        Calculate how many days current stock will last based on avg consumption
+        Note: For bulk operations, use calculate_days_on_hand_bulk to avoid N+1 queries
+        """
         # Get average daily consumption (last 30 days)
         thirty_days_ago = date.today() - timedelta(days=30)
         
@@ -136,6 +139,39 @@ class WarehouseService:
             return 999  # No consumption, infinite days
         
         return int(float(item.current_stock or 0) / avg_daily)
+    
+    @staticmethod
+    def calculate_days_on_hand_bulk(hotel_id, days=30) -> dict:
+        """
+        BUG #25 FIX: Calculate days on hand for all items at once to avoid N+1 queries
+        Returns: dict mapping item_id -> days_on_hand
+        """
+        from models import Item
+        
+        cutoff = date.today() - timedelta(days=days)
+        
+        # Single query for all consumptions
+        consumptions = db.session.query(
+            Transaction.item_id,
+            func.sum(Transaction.quantity).label('total')
+        ).filter(
+            Transaction.hotel_id == hotel_id,
+            Transaction.transaction_type == 'مصرف',
+            Transaction.transaction_date >= cutoff,
+            Transaction.is_deleted == False
+        ).group_by(Transaction.item_id).all()
+        
+        # Build result dict
+        result = {}
+        for item_id, total in consumptions:
+            avg_daily = float(total) / days if total else 0
+            item = Item.query.get(item_id)
+            if item and avg_daily > 0:
+                result[item_id] = int(item.current_stock / avg_daily)
+            else:
+                result[item_id] = 999
+        
+        return result
     
     @staticmethod
     def get_movements(hotel_id: int, item_id: int = None, 

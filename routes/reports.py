@@ -17,7 +17,14 @@ def executive_summary():
     خلاصه اجرایی مدیریتی - صفحه ویژه مدیر هتل
     نمایش سریع وضعیت مالی و اقلام حیاتی با پیشنهادات عملی
     """
-    days = request.args.get('days', 30, type=int)
+    # دریافت پارامترها
+    # BUG #23 FIX: Validate days parameter to prevent DoS attack
+    try:
+        days = int(request.args.get('days', 30))
+        if days <= 0 or days > 365:
+            days = 30
+    except (ValueError, TypeError):
+        days = 30
     if days <= 0 or days > 365:
         days = 30
     
@@ -150,11 +157,18 @@ def executive_summary():
     total_consumption = float(total_consumption)
     total_stock_value = float(total_stock_value)
     
-    inventory_turnover = (total_consumption / total_stock_value * (365/days)) if total_stock_value > 0 else 0
+    # BUG #18 FIX: Improved division by zero protection
+    if total_stock_value > 0 and days > 0:
+        inventory_turnover = (total_consumption / total_stock_value) * (365 / days)
+    else:
+        inventory_turnover = 0
     
     # 5. Stock Coverage Days (How many days current stock will last)
     avg_daily_consumption = total_consumption / days if days > 0 else 0
-    stock_coverage_days = total_stock_value / avg_daily_consumption if avg_daily_consumption > 0 else 0
+    if avg_daily_consumption > 0:
+        stock_coverage_days = total_stock_value / avg_daily_consumption
+    else:
+        stock_coverage_days = 999  # Infinite days (no consumption)
     
     # 6. Efficiency Score (lower waste = higher efficiency)
     efficiency_score = 100 - waste_ratio if waste_ratio <= 100 else 0

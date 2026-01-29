@@ -275,23 +275,20 @@ class ParetoService:
         Calculate Gini coefficient for measuring inequality
         0 = perfect equality, 1 = perfect inequality
         For Pareto distributions, expect 0.6-0.8
+        BUG #17 FIX: Added zero division protection
         """
         if not values or len(values) < 2:
             return 0
         
         sorted_values = sorted(values)
         n = len(sorted_values)
-        cumulative = 0
         total = sum(sorted_values)
         
-        if total == 0:
-            return 0
+        # BUG #17 FIX: Check for zero or near-zero total
+        if total == 0 or total <= 0.001:
+            return 0  # Perfect equality for zero values
         
-        for i, val in enumerate(sorted_values):
-            cumulative += val
-            # Gini formula
-        
-        # Alternative Gini calculation
+        # Alternative Gini calculation using cumulative sum
         cumsum = 0
         for i, val in enumerate(sorted_values, 1):
             cumsum += (2 * i - n - 1) * val
