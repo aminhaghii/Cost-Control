@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+
+{% block title %}برنامه خرید هوشمند{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <h2><i class="fas fa-brain me-2"></i> برنامه خرید هوشمند (AI)</h2>
+    <div class="d-flex gap-2">
+        <select id="confidenceFilter" class="form-select form-select-sm" style="width: auto;" onchange="changeConfidence(this.value)">
+            <option value="low" {% if confidence == 'low' %}selected{% endif %}>همه پیشنهادها</option>
+            <option value="medium" {% if confidence == 'medium' %}selected{% endif %}>اطمینان متوسط+</option>
+            <option value="high" {% if confidence == 'high' %}selected{% endif %}>اطمینان بالا</option>
+        </select>
+        <button onclick="window.print()" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-print me-1"></i> چاپ
+        </button>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row mb-4">
+    <div class="col-md-4 mb-3">
+        <div class="card bg-primary text-white h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-boxes fa-2x mb-2"></i>
+                <h3 class="mb-0">{{ total_items }}</h3>
+                <small>کالا نیازمند سفارش</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card bg-success text-white h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-money-bill-wave fa-2x mb-2"></i>
+                <h3 class="mb-0">{{ "{:,.0f}".format(total_suggested_value) }}</h3>
+                <small>ارزش تخمینی سفارش (ریال)</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card bg-info text-white h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-chart-line fa-2x mb-2"></i>
+                <h3 class="mb-0">تحلیل روند</h3>
+                <small>پیش‌بینی مبتنی بر مصرف 90 روز</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Info Alert -->
+<div class="alert alert-info">
+    <i class="fas fa-info-circle me-2"></i>
+    <strong>نحوه کار:</strong> این سیستم با تحلیل روند مصرف 3 ماه گذشته، نیاز آینده را پیش‌بینی می‌کند. 
+    اگر مصرف در حال افزایش است، مقدار بیشتری پیشنهاد می‌شود و بالعکس.
+</div>
+
+<!-- Procurement Table -->
+<div class="card">
+    <div class="card-header bg-dark text-white">
+        <i class="fas fa-shopping-cart me-2"></i> لیست پیشنهادی خرید
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>کد کالا</th>
+                        <th>نام کالا</th>
+                        <th>موجودی فعلی</th>
+                        <th>میانگین مصرف ماهانه</th>
+                        <th>روند</th>
+                        <th>پیش‌بینی ماه آینده</th>
+                        <th class="table-success">مقدار پیشنهادی</th>
+                        <th>اطمینان</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in suggestions %}
+                    <tr>
+                        <td><span class="badge bg-secondary">{{ item.item_code }}</span></td>
+                        <td><strong>{{ item.item_name }}</strong></td>
+                        <td>{{ "{:.1f}".format(item.current_stock) }} {{ item.unit }}</td>
+                        <td>{{ "{:.1f}".format(item.avg_monthly_consumption) }} {{ item.unit }}</td>
+                        <td>
+                            {% if item.trend_direction == 'up' %}
+                                <span class="badge bg-danger">
+                                    <i class="fas fa-arrow-up"></i> افزایشی ({{ "{:.0f}".format(item.trend_factor * 100) }}%)
+                                </span>
+                            {% elif item.trend_direction == 'down' %}
+                                <span class="badge bg-success">
+                                    <i class="fas fa-arrow-down"></i> کاهشی ({{ "{:.0f}".format(item.trend_factor * 100) }}%)
+                                </span>
+                            {% elif item.trend_direction == 'stable' %}
+                                <span class="badge bg-info">
+                                    <i class="fas fa-minus"></i> پایدار
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary">
+                                    <i class="fas fa-question"></i> بدون داده
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>{{ "{:.1f}".format(item.predicted_next_month) }} {{ item.unit }}</td>
+                        <td class="table-success">
+                            <strong>{{ "{:.1f}".format(item.suggested_order) }} {{ item.unit }}</strong>
+                        </td>
+                        <td>
+                            {% if item.confidence == 'high' %}
+                                <span class="badge bg-success">بالا</span>
+                            {% elif item.confidence == 'medium' %}
+                                <span class="badge bg-warning">متوسط</span>
+                            {% else %}
+                                <span class="badge bg-secondary">پایین</span>
+                            {% endif %}
+                            <small class="text-muted">({{ item.data_points }} ماه)</small>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-4">
+                            <i class="fas fa-check-circle fa-2x mb-2"></i>
+                            <p>هیچ کالایی نیاز به سفارش ندارد!</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+    <div class="card-footer">
+        <nav>
+            <ul class="pagination justify-content-center mb-0">
+                <li class="page-item {% if page == 1 %}disabled{% endif %}">
+                    <a class="page-link" href="?page={{ page - 1 }}&confidence={{ confidence }}">قبلی</a>
+                </li>
+                {% for p in range(1, total_pages + 1) %}
+                    {% if p == page %}
+                        <li class="page-item active"><span class="page-link">{{ p }}</span></li>
+                    {% elif p <= 3 or p > total_pages - 3 or (p >= page - 1 and p <= page + 1) %}
+                        <li class="page-item"><a class="page-link" href="?page={{ p }}&confidence={{ confidence }}">{{ p }}</a></li>
+                    {% elif p == 4 or p == total_pages - 3 %}
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                {% endfor %}
+                <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+                    <a class="page-link" href="?page={{ page + 1 }}&confidence={{ confidence }}">بعدی</a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function changeConfidence(value) {
+    window.location.href = '{{ url_for("reports.procurement_plan") }}?confidence=' + value;
+}
+</script>
+{% endblock %}

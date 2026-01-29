@@ -1,0 +1,204 @@
+{% extends 'base.html' %}
+
+{% block title %}تحلیل موجودی راکد{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <h2><i class="fas fa-warehouse me-2"></i> تحلیل موجودی راکد (Dead Stock)</h2>
+    <div class="d-flex gap-2">
+        <select id="daysFilter" class="form-select form-select-sm" style="width: auto;" onchange="changeDays(this.value)">
+            <option value="30" {% if inactive_days == 30 %}selected{% endif %}>30 روز</option>
+            <option value="60" {% if inactive_days == 60 %}selected{% endif %}>60 روز</option>
+            <option value="90" {% if inactive_days == 90 %}selected{% endif %}>90 روز</option>
+            <option value="180" {% if inactive_days == 180 %}selected{% endif %}>180 روز</option>
+        </select>
+        <button onclick="window.print()" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-print me-1"></i> چاپ
+        </button>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row mb-4">
+    <div class="col-md-4 mb-3">
+        <div class="card bg-danger text-white h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-box fa-2x mb-2"></i>
+                <h3 class="mb-0">{{ total_items }}</h3>
+                <small>کالای راکد</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card bg-warning text-white h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-money-bill-wave fa-2x mb-2"></i>
+                <h3 class="mb-0">{{ "{:,.0f}".format(total_frozen_capital) }}</h3>
+                <small>سرمایه منجمد (ریال)</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card bg-info text-white h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-clock fa-2x mb-2"></i>
+                <h3 class="mb-0">{{ inactive_days }}+</h3>
+                <small>روز بدون مصرف</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Alert Messages -->
+{% if total_items == 0 %}
+<div class="alert alert-success">
+    <i class="fas fa-check-circle me-2"></i>
+    <strong>عالی!</strong> هیچ موجودی راکدی در انبار وجود ندارد. همه کالاها در گردش هستند.
+</div>
+{% else %}
+<div class="alert alert-warning">
+    <i class="fas fa-exclamation-triangle me-2"></i>
+    <strong>توجه:</strong> {{ "{:,.0f}".format(total_frozen_capital) }} ریال سرمایه در {{ total_items }} کالا منجمد شده است. 
+    این کالاها بیش از {{ inactive_days }} روز مصرف نشده‌اند. توصیه می‌شود برای کاهش هزینه نگهداری، اقدام به فروش یا انتقال شود.
+</div>
+{% endif %}
+
+<!-- Dead Stock Table -->
+<div class="card">
+    <div class="card-header bg-dark text-white">
+        <i class="fas fa-list me-2"></i> لیست موجودی راکد
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>کد کالا</th>
+                        <th>نام کالا</th>
+                        <th>دسته</th>
+                        <th>موجودی فعلی</th>
+                        <th>قیمت واحد</th>
+                        <th class="table-warning">ارزش منجمد</th>
+                        <th>آخرین مصرف</th>
+                        <th>مدت عدم مصرف</th>
+                        <th>وضعیت</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in dead_items %}
+                    <tr>
+                        <td><span class="badge bg-secondary">{{ item.item_code }}</span></td>
+                        <td><strong>{{ item.item_name }}</strong></td>
+                        <td>
+                            {% if item.category == 'Food' %}
+                                <span class="badge bg-success">غذایی</span>
+                            {% else %}
+                                <span class="badge bg-info">غیرغذایی</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ "{:.1f}".format(item.current_stock) }} {{ item.unit }}</td>
+                        <td>{{ "{:,.0f}".format(item.unit_price) }} ریال</td>
+                        <td class="table-warning">
+                            <strong>{{ "{:,.0f}".format(item.frozen_value) }} ریال</strong>
+                        </td>
+                        <td>
+                            {% if item.last_consumption_date %}
+                                {{ item.last_consumption_date.strftime('%Y/%m/%d') }}
+                            {% else %}
+                                <span class="text-muted">هرگز</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.days_inactive %}
+                                <span class="badge {% if item.days_inactive > 180 %}bg-danger{% elif item.days_inactive > 90 %}bg-warning{% else %}bg-secondary{% endif %}">
+                                    {{ item.days_inactive }} روز
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary">نامشخص</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.status == 'never_used' %}
+                                <span class="badge bg-danger">
+                                    <i class="fas fa-times-circle"></i> هرگز مصرف نشده
+                                </span>
+                            {% else %}
+                                <span class="badge bg-warning">
+                                    <i class="fas fa-pause-circle"></i> راکد
+                                </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="9" class="text-center text-muted py-4">
+                            <i class="fas fa-check-circle fa-2x mb-2 text-success"></i>
+                            <p>هیچ موجودی راکدی یافت نشد!</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                {% if dead_items %}
+                <tfoot class="table-dark">
+                    <tr>
+                        <th colspan="5" class="text-end">جمع کل سرمایه منجمد:</th>
+                        <th class="table-warning">
+                            <strong>{{ "{:,.0f}".format(total_frozen_capital) }} ریال</strong>
+                        </th>
+                        <th colspan="3"></th>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+    
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+    <div class="card-footer">
+        <nav>
+            <ul class="pagination justify-content-center mb-0">
+                <li class="page-item {% if page == 1 %}disabled{% endif %}">
+                    <a class="page-link" href="?page={{ page - 1 }}&days={{ inactive_days }}">قبلی</a>
+                </li>
+                {% for p in range(1, total_pages + 1) %}
+                    {% if p == page %}
+                        <li class="page-item active"><span class="page-link">{{ p }}</span></li>
+                    {% elif p <= 3 or p > total_pages - 3 or (p >= page - 1 and p <= page + 1) %}
+                        <li class="page-item"><a class="page-link" href="?page={{ p }}&days={{ inactive_days }}">{{ p }}</a></li>
+                    {% elif p == 4 or p == total_pages - 3 %}
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                {% endfor %}
+                <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+                    <a class="page-link" href="?page={{ page + 1 }}&days={{ inactive_days }}">بعدی</a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Recommendations -->
+{% if total_items > 0 %}
+<div class="card mt-4 border-info">
+    <div class="card-header bg-info text-white">
+        <i class="fas fa-lightbulb me-2"></i> پیشنهادات عملی
+    </div>
+    <div class="card-body">
+        <ul class="mb-0">
+            <li><strong>فروش با تخفیف:</strong> کالاهایی که بیش از 180 روز راکد هستند را با تخفیف به فروش برسانید.</li>
+            <li><strong>انتقال به واحدهای دیگر:</strong> اگر هتل‌های دیگر نیاز دارند، موجودی را منتقل کنید.</li>
+            <li><strong>بررسی دلیل:</strong> چرا این کالاها مصرف نمی‌شوند؟ آیا نیاز به حذف از لیست خرید دارند؟</li>
+            <li><strong>کاهش سفارش:</strong> برای جلوگیری از تکرار، مقدار خرید این اقلام را کاهش دهید.</li>
+        </ul>
+    </div>
+</div>
+{% endif %}
+
+<script>
+function changeDays(value) {
+    window.location.href = '{{ url_for("reports.dead_stock") }}?days=' + value;
+}
+</script>
+{% endblock %}

@@ -3,9 +3,14 @@
 """
 Hotel Scope Service - P0-3: Multi-hotel Access Enforcement
 Provides functions for scoping queries to allowed hotels per user
+
+SINGLE HOTEL MODE: When enabled, all hotel filtering is bypassed
 """
 
 from models import db, Hotel, UserHotel
+
+# SINGLE HOTEL MODE: Set to True to disable multi-hotel filtering
+SINGLE_HOTEL_MODE = True
 
 
 def get_allowed_hotel_ids(user):
@@ -17,7 +22,12 @@ def get_allowed_hotel_ids(user):
     
     Returns:
         List of hotel IDs or None (meaning all hotels for admin)
+        In SINGLE_HOTEL_MODE: Always returns None (no filtering)
     """
+    # SINGLE HOTEL MODE: Bypass all hotel filtering
+    if SINGLE_HOTEL_MODE:
+        return None
+    
     if not user:
         return []
     
@@ -69,7 +79,12 @@ def user_can_access_hotel(user, hotel_id):
     
     Returns:
         Boolean
+        In SINGLE_HOTEL_MODE: Always returns True
     """
+    # SINGLE HOTEL MODE: Everyone has access to all hotels
+    if SINGLE_HOTEL_MODE:
+        return True
+    
     allowed = get_allowed_hotel_ids(user)
     
     if allowed is None:

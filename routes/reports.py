@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request
 from flask_login import login_required
 from services import ParetoService, ABCService
+from services.ai_service import AIService
 from models import db, Transaction, Item
 from sqlalchemy import func
 from datetime import date, timedelta
@@ -62,6 +63,9 @@ def executive_summary():
         Transaction.transaction_type == 'مصرف',
         Transaction.transaction_date >= current_start
     ).scalar() or 0
+    # Normalize numeric types to float to avoid Decimal + float errors
+    total_consumption_for_ratio = float(total_consumption_for_ratio)
+    total_waste = float(total_waste)
     
     total_outflow = total_consumption_for_ratio + total_waste
     waste_ratio = (total_waste / total_outflow * 100) if total_outflow > 0 else 0
@@ -349,3 +353,81 @@ def abc():
                          mode=mode,
                          category=category,
                          days=days)
+
+@reports_bp.route('/procurement-plan')
+@login_required
+def procurement_plan():
+    """
+    AI-Powered Procurement Plan - Smart Reorder Suggestions
+    Uses trend analysis to predict future needs
+    """
+    confidence = request.args.get('confidence', 'low')
+    page = request.args.get('page', 1, type=int)
+    per_page = 50
+    
+    # Validate confidence parameter
+    if confidence not in ['low', 'medium', 'high']:
+        confidence = 'low'
+    
+    ai_service = AIService()
+    
+    # Get procurement suggestions (SINGLE HOTEL MODE: no hotel filtering)
+    suggestions = ai_service.get_procurement_plan(min_confidence=confidence)
+    
+    # Calculate totals
+    total_suggested_value = sum(
+        s['suggested_order'] * Item.query.get(s['item_id']).unit_price 
+        for s in suggestions
+    )
+    
+    # Pagination
+    total_items = len(suggestions)
+    total_pages = (total_items + per_page - 1) // per_page
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    suggestions_page = suggestions[start_idx:end_idx]
+    
+    return render_template('reports/procurement_plan.html',
+                         suggestions=suggestions_page,
+                         total_items=total_items,
+                         total_suggested_value=total_suggested_value,
+                         page=page,
+                         total_pages=total_pages,
+                         confidence=confidence)
+
+@reports_bp.route('/dead-stock')
+@login_required
+def dead_stock():
+    """
+    Dead Stock Analysis - Find Frozen Capital
+    Identifies items with no recent consumption
+    """
+    inactive_days = request.args.get('days', 60, type=int)
+    page = request.args.get('page', 1, type=int)
+    per_page = 50
+    
+    # Validate days parameter
+    if inactive_days <= 0 or inactive_days > 365:
+        inactive_days = 60
+    
+    ai_service = AIService()
+    
+    # Analyze dead stock (SINGLE HOTEL MODE: no hotel filtering)
+    analysis = ai_service.analyze_dead_stock(inactive_days=inactive_days)
+    
+    dead_items = analysis['dead_items']
+    
+    # Pagination
+    total_items = len(dead_items)
+    total_pages = (total_items + per_page - 1) // per_page
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    dead_items_page = dead_items[start_idx:end_idx]
+    
+    return render_template('reports/dead_stock.html',
+                         dead_items=dead_items_page,
+                         total_frozen_capital=analysis['total_frozen_capital'],
+                         total_items=total_items,
+                         inactive_days=inactive_days,
+                         page=page,
+                         total_pages=total_pages)

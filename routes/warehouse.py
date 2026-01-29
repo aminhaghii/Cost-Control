@@ -12,7 +12,7 @@ from models.inventory_count import VARIANCE_REASONS
 from services.warehouse_service import WarehouseService
 from services.inventory_count_service import InventoryCountService
 from services.waste_analysis_service import WasteAnalysisService
-from services.hotel_scope_service import get_allowed_hotel_ids, user_can_access_hotel
+from services.hotel_scope_service import get_allowed_hotel_ids, user_can_access_hotel, SINGLE_HOTEL_MODE
 from utils.decimal_utils import parse_decimal_input
 import logging
 
@@ -23,6 +23,17 @@ warehouse_bp = Blueprint('warehouse', __name__, url_prefix='/warehouse')
 
 def get_user_hotel_id():
     """Get primary hotel ID for current user"""
+    # SINGLE HOTEL MODE: Always use the first active hotel
+    if SINGLE_HOTEL_MODE:
+        main_hotel = Hotel.query.filter_by(hotel_code='MAIN').first()
+        if main_hotel:
+            return main_hotel.id
+        first_hotel = Hotel.query.filter_by(is_active=True).first()
+        if first_hotel:
+            return first_hotel.id
+        fallback_hotel = Hotel.query.first()
+        return fallback_hotel.id if fallback_hotel else 1
+    
     hotel_ids = get_allowed_hotel_ids(current_user)
     
     # Admin has access to all hotels (returns None)
