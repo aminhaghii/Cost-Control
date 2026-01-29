@@ -7,6 +7,7 @@ Flask Application Entry Point
 
 import os
 import logging
+from datetime import datetime
 from flask import Flask, redirect, url_for, jsonify
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
@@ -15,15 +16,34 @@ from sqlalchemy.engine import Engine
 from config import Config
 from models import db, User
 from routes import register_blueprints
+from utils.timezone import IRAN_TZ, get_iran_now
 
-# Configure logging
+# Custom logging formatter with Iran timezone
+class IranTimezoneFormatter(logging.Formatter):
+    def formatTime(self, record, datefmt=None):
+        dt = datetime.fromtimestamp(record.created, tz=IRAN_TZ)
+        if datefmt:
+            return dt.strftime(datefmt)
+        return dt.strftime('%Y-%m-%d %H:%M:%S')
+    
+    def format(self, record):
+        record.iran_time = datetime.fromtimestamp(record.created, tz=IRAN_TZ).strftime('%Y-%m-%d %H:%M:%S')
+        return super().format(record)
+
+# Configure logging with Iran timezone
+formatter = IranTimezoneFormatter(
+    '%(iran_time)s [Iran] - %(name)s - %(levelname)s - %(message)s'
+)
+
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(formatter)
+
+file_handler = logging.FileHandler('app.log', encoding='utf-8')
+file_handler.setFormatter(formatter)
+
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('app.log', encoding='utf-8')
-    ]
+    handlers=[console_handler, file_handler]
 )
 logger = logging.getLogger(__name__)
 
@@ -155,11 +175,16 @@ if __name__ == '__main__':
     flask_env = os.environ.get('FLASK_ENV', 'production')
     debug_mode = flask_env == 'development'
     
+    # Display current Iran time at startup
+    iran_time = get_iran_now()
+    
     print("\n" + "="*60)
     print("Hotel Inventory Management - Pareto Analysis")
     print("="*60)
     print(f"\nEnvironment: {flask_env}")
     print(f"Debug Mode: {debug_mode}")
+    print(f"System Timezone: Iran (UTC+03:30)")
+    print(f"Current Iran Time: {iran_time.strftime('%Y-%m-%d %H:%M:%S')}")
     print("\nAccess URL: http://localhost:8084")
     print("\nServer is running...")
     print("="*60 + "\n")
@@ -168,5 +193,6 @@ if __name__ == '__main__':
     logger.info(f"Application starting in {flask_env} mode")
     logger.info(f"Debug mode: {debug_mode}")
     logger.info(f"CSRF protection: {app.config.get('WTF_CSRF_ENABLED', False)}")
+    logger.info(f"System timezone set to Iran (UTC+03:30) - Current time: {iran_time.strftime('%Y-%m-%d %H:%M:%S')}")
     
     app.run(host='0.0.0.0', port=8084, debug=debug_mode)

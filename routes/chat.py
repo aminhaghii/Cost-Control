@@ -3,10 +3,13 @@ Chat API Routes for Analytics Chatbot
 P0-5: CSRF protected, rate limited, audit logged
 """
 
-from flask import Blueprint, request, jsonify, render_template, current_app
+from flask import Blueprint, render_template, request, jsonify, current_app
 from flask_login import login_required, current_user
-from services.chat_service import ChatService
+from services import ChatService
+from models import Item, Transaction, db
+from sqlalchemy import func
 from datetime import datetime
+from utils.timezone import get_iran_now, get_iran_today
 import logging
 
 chat_bp = Blueprint('chat', __name__, url_prefix='/chat')
@@ -55,7 +58,7 @@ def process_message():
         result = chat_service.process_message(message, user_id=current_user.id, user=current_user)
         
         # Add timestamp
-        result['timestamp'] = datetime.now().strftime('%H:%M')
+        result['timestamp'] = get_iran_now().strftime('%H:%M')
         result['user'] = current_user.full_name or current_user.username
         
         return jsonify(result)
@@ -129,7 +132,7 @@ def get_quick_stats():
         
         total_items = Item.query.count()
         today_trans = Transaction.query.filter(
-            func.date(Transaction.transaction_date) == datetime.now().date()
+            func.date(Transaction.transaction_date) == get_iran_today()
         ).count()
         
         return jsonify({

@@ -8,6 +8,7 @@ Provides functions for recalculating and rebuilding stock from transactions
 from datetime import datetime
 from sqlalchemy import func, update
 from models import db, Item, Transaction, TRANSACTION_DIRECTION
+from utils.timezone import get_iran_today
 
 
 def recalculate_stock(item_id=None, hotel_id=None):
@@ -132,7 +133,7 @@ def adjust_stock(item_id, delta_quantity, reason, user_id, hotel_id=None):
         source='adjustment',
         description=reason,
         user_id=user_id,
-        transaction_date=datetime.now().date()
+        transaction_date=get_iran_today()
     )
     
     db.session.add(tx)

@@ -26,6 +26,7 @@ import jdatetime
 import os
 import requests
 from dotenv import load_dotenv
+from utils.timezone import get_iran_now, get_iran_today
 
 load_dotenv()
 
@@ -214,7 +215,7 @@ class ChatService:
             hotels_summary = '\n'.join(hotels_info) if hotels_info else "  (No data available)"
             
             # Transaction stats (30 days, scoped)
-            start_date = datetime.now() - timedelta(days=30)
+            start_date = get_iran_now() - timedelta(days=30)
             
             base_tx_filter = [
                 Transaction.transaction_date >= start_date,
@@ -244,9 +245,7 @@ class ChatService:
             waste_dec = to_decimal(waste_raw)
             waste_ratio = (waste_dec / purchases_dec * Decimal('100')) if purchases_dec > 0 else Decimal('0')
             
-            from utils.timezone import get_iran_today
-            iran_today = get_iran_today()
-            today_filter = [func.date(Transaction.transaction_date) == iran_today]
+            today_filter = [func.date(Transaction.transaction_date) == get_iran_today()]
             if allowed_hotel_ids is not None:
                 today_filter.append(Transaction.hotel_id.in_(allowed_hotel_ids))
             today_trans = Transaction.query.filter(*today_filter).count()

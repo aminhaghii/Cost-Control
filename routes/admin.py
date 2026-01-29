@@ -8,6 +8,7 @@ from models import db, User, Item, Transaction, Alert, AuditLog, ROLES, ROLE_LAB
 from utils.decorators import admin_required, manager_required
 from datetime import datetime, timedelta
 from sqlalchemy import func, desc
+from utils.timezone import get_iran_now
 import logging
 
 logger = logging.getLogger(__name__)
@@ -784,7 +785,7 @@ def logs_export():
     wb.save(output)
     output.seek(0)
     
-    filename = f'audit_logs_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+    filename = f'audit_logs_{get_iran_now().strftime("%Y%m%d_%H%M%S")}.xlsx'
     
     return send_file(
         output,

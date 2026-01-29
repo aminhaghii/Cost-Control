@@ -1,7 +1,9 @@
-from flask import Blueprint, request, send_file, current_app
+from flask import Blueprint, send_file, request, flash, redirect, url_for, current_app
 from flask_login import login_required, current_user
 from services import ParetoService, ABCService, ExcelReportGenerator
 from datetime import datetime
+from utils.timezone import get_iran_now
+import io
 
 export_bp = Blueprint('export', __name__, url_prefix='/export')
 
@@ -33,7 +35,7 @@ def download_pareto_excel():
     wb = excel_gen.generate_pareto_report(mode, category, days)
     output = excel_gen.save_to_bytes(wb)
     
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    timestamp = get_iran_now().strftime('%Y%m%d_%H%M%S')
     filename = f"Pareto_Report_{category}_{timestamp}.xlsx"
     
     return send_file(
@@ -71,7 +73,7 @@ def download_abc_excel():
     wb = excel_gen.generate_pareto_report(mode, category, days)
     output = excel_gen.save_to_bytes(wb)
     
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    timestamp = get_iran_now().strftime('%Y%m%d_%H%M%S')
     filename = f"ABC_Report_{category}_{timestamp}.xlsx"
     
     return send_file(

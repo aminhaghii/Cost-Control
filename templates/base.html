@@ -214,6 +214,34 @@
         .select2-container--bootstrap-5 .select2-selection {
             min-height: 38px;
         }
+
+        /* Live Iran clock */
+        .iran-clock-chip {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(6px);
+            color: #f5f7fa;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 0.35rem 1rem;
+            min-width: 165px;
+        }
+
+        .iran-clock-chip small {
+            font-size: 0.65rem;
+            letter-spacing: 0.05rem;
+            opacity: 0.85;
+        }
+
+        .iran-clock-time {
+            font-size: 1.25rem;
+            font-weight: 600;
+            letter-spacing: 0.08rem;
+        }
+
+        .iran-clock-chip .city-label {
+            font-size: 0.7rem;
+            opacity: 0.8;
+        }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
@@ -278,7 +306,14 @@
                     {% endif %}
                     {% endif %}
                 </ul>
-                <ul class="navbar-nav">
+                <ul class="navbar-nav align-items-center">
+                    <li class="nav-item me-3 d-none d-md-block">
+                        <div class="iran-clock-chip text-center">
+                            <small>⏱ زمان سیستم</small>
+                            <div class="iran-clock-time" id="iranClock">--:--:--</div>
+                            <div class="city-label">تهران (UTC+3:30)</div>
+                        </div>
+                    </li>
                     {% if current_user.is_authenticated %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
@@ -405,6 +440,29 @@
             setTimeout(() => toast.fadeOut('slow', () => toast.remove()), 4000);
         }
         
+        // Live Iran clock widget
+        function startIranClock() {
+            const clockEl = document.getElementById('iranClock');
+            if (!clockEl) return;
+
+            const formatter = new Intl.DateTimeFormat('fa-IR', {
+                timeZone: 'Asia/Tehran',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+
+            const tick = () => {
+                const now = new Date();
+                clockEl.textContent = formatter.format(now);
+            };
+
+            tick();
+            setInterval(tick, 1000);
+        }
+
+        document.addEventListener('DOMContentLoaded', startIranClock);
+
         function validateTransactionForm() {
             const quantity = parseFloat($('input[name="quantity"]').val());
             const unitPrice = parseFloat($('input[name="unit_price"]').val());

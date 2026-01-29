@@ -10,9 +10,9 @@ import os
 import re
 import hashlib
 import json
-from datetime import datetime
+from datetime import datetime, date
 from decimal import Decimal
-from sqlalchemy import func
+from utils.timezone import get_iran_today
 import pandas as pd
 from models import db, Item, Transaction, ImportBatch
 
@@ -716,7 +716,7 @@ class DataImporter:
                     is_opening_balance=True,
                     import_batch_id=self.import_batch.id if self.import_batch else None
                 )
-                transaction.transaction_date = datetime.now().date()
+                transaction.transaction_date = get_iran_today()
                 db.session.add(transaction)
                 self.imported_transactions += 1
         

@@ -12,7 +12,7 @@ from models import db, Transaction, Item
 from services.pareto_service import ParetoService
 from services.abc_service import ABCService
 from services.llama_analyzer import WorkflowAnalyzer
-from datetime import datetime, timedelta
+from utils.timezone import get_iran_now, get_iran_today
 from sqlalchemy import func
 
 ai_bp = Blueprint('ai_analysis', __name__, url_prefix='/ai')
@@ -68,7 +68,7 @@ def reorder_suggestions():
         'category': item.category
     } for item in items]
     
-    thirty_days_ago = datetime.now() - timedelta(days=30)
+    thirty_days_ago = get_iran_now() - timedelta(days=30)
     
     # Get consumption data
     consumption = db.session.query(
@@ -136,7 +136,7 @@ def waste_analysis():
     category = request.args.get('category', 'Food')
     days = int(request.args.get('days', 30))
     
-    start_date = datetime.now() - timedelta(days=days)
+    start_date = get_iran_now() - timedelta(days=days)
     
     waste_transactions = db.session.query(
         Item.item_code,
@@ -182,7 +182,7 @@ def waste_analysis():
 @login_required
 def daily_insights():
     """Get daily AI insights for dashboard"""
-    today = datetime.now().date()
+    today = get_iran_today()
     
     today_transactions = Transaction.query.filter(
         func.date(Transaction.transaction_date) == today

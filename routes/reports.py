@@ -121,6 +121,67 @@ def executive_summary():
             'amount': abs(current_total - previous_total)
         })
     
+    # ═══ NEW ANALYTICAL KPIs FOR MANAGERS ═══
+    
+    # 1. Average Daily Spend
+    avg_daily_spend = total_purchase / days if days > 0 else 0
+    
+    # 2. Transaction Count & Average
+    trans_count = db.session.query(func.count(Transaction.id)).filter(
+        Transaction.transaction_type == 'خرید',
+        Transaction.transaction_date >= current_start
+    ).scalar() or 0
+    avg_transaction = total_purchase / trans_count if trans_count > 0 else 0
+    
+    # 3. Consumption Stats
+    total_consumption = db.session.query(
+        func.coalesce(func.sum(Transaction.total_amount), 0)
+    ).filter(
+        Transaction.transaction_type == 'مصرف',
+        Transaction.transaction_date >= current_start
+    ).scalar() or 0
+    
+    # 4. Inventory Turnover Ratio (Consumption / Avg Inventory)
+    total_stock_value = db.session.query(
+        func.coalesce(func.sum(Item.current_stock * Item.unit_price), 0)
+    ).filter(Item.is_active == True).scalar() or 0
+    
+    # Convert to float for calculations
+    total_consumption = float(total_consumption)
+    total_stock_value = float(total_stock_value)
+    
+    inventory_turnover = (total_consumption / total_stock_value * (365/days)) if total_stock_value > 0 else 0
+    
+    # 5. Stock Coverage Days (How many days current stock will last)
+    avg_daily_consumption = total_consumption / days if days > 0 else 0
+    stock_coverage_days = total_stock_value / avg_daily_consumption if avg_daily_consumption > 0 else 0
+    
+    # 6. Efficiency Score (lower waste = higher efficiency)
+    efficiency_score = 100 - waste_ratio if waste_ratio <= 100 else 0
+    
+    # 7. Critical Items Count
+    critical_items_count = Item.query.filter(
+        Item.is_active == True,
+        Item.current_stock < Item.min_stock
+    ).count()
+    
+    # 8. Items by ABC Class
+    total_items = Item.query.filter(Item.is_active == True).count()
+    
+    # Bundle all KPIs
+    kpis = {
+        'avg_daily_spend': avg_daily_spend,
+        'trans_count': trans_count,
+        'avg_transaction': avg_transaction,
+        'total_consumption': total_consumption,
+        'inventory_turnover': inventory_turnover,
+        'stock_coverage_days': stock_coverage_days,
+        'efficiency_score': efficiency_score,
+        'critical_items_count': critical_items_count,
+        'total_stock_value': total_stock_value,
+        'total_items': total_items
+    }
+    
     return render_template('reports/executive_summary.html',
                          days=days,
                          food_stats=food_stats,
@@ -134,7 +195,8 @@ def executive_summary():
                          waste_ratio=waste_ratio,
                          potential_savings=potential_savings,
                          change_percentage=change_percentage,
-                         action_items=action_items)
+                         action_items=action_items,
+                         kpis=kpis)
 
 @reports_bp.route('/pareto')
 @login_required

@@ -57,6 +57,63 @@
     </div>
 </div>
 
+<!-- Advanced KPIs for Manager -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-dark">
+            <div class="card-header bg-dark text-white">
+                <i class="fas fa-chart-line me-2"></i> شاخص‌های کلیدی عملکرد (KPIs)
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-2 col-6 mb-3">
+                        <div class="border rounded p-2 h-100">
+                            <i class="fas fa-calendar-day text-primary fa-lg"></i>
+                            <h5 class="mt-2 mb-0">{{ "{:,.0f}".format(kpis.avg_daily_spend) }}</h5>
+                            <small class="text-muted">میانگین خرید روزانه</small>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-6 mb-3">
+                        <div class="border rounded p-2 h-100">
+                            <i class="fas fa-receipt text-info fa-lg"></i>
+                            <h5 class="mt-2 mb-0">{{ kpis.trans_count }}</h5>
+                            <small class="text-muted">تعداد تراکنش خرید</small>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-6 mb-3">
+                        <div class="border rounded p-2 h-100">
+                            <i class="fas fa-sync-alt text-success fa-lg"></i>
+                            <h5 class="mt-2 mb-0">{{ "{:.1f}".format(kpis.inventory_turnover) }}x</h5>
+                            <small class="text-muted">گردش موجودی (سالانه)</small>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-6 mb-3">
+                        <div class="border rounded p-2 h-100">
+                            <i class="fas fa-clock text-warning fa-lg"></i>
+                            <h5 class="mt-2 mb-0">{{ "{:.0f}".format(kpis.stock_coverage_days) }}</h5>
+                            <small class="text-muted">روز پوشش موجودی</small>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-6 mb-3">
+                        <div class="border rounded p-2 h-100">
+                            <i class="fas fa-tachometer-alt {% if kpis.efficiency_score >= 95 %}text-success{% elif kpis.efficiency_score >= 90 %}text-warning{% else %}text-danger{% endif %} fa-lg"></i>
+                            <h5 class="mt-2 mb-0">{{ "{:.1f}".format(kpis.efficiency_score) }}%</h5>
+                            <small class="text-muted">امتیاز بهره‌وری</small>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-6 mb-3">
+                        <div class="border rounded p-2 h-100">
+                            <i class="fas fa-exclamation-triangle {% if kpis.critical_items_count > 10 %}text-danger{% elif kpis.critical_items_count > 0 %}text-warning{% else %}text-success{% endif %} fa-lg"></i>
+                            <h5 class="mt-2 mb-0">{{ kpis.critical_items_count }}</h5>
+                            <small class="text-muted">کالای بحرانی</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Pareto Validation Cards -->
 <div class="row mb-4">
     <div class="col-md-6 mb-3">
