@@ -631,11 +631,37 @@ class DataImporter:
         
         return 'NonFood'
     
+    def _normalize_unit(self, unit):
+        """
+        BUSINESS LOGIC FIX #4: Normalize unit for comparison
+        Handles variations like 'کیلوگرم' vs 'کیلو' or 'لیتر' vs 'L'
+        """
+        if not unit:
+            return ''
+        
+        unit_lower = unit.strip().lower()
+        
+        # Map common variations to standard form
+        unit_map = {
+            'کیلو': 'کیلوگرم',
+            'kg': 'کیلوگرم',
+            'l': 'لیتر',
+            'ل': 'لیتر',
+            'ع': 'عدد',
+            'pcs': 'عدد',
+            'piece': 'عدد',
+            'م': 'متر',
+            'm': 'متر',
+        }
+        
+        return unit_map.get(unit_lower, unit_lower)
+    
     def _get_or_create_item(self, name, unit, category, current_stock, 
                            weekly_consumption, monthly_consumption, hotel):
         """
         Get existing item or create new one
         P1-5: Set base_unit for normalization
+        BUSINESS LOGIC FIX #4: Validate unit mismatch to prevent inventory corruption
         """
         # Check if item exists for this hotel
         query = Item.query.filter_by(item_name_fa=name)
@@ -644,6 +670,18 @@ class DataImporter:
         existing = query.first()
         
         if existing:
+            # BUSINESS LOGIC FIX #4: Check for unit mismatch
+            # Normalize both units for comparison
+            existing_unit_normalized = self._normalize_unit(existing.unit)
+            new_unit_normalized = self._normalize_unit(unit)
+            
+            if existing_unit_normalized != new_unit_normalized:
+                # Critical error: unit mismatch
+                error_msg = f"عدم تطابق واحد برای کالا '{name}': سیستم '{existing.unit}' دارد، فایل '{unit}' دارد. ردیف نادیده گرفته شد."
+                self.errors.append(error_msg)
+                logger.error(f"Unit mismatch for item {name}: system has '{existing.unit}', file has '{unit}'. Skipped.")
+                return None  # Skip this row
+            
             # Update if needed
             if current_stock > 0:
                 existing.current_stock = current_stock

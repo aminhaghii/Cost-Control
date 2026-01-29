@@ -258,8 +258,17 @@ def create():
             
             transaction_date = datetime.strptime(transaction_date_str, '%Y-%m-%d').date()
             
-            # P0-4: Use Decimal for money precision
-            price_decimal = unit_price_decimal
+            # BUSINESS LOGIC FIX #3: Enforce weighted average cost for outflows
+            # Consumption and Waste MUST use item's current cost, not user input
+            if transaction_type in ['مصرف', 'ضایعات']:
+                # Force use of item's weighted average cost
+                if unit_price_decimal != Decimal(str(item.unit_price)):
+                    logger.warning(f'User tried to set price {unit_price_decimal} for {transaction_type}, forcing item cost {item.unit_price}')
+                price_decimal = Decimal(str(item.unit_price))
+            else:
+                # Purchase and Adjustment can have custom prices
+                price_decimal = unit_price_decimal
+            
             total_decimal = (quantity_decimal * price_decimal).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
             
             logger.info(f'Creating transaction: item={item_id}, qty={quantity}, price={price_decimal}, total={total_decimal}')
@@ -472,8 +481,17 @@ def edit(id):
             # Bug #8: Auto-set category from item
             category = auto_set_category(new_item)
             
-            # P0-4: Use Decimal for money
-            price_decimal = Decimal(str(unit_price)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            # BUSINESS LOGIC FIX #3: Enforce weighted average cost for outflows in edit
+            # Consumption and Waste MUST use item's current cost, not user input
+            if transaction_type in ['مصرف', 'ضایعات']:
+                # Force use of item's weighted average cost
+                if unit_price != new_item.unit_price:
+                    logger.warning(f'User tried to set price {unit_price} for {transaction_type} in edit, forcing item cost {new_item.unit_price}')
+                price_decimal = Decimal(str(new_item.unit_price))
+            else:
+                # Purchase and Adjustment can have custom prices
+                price_decimal = Decimal(str(unit_price)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            
             total_decimal = (quantity_decimal * price_decimal).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
             
             # Update transaction fields
@@ -487,7 +505,19 @@ def edit(id):
             transaction.description = description
             
             # P0-2: Recalculate signed_quantity
+            old_signed_quantity = transaction.signed_quantity
             transaction.calculate_signed_quantity()
+            new_signed_quantity = transaction.signed_quantity
+            
+            # BUSINESS LOGIC FIX #2: Check for retroactive stock negative
+            # When reducing purchase or changing to consumption, verify current stock won't go negative
+            stock_delta = new_signed_quantity - old_signed_quantity
+            if stock_delta < 0:  # Stock is reducing
+                # Check if this reduction would make current stock negative
+                if (new_item.current_stock + stock_delta) < 0:
+                    db.session.rollback()
+                    flash('ویرایش این تراکنش باعث منفی شدن موجودی فعلی انبار می‌شود (چون کالا مصرف شده است).', 'danger')
+                    return render_template('transactions/edit.html', transaction=transaction, items=items)
             
             # BUG #46 FIX: Lock before update
             db.session.execute(

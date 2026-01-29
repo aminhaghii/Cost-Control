@@ -48,7 +48,18 @@ def executive_summary():
     # محاسبه کل هزینه‌ها
     total_purchase = food_stats.get('total_amount', 0) + nonfood_stats.get('total_amount', 0)
     total_waste = waste_stats.get('total_amount', 0)
-    waste_ratio = (total_waste / total_purchase * 100) if total_purchase > 0 else 0
+    
+    # BUSINESS LOGIC FIX #1: Calculate waste ratio based on total outflow (consumption + waste)
+    # instead of purchase to avoid 0% when purchase=0 but consumption exists
+    total_consumption_for_ratio = db.session.query(
+        func.coalesce(func.sum(Transaction.total_amount), 0)
+    ).filter(
+        Transaction.transaction_type == 'مصرف',
+        Transaction.transaction_date >= current_start
+    ).scalar() or 0
+    
+    total_outflow = total_consumption_for_ratio + total_waste
+    waste_ratio = (total_waste / total_outflow * 100) if total_outflow > 0 else 0
     
     # محاسبه صرفه‌جویی بالقوه (۱۰% کاهش در اقلام کلاس A)
     potential_savings_food = food_stats.get('class_a_amount', 0) * 0.10
@@ -179,6 +190,7 @@ def executive_summary():
         stock_coverage_days = 999  # Infinite (no consumption)
     
     # 6. Efficiency Score (lower waste = higher efficiency)
+    # Uses the corrected waste_ratio based on total_outflow
     efficiency_score = 100 - waste_ratio if waste_ratio <= 100 else 0
     
     # 7. Critical Items Count
