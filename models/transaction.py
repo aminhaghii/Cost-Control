@@ -10,12 +10,13 @@ TRANSACTION_TYPES = {
     'adjustment': 'اصلاحی'
 }
 
-# Direction mapping: +1 increases stock, -1 decreases stock
+# BUG #37 FIX: Direction mapping - removed 'اصلاحی' to force explicit direction
+# Direction: +1 increases stock, -1 decreases stock
 TRANSACTION_DIRECTION = {
     'خرید': 1,       # purchase increases stock
     'مصرف': -1,      # consumption decreases stock
     'ضایعات': -1,    # waste decreases stock
-    'اصلاحی': 1      # adjustment can be +/- (use direction field)
+    # 'اصلاحی' removed - must be explicitly set via direction parameter
 }
 
 # Warehouse Management Constants
@@ -54,6 +55,9 @@ class Transaction(db.Model):
     - direction: +1 (increases stock) or -1 (decreases stock)
     - signed_quantity: ALWAYS = quantity * direction (computed, not stored independently)
     - quantity: ALWAYS positive, direction determines effect
+    
+    BUG #37 FIX: Adjustment transactions must explicitly specify direction
+    BUG #47 FIX: Price override reason stored for audit trail
     """
     __tablename__ = 'transactions'
     
@@ -98,6 +102,10 @@ class Transaction(db.Model):
     unit = db.Column(db.String(20), nullable=True)  # Original unit from import
     conversion_factor_to_base = db.Column(db.Float, default=1.0)  # Factor to convert to item's base_unit
     
+    # BUG #47 FIX: Price override audit trail
+    price_was_overridden = db.Column(db.Boolean, default=False)
+    price_override_reason = db.Column(db.Text, nullable=True)
+    
     # Soft delete support
     is_deleted = db.Column(db.Boolean, default=False)
     deleted_at = db.Column(db.DateTime, nullable=True)
@@ -131,6 +139,7 @@ class Transaction(db.Model):
     def calculate_signed_quantity(self):
         """
         P0-2: Centralized signed_quantity calculation
+        BUG #37 FIX: For adjustments, direction must be explicitly set
         BUG-FIX #13: Improved error messages with full context
         
         Rules:
@@ -144,11 +153,20 @@ class Transaction(db.Model):
         self.quantity = abs(self.quantity) if self.quantity else 0
         
         if self.transaction_type == 'اصلاحی':
-            # For adjustments, direction is explicitly set (default +1)
-            self.direction = self.direction if self.direction in (1, -1) else 1
+            # BUG #37 FIX: For adjustments, direction MUST be explicitly set
+            if self.direction not in (1, -1):
+                raise ValueError(
+                    f"Adjustment transactions must have explicit direction (+1 or -1). "
+                    f"Transaction ID: {self.id}, Current direction: {self.direction}"
+                )
         else:
             # For other types, derive direction from type
-            self.direction = TRANSACTION_DIRECTION.get(self.transaction_type, 1)
+            self.direction = TRANSACTION_DIRECTION.get(self.transaction_type)
+            if self.direction is None:
+                raise ValueError(
+                    f"Unknown transaction type '{self.transaction_type}'. "
+                    f"Valid types: {', '.join(TRANSACTION_DIRECTION.keys())}"
+                )
         
         # P1-FIX: Properly determine conversion factor
         factor = self.conversion_factor_to_base
@@ -195,6 +213,8 @@ class Transaction(db.Model):
                            requires_approval=False, allow_price_override=False):
         """
         P0-2/P0-3/P0-4: Centralized transaction creation
+        BUG #37 FIX: Validate direction for adjustment transactions
+        BUG #47 FIX: Store price override reason for audit trail
         BUG-FIX #2: Removed current_user dependency - now uses allow_price_override parameter
         
         Use this factory method instead of direct instantiation.
@@ -214,11 +234,20 @@ class Transaction(db.Model):
         if quantity is None or float(quantity) <= 0:
             raise ValueError(f"Quantity must be greater than zero, got: {quantity}")
 
+        # BUG #37 FIX: For adjustment transactions, direction must be explicitly provided
+        if transaction_type == 'اصلاحی' and direction is None:
+            raise ValueError(
+                "Adjustment transactions MUST specify direction explicitly (+1 to increase stock, -1 to decrease). "
+                "Example: direction=1 for adding stock, direction=-1 for removing stock"
+            )
+
         # BUG-FIX #2: PRICE CONTROL without current_user dependency
         # Now relies on allow_price_override parameter (set by caller after auth check)
         item_price_decimal = Decimal(str(item.unit_price)) if item.unit_price is not None else Decimal('0')
         submitted_price_decimal = Decimal(str(unit_price)) if unit_price is not None else None
 
+        # BUG #47 FIX: Track price override for audit
+        price_changed = False
         if submitted_price_decimal is not None:
             price_changed = submitted_price_decimal != item_price_decimal
             if price_changed:
@@ -248,7 +277,14 @@ class Transaction(db.Model):
         if direction is not None:
             dir_value = 1 if direction > 0 else -1
         else:
-            dir_value = TRANSACTION_DIRECTION.get(transaction_type, 1)
+            # BUG #37 FIX: This will now only work for non-adjustment types
+            # (adjustment will have been caught by validation above)
+            dir_value = TRANSACTION_DIRECTION.get(transaction_type)
+            if dir_value is None:
+                raise ValueError(
+                    f"Unknown transaction type '{transaction_type}'. "
+                    f"Valid types: {', '.join(TRANSACTION_DIRECTION.keys())} or 'اصلاحی' (requires explicit direction)"
+                )
         
         # BUG-VALIDATION-001: quantity already validated > 0, convert to float
         qty = float(quantity)
@@ -286,7 +322,10 @@ class Transaction(db.Model):
             is_opening_balance=is_opening_balance,
             import_batch_id=import_batch_id,
             transaction_date=date.today(),
-            requires_approval=requires_approval
+            requires_approval=requires_approval,
+            # BUG #47 FIX: Store price override audit info
+            price_was_overridden=price_changed,
+            price_override_reason=price_override_reason if price_changed else None
         )
         return tx
     
