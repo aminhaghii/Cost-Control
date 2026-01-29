@@ -287,8 +287,16 @@ def create():
             # ═══ Warehouse Management: Check if approval needed ═══
             requires_approval = False
             total_float = float(total_decimal)
-            if transaction_type == 'ضایعات' and item.hotel_id:
-                settings = WarehouseSettings.get_or_create(item.hotel_id)
+            if transaction_type == 'ضایعات':
+                # BUG #41 FIX: Always check approval for waste (use default hotel if needed)
+                hotel_id_to_check = item.hotel_id
+                if not hotel_id_to_check:
+                    # Use default hotel or main hotel for global items
+                    from models import Hotel
+                    main_hotel = Hotel.query.filter_by(hotel_code='MAIN').first()
+                    hotel_id_to_check = main_hotel.id if main_hotel else 1
+                
+                settings = WarehouseSettings.get_or_create(hotel_id_to_check)
                 if settings.check_waste_approval_needed(total_float):
                     requires_approval = True
             
@@ -448,6 +456,11 @@ def edit(id):
                 flash(stock_error, 'danger')
                 return render_template('transactions/edit.html', transaction=transaction, items=items)
             
+            # BUG #46 FIX: Lock before rollback and update
+            db.session.execute(
+                select(Item).where(Item.id == old_item_id).with_for_update()
+            ).scalar_one_or_none()
+            
             # BUG #1 FIX: Use atomic update to prevent race condition
             if transaction.signed_quantity:
                 db.session.execute(
@@ -475,6 +488,11 @@ def edit(id):
             
             # P0-2: Recalculate signed_quantity
             transaction.calculate_signed_quantity()
+            
+            # BUG #46 FIX: Lock before update
+            db.session.execute(
+                select(Item).where(Item.id == new_item.id).with_for_update()
+            ).scalar_one_or_none()
             
             # BUG #1 FIX: Use atomic update to prevent race condition
             db.session.execute(

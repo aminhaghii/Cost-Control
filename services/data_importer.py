@@ -673,6 +673,15 @@ class DataImporter:
             unit_type, _ = UNIT_CONVERSIONS[unit]
             base_unit = BASE_UNITS.get(unit_type, unit)
         
+        # BUG #43 FIX: Use fraction of monthly or weekly for min_stock
+        # Industry standard: 25-30% of monthly (1 week) for safety stock
+        if monthly_consumption > 0:
+            min_stock_value = monthly_consumption * 0.25  # 1 week (7-8 days)
+        elif weekly_consumption > 0:
+            min_stock_value = weekly_consumption * 1.5  # 1.5 weeks
+        else:
+            min_stock_value = 0
+        
         # Create new item
         new_item = Item(
             item_code=item_code,
@@ -683,7 +692,7 @@ class DataImporter:
             base_unit=base_unit,  # P1-5: Set base_unit
             hotel_id=self.hotel_id,
             current_stock=current_stock,
-            min_stock=monthly_consumption if monthly_consumption > 0 else 0,
+            min_stock=min_stock_value,
             is_active=True
         )
         
@@ -695,9 +704,10 @@ class DataImporter:
     
     def create_initial_stock_transactions(self, user_id=1):
         """
-        Create initial stock transactions for items with current_stock > 0
+        Create initial stock transactions for items with current_stock != 0
         P0-2: Mark as opening balance with proper fields
         P3-FIX: Only process items from current import batch (tracked via affected_item_ids)
+        BUG #44 FIX: Handle negative stocks and validate
         """
         # P3-FIX: Only process items that were created/updated in THIS import
         if not self.affected_item_ids:
@@ -705,8 +715,18 @@ class DataImporter:
         
         items_with_stock = Item.query.filter(
             Item.id.in_(self.affected_item_ids),
-            Item.current_stock > 0
+            Item.current_stock != 0  # BUG #44 FIX: Include negative stocks
         ).all()
+        
+        # BUG #44 FIX: Warn about negative stocks and reset them
+        for item in items_with_stock:
+            if item.current_stock < 0:
+                self.warnings.append(
+                    f'کالا {item.item_name_fa} موجودی منفی دارد: {item.current_stock}'
+                )
+                # Reset to zero
+                item.current_stock = 0
+                continue
         
         for item in items_with_stock:
             # Check if initial transaction exists for this batch

@@ -11,11 +11,12 @@ TRANSACTION_TYPES = {
 }
 
 # Direction mapping: +1 increases stock, -1 decreases stock
+# BUG #37 FIX: 'اصلاحی' removed - direction MUST be explicitly set
 TRANSACTION_DIRECTION = {
     'خرید': 1,       # purchase increases stock
     'مصرف': -1,      # consumption decreases stock
     'ضایعات': -1,    # waste decreases stock
-    'اصلاحی': 1      # adjustment can be +/- (use direction field)
+    # 'اصلاحی' removed - must specify direction explicitly (+1 or -1)
 }
 
 # Warehouse Management Constants
@@ -119,6 +120,10 @@ class Transaction(db.Model):
     approved_at = db.Column(db.DateTime, nullable=True)
     approval_status = db.Column(db.String(20), default='not_required')
     
+    # BUG #47 FIX: Price override tracking
+    price_was_overridden = db.Column(db.Boolean, default=False)
+    price_override_reason = db.Column(db.Text, nullable=True)
+    
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -219,6 +224,7 @@ class Transaction(db.Model):
         item_price_decimal = Decimal(str(item.unit_price)) if item.unit_price is not None else Decimal('0')
         submitted_price_decimal = Decimal(str(unit_price)) if unit_price is not None else None
 
+        price_changed = False
         if submitted_price_decimal is not None:
             price_changed = submitted_price_decimal != item_price_decimal
             if price_changed:
@@ -245,6 +251,10 @@ class Transaction(db.Model):
             raise ValueError("Transaction hotel_id must match item's hotel_id")
 
         # Determine direction
+        # BUG #37 FIX: For adjustments, direction MUST be provided
+        if transaction_type == 'اصلاحی' and direction is None:
+            raise ValueError("Adjustment transactions MUST specify direction explicitly (+1 or -1)")
+        
         if direction is not None:
             dir_value = 1 if direction > 0 else -1
         else:
@@ -286,7 +296,10 @@ class Transaction(db.Model):
             is_opening_balance=is_opening_balance,
             import_batch_id=import_batch_id,
             transaction_date=date.today(),
-            requires_approval=requires_approval
+            requires_approval=requires_approval,
+            # BUG #47 FIX: Store price override information
+            price_was_overridden=price_changed,
+            price_override_reason=price_override_reason if price_changed else None
         )
         return tx
     

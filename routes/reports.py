@@ -157,18 +157,26 @@ def executive_summary():
     total_consumption = float(total_consumption)
     total_stock_value = float(total_stock_value)
     
-    # BUG #18 FIX: Improved division by zero protection
+    # BUG #42 FIX: Improved inventory turnover calculation
     if total_stock_value > 0 and days > 0:
-        inventory_turnover = (total_consumption / total_stock_value) * (365 / days)
+        if total_consumption > 0:
+            inventory_turnover = (total_consumption / total_stock_value) * (365 / days)
+        else:
+            inventory_turnover = 0  # No consumption, zero turnover
+    elif total_consumption > 0:
+        inventory_turnover = float('inf')  # Consumption without stock (should not happen)
     else:
         inventory_turnover = 0
     
     # 5. Stock Coverage Days (How many days current stock will last)
+    # BUG #42 FIX: Handle zero stock correctly
     avg_daily_consumption = total_consumption / days if days > 0 else 0
-    if avg_daily_consumption > 0:
+    if avg_daily_consumption > 0 and total_stock_value > 0:
         stock_coverage_days = total_stock_value / avg_daily_consumption
+    elif total_stock_value <= 0:
+        stock_coverage_days = 0  # No stock
     else:
-        stock_coverage_days = 999  # Infinite days (no consumption)
+        stock_coverage_days = 999  # Infinite (no consumption)
     
     # 6. Efficiency Score (lower waste = higher efficiency)
     efficiency_score = 100 - waste_ratio if waste_ratio <= 100 else 0

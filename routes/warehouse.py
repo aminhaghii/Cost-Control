@@ -378,18 +378,20 @@ def approvals():
                          pending=pending,
                          hotel_id=hotel_id,
                          WASTE_REASONS=WASTE_REASONS)
-
-
-@warehouse_bp.route('/approvals/<int:tx_id>/approve', methods=['POST'])
 @login_required
 def approve_transaction(tx_id):
-    """Approve a pending transaction"""
+    """Approve a pending transaction and update stock"""
     tx = Transaction.query.get_or_404(tx_id)
     
     # BUG-FIX: Check hotel access before approving
     if not user_can_access_hotel(current_user, tx.hotel_id):
         flash('دسترسی غیرمجاز', 'danger')
         return redirect(url_for('warehouse.approvals'))
+    
+    # BUG #38 FIX: Check permission - only admin/manager can approve
+    if current_user.role not in ['admin', 'manager']:
+        flash('فقط مدیران می‌توانند تراکنش‌ها را تایید کنند', 'danger')
+        return redirect(url_for('warehouse.approvals', hotel_id=tx.hotel_id))
     
     try:
         WarehouseService.approve_transaction(tx_id, current_user.id)
@@ -411,6 +413,11 @@ def reject_transaction(tx_id):
     if not user_can_access_hotel(current_user, tx.hotel_id):
         flash('دسترسی غیرمجاز', 'danger')
         return redirect(url_for('warehouse.approvals'))
+    
+    # BUG #38 FIX: Check permission - only admin/manager can reject
+    if current_user.role not in ['admin', 'manager']:
+        flash('فقط مدیران می‌توانند تراکنش‌ها را رد کنند', 'danger')
+        return redirect(url_for('warehouse.approvals', hotel_id=tx.hotel_id))
     
     try:
         reason = request.form.get('reason', '')

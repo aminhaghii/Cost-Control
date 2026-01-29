@@ -290,9 +290,10 @@ class WarehouseService:
         tx.approved_by_id = approver_id
         tx.approved_at = datetime.utcnow()
         
-        # NOW update stock
+        # BUG #39 FIX: Only update stock if it wasn't already updated
+        # If requires_approval was True from start, stock is NOT yet updated
         item = Item.query.get(tx.item_id)
-        if item:
+        if item and tx.requires_approval:
             item.current_stock = (item.current_stock or 0) + tx.signed_quantity
             # Check and create stock alerts (now that stock is updated)
             from routes.transactions import check_and_create_stock_alert
@@ -318,11 +319,19 @@ class WarehouseService:
     
     @staticmethod
     def reject_transaction(transaction_id: int, approver_id: int, reason: str = None) -> Transaction:
-        """Reject a pending transaction - stock NOT updated"""
+        """Reject a pending transaction - rollback stock if needed"""
         tx = Transaction.query.get_or_404(transaction_id)
         
         if tx.approval_status != 'pending':
             raise ValueError("این تراکنش در انتظار تایید نیست")
+        
+        # BUG #45 FIX: If stock was already updated (requires_approval=False), roll it back
+        if not tx.requires_approval:
+            item = Item.query.get(tx.item_id)
+            if item:
+                item.current_stock = (item.current_stock or 0) - tx.signed_quantity
+                from routes.transactions import check_and_create_stock_alert
+                check_and_create_stock_alert(item)
         
         # Update approval fields
         tx.approval_status = 'rejected'

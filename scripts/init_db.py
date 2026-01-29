@@ -26,7 +26,8 @@ def init_database():
         admin = User(
             username='admin',
             email='admin@hotel.com',
-            full_name='مدیر سیستم'
+            full_name='مدیر سیستم',
+            role='admin'
         )
         admin.set_password('admin')
         db.session.add(admin)
@@ -34,7 +35,8 @@ def init_database():
         user1 = User(
             username='user1',
             email='user1@hotel.com',
-            full_name='کاربر تست'
+            full_name='کاربر تست',
+            role='manager'
         )
         user1.set_password('1234')
         db.session.add(user1)

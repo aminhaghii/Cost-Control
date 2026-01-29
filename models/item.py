@@ -38,6 +38,11 @@ class Item(db.Model):
     """
     __tablename__ = 'items'
     
+    # BUG #40 FIX: Add constraint to prevent negative stock
+    __table_args__ = (
+        db.CheckConstraint('current_stock >= 0', name='ck_item_stock_non_negative'),
+    )
+    
     id = db.Column(db.Integer, primary_key=True)
     item_code = db.Column(db.String(20), unique=True, nullable=False)
     item_name_fa = db.Column(db.String(100), nullable=False)
