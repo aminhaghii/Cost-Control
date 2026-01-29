@@ -8,6 +8,7 @@ from models import db, User, Item, Transaction, Alert, AuditLog, ROLES, ROLE_LAB
 from utils.decorators import admin_required, manager_required
 from datetime import datetime, timedelta
 from sqlalchemy import func, desc
+import html
 from utils.timezone import get_iran_now
 import logging
 
@@ -402,9 +403,11 @@ def items_list():
         query = query.filter(Item.current_stock < Item.min_stock)
     
     if search:
+        # BUG #30 FIX: Escape SQL wildcards in search
+        search_escaped = search.replace('%', '\\%').replace('_', '\\_')
         query = query.filter(
-            (Item.item_code.ilike(f'%{search}%')) |
-            (Item.item_name_fa.ilike(f'%{search}%'))
+            (Item.item_code.ilike(f'%{search_escaped}%', escape='\\')) |
+            (Item.item_name_fa.ilike(f'%{search_escaped}%', escape='\\'))
         )
     
     items = query.order_by(Item.item_name_fa).paginate(page=page, per_page=20)
@@ -421,8 +424,9 @@ def items_list():
 def items_create():
     """Create a new item"""
     if request.method == 'POST':
-        item_code = request.form.get('item_code', '').strip()
-        item_name_fa = request.form.get('item_name_fa', '').strip()
+        # BUG #28 FIX: Sanitize user input to prevent stored XSS
+        item_code = html.escape(request.form.get('item_code', '').strip())
+        item_name_fa = html.escape(request.form.get('item_name_fa', '').strip())
         category = request.form.get('category', 'Food')
         unit = request.form.get('unit', '').strip()
         unit_price = request.form.get('unit_price', 0, type=float)
@@ -531,8 +535,9 @@ def items_edit(item_id):
             'is_active': item.is_active
         }
         
-        item_code = request.form.get('item_code', '').strip()
-        item_name_fa = request.form.get('item_name_fa', '').strip()
+        # BUG #28 FIX: Sanitize user input to prevent stored XSS
+        item_code = html.escape(request.form.get('item_code', '').strip())
+        item_name_fa = html.escape(request.form.get('item_name_fa', '').strip())
         category = request.form.get('category', 'Food')
         unit = request.form.get('unit', '').strip()
         unit_price = request.form.get('unit_price', 0, type=float)
@@ -744,7 +749,12 @@ def logs_export():
         except:
             pass
     
-    logs = query.order_by(desc(AuditLog.created_at)).limit(10000).all()
+    # BUG #36 FIX: Cap export size to prevent excessive memory usage
+    MAX_EXPORT_LIMIT = 5000
+    total_logs = query.count()
+    logs = query.order_by(desc(AuditLog.created_at)).limit(MAX_EXPORT_LIMIT).all()
+    if total_logs > MAX_EXPORT_LIMIT:
+        flash(f'فقط {MAX_EXPORT_LIMIT} رکورد اول export شد', 'warning')
     
     # Create Excel
     wb = Workbook()
@@ -820,11 +830,17 @@ def data_import():
             flash('فایلی انتخاب نشده است', 'danger')
             return redirect(request.url)
         
-        # BUG #5 FIX: Check file size before saving (max 16MB)
+        # BUG #26 FIX: Check Content-Length before reading file (max 16MB)
         MAX_UPLOAD_SIZE = 16 * 1024 * 1024  # 16 MB
-        file.seek(0, os.SEEK_END)
-        file_size = file.tell()
-        file.seek(0)  # Reset to beginning
+        content_length = request.content_length
+        if content_length and content_length > MAX_UPLOAD_SIZE:
+            flash(f'حجم فایل نباید بیشتر از {MAX_UPLOAD_SIZE/1024/1024:.0f} مگابایت باشد', 'danger')
+            return redirect(request.url)
+
+        # BUG #26 FIX: Check file stream size safely
+        file.stream.seek(0, os.SEEK_END)
+        file_size = file.stream.tell()
+        file.stream.seek(0)  # Reset to beginning
         
         if file_size > MAX_UPLOAD_SIZE:
             flash(f'حجم فایل نباید بیشتر از {MAX_UPLOAD_SIZE/1024/1024:.0f} مگابایت باشد', 'danger')
@@ -953,16 +969,17 @@ def import_preview(filename):
         sheets_info = []
         
         for sheet_name in excel_file.sheet_names:
-            df = pd.read_excel(excel_file, sheet_name=sheet_name, nrows=5)
+            # BUG #32 FIX: Read each sheet once and reuse the dataframe
+            df = pd.read_excel(excel_file, sheet_name=sheet_name)
             sheets_info.append({
                 'name': sheet_name,
-                'rows': len(pd.read_excel(excel_file, sheet_name=sheet_name)),
+                'rows': len(df),
                 'columns': list(df.columns),
                 'preview': df.head(5).to_dict('records')
             })
         
-        return render_template('admin/import/preview.html', 
-                             filename=filename, 
+        return render_template('admin/import/preview.html',
+                             filename=filename,
                              sheets=sheets_info)
     except Exception as e:
         flash(f'خطا در خواندن فایل: {str(e)}', 'danger')

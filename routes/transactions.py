@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, abort
 from flask_login import login_required, current_user
-from sqlalchemy import update
+from sqlalchemy import update, select
 from models import db, Transaction, Item, Alert, WarehouseSettings
 from models.transaction import WASTE_REASONS, DEPARTMENTS
 from datetime import date, datetime, timedelta, timezone
@@ -8,6 +8,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from utils.decimal_utils import parse_decimal_input
 import html
 import logging
+from urllib.parse import urlparse, urljoin
 
 # BUG-FIX #11: Import limiter for API rate limiting
 try:
@@ -23,6 +24,13 @@ IRAN_TZ = timezone(timedelta(hours=3, minutes=30))
 def get_iran_today():
     """Get current date in Iran timezone"""
     return datetime.now(IRAN_TZ).date()
+
+
+def is_safe_url(target):
+    """Validate redirect URLs to prevent open redirect"""
+    ref_url = urlparse(request.host_url)
+    test_url = urlparse(urljoin(request.host_url, target))
+    return test_url.scheme in ('http', 'https') and ref_url.netloc == test_url.netloc
 
 # Validation Constants
 MAX_QUANTITY = 999999
@@ -324,6 +332,10 @@ def create():
             # Only update stock if approval NOT required
             # P1-FIX: Use atomic database update to prevent race conditions
             if not requires_approval:
+                # BUG #29 FIX: Lock the row before updating stock (when supported)
+                db.session.execute(
+                    select(Item).where(Item.id == item.id).with_for_update()
+                ).scalar_one_or_none()
                 db.session.execute(
                     update(Item).where(Item.id == item.id)
                     .values(current_stock=Item.current_stock + transaction.signed_quantity)
@@ -355,6 +367,9 @@ def create():
             else:
                 flash('تراکنش با موفقیت ثبت شد', 'success')
             
+            next_url = request.args.get('next') or request.form.get('next')
+            if next_url and is_safe_url(next_url):
+                return redirect(next_url)
             return redirect(url_for('transactions.list_transactions'))
             
         except Exception as e:

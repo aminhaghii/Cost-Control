@@ -1,5 +1,6 @@
 from . import db
 from datetime import datetime
+from urllib.parse import urlparse, parse_qs, urlencode
 
 class AuditLog(db.Model):
     """
@@ -124,11 +125,32 @@ class AuditLog(db.Model):
         if request:
             log_entry.ip_address = request.remote_addr
             log_entry.user_agent = request.user_agent.string[:500] if request.user_agent else None
+            if request.url:
+                sanitized_url = cls._sanitize_request_url(request.url)
+                if description:
+                    log_entry.description = f"{description} | URL: {sanitized_url}"
+                else:
+                    log_entry.description = f"URL: {sanitized_url}"
         
         db.session.add(log_entry)
         # Note: Commit should be done by the calling code
         
         return log_entry
+
+    @staticmethod
+    def _sanitize_request_url(url):
+        """BUG #34 FIX: Remove sensitive query parameters from URLs before logging."""
+        parsed = urlparse(url)
+        query_params = parse_qs(parsed.query)
+
+        # Remove sensitive parameters
+        sensitive_keys = {'password', 'token', 'api_key', 'secret'}
+        for key in list(query_params.keys()):
+            if key.lower() in sensitive_keys:
+                query_params.pop(key, None)
+
+        sanitized_query = urlencode(query_params, doseq=True)
+        return parsed._replace(query=sanitized_query).geturl()
     
     def get_old_values_dict(self):
         """Parse old_values JSON string to dict"""

@@ -51,7 +51,8 @@ class Config:
     # Only disable secure cookie in explicit development mode
     SESSION_COOKIE_SECURE = not IS_DEVELOPMENT  # True unless explicitly in development
     SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to session cookie
-    SESSION_COOKIE_SAMESITE = 'Lax'  # Prevent CSRF via cross-site requests
+    # BUG #27 FIX: Use Strict in production to prevent CSRF via cross-site requests
+    SESSION_COOKIE_SAMESITE = 'Strict' if IS_PRODUCTION else 'Lax'
     PERMANENT_SESSION_LIFETIME = 3600  # 1 hour session lifetime
     
     # Security Headers

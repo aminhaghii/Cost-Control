@@ -7,11 +7,18 @@ import logging
 # BUG-FIX #3: Import database-backed rate limiting
 from services.rate_limit_service import LoginAttempt
 
+# BUG #31 FIX: Apply rate limiting to login endpoint if limiter is available
+try:
+    from app import limiter
+except ImportError:
+    limiter = None
+
 logger = logging.getLogger(__name__)
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
+@limiter.limit("10 per minute") if limiter else (lambda f: f)
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard.index'))
