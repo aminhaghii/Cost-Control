@@ -35,6 +35,7 @@ UNIT_CONVERSIONS = {
 class Item(db.Model):
     """
     Item model with P1-5 unit normalization support
+    BUG #40 FIX: Added constraint to prevent negative stock
     """
     __tablename__ = 'items'
     
@@ -59,6 +60,11 @@ class Item(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # BUG #40 FIX: Prevent negative stock at database level
+    __table_args__ = (
+        db.CheckConstraint('current_stock >= 0', name='ck_item_stock_non_negative'),
+    )
     
     transactions = db.relationship('Transaction', backref='item', lazy='dynamic')
     
