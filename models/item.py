@@ -35,9 +35,16 @@ UNIT_CONVERSIONS = {
 class Item(db.Model):
     """
     Item model with P1-5 unit normalization support
-    BUG #40 FIX: Added constraint to prevent negative stock
+    BUG #40 FIX: Database constraints prevent negative stock values
     """
     __tablename__ = 'items'
+    
+    # BUG #40 FIX: Add constraints to prevent negative stock values
+    __table_args__ = (
+        db.CheckConstraint('current_stock >= 0', name='ck_item_stock_non_negative'),
+        db.CheckConstraint('min_stock >= 0', name='ck_item_min_stock_non_negative'),
+        db.CheckConstraint('max_stock IS NULL OR max_stock >= 0', name='ck_item_max_stock_non_negative'),
+    )
     
     id = db.Column(db.Integer, primary_key=True)
     item_code = db.Column(db.String(20), unique=True, nullable=False)
@@ -60,11 +67,6 @@ class Item(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # BUG #40 FIX: Prevent negative stock at database level
-    __table_args__ = (
-        db.CheckConstraint('current_stock >= 0', name='ck_item_stock_non_negative'),
-    )
     
     transactions = db.relationship('Transaction', backref='item', lazy='dynamic')
     
