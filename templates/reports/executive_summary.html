@@ -186,6 +186,65 @@
     </div>
 </div>
 
+<!-- Financial Reconciliation for Auditor -->
+<div class="card mb-4 border-info">
+    <div class="card-header bg-info text-white">
+        <i class="fas fa-balance-scale me-2"></i> تراز مالی و مغایرت‌گیری
+    </div>
+    <div class="card-body">
+        <div class="alert alert-info mb-3">
+            <strong>فرمول تراز مالی:</strong> موجودی اول دوره + خرید - (مصرف + ضایعات) = موجودی پایان دوره
+        </div>
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>شرح</th>
+                        <th class="text-end">مبلغ (ریال)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><i class="fas fa-box-open text-primary me-2"></i>موجودی اول دوره</td>
+                        <td class="text-end fw-bold">{{ "{:,.0f}".format(financial_reconciliation.opening_value) }}</td>
+                    </tr>
+                    <tr class="table-success">
+                        <td><i class="fas fa-plus-circle text-success me-2"></i>خرید دوره</td>
+                        <td class="text-end fw-bold">+ {{ "{:,.0f}".format(financial_reconciliation.total_purchase) }}</td>
+                    </tr>
+                    <tr class="table-danger">
+                        <td><i class="fas fa-minus-circle text-danger me-2"></i>مصرف و ضایعات دوره</td>
+                        <td class="text-end fw-bold">- {{ "{:,.0f}".format(financial_reconciliation.total_usage_waste) }}</td>
+                    </tr>
+                    <tr class="table-warning">
+                        <td><strong><i class="fas fa-calculator text-warning me-2"></i>موجودی محاسبه شده</strong></td>
+                        <td class="text-end fw-bold">= {{ "{:,.0f}".format(financial_reconciliation.calculated_closing) }}</td>
+                    </tr>
+                    <tr class="table-info">
+                        <td><strong><i class="fas fa-warehouse text-info me-2"></i>موجودی واقعی فعلی</strong></td>
+                        <td class="text-end fw-bold">{{ "{:,.0f}".format(financial_reconciliation.actual_closing) }}</td>
+                    </tr>
+                    <tr class="{% if financial_reconciliation.variance|abs > 100000 %}table-danger{% else %}table-success{% endif %}">
+                        <td><strong><i class="fas fa-exclamation-triangle me-2"></i>مغایرت (اختلاف)</strong></td>
+                        <td class="text-end fw-bold">{{ "{:,.0f}".format(financial_reconciliation.variance) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        {% if financial_reconciliation.variance|abs > 100000 %}
+        <div class="alert alert-warning mb-0">
+            <i class="fas fa-info-circle me-2"></i>
+            <strong>توجه:</strong> مغایرت قابل توجهی بین موجودی محاسبه شده و واقعی وجود دارد. لطفاً اسناد را بررسی کنید.
+        </div>
+        {% else %}
+        <div class="alert alert-success mb-0">
+            <i class="fas fa-check-circle me-2"></i>
+            <strong>عالی!</strong> تراز مالی در محدوده قابل قبول است.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
 <!-- Action Items -->
 {% if action_items %}
 <div class="card mb-4 border-primary">

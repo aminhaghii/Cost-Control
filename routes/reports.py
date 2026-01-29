@@ -28,6 +28,11 @@ def executive_summary():
     if days <= 0 or days > 365:
         days = 30
     
+    # CRITICAL FIX: Define date variables at the top before any usage
+    today = get_iran_today()
+    current_start = today - timedelta(days=days)
+    previous_start = current_start - timedelta(days=days)
+    
     pareto_service = ParetoService()
     abc_service = ABCService()
     
@@ -66,11 +71,7 @@ def executive_summary():
     potential_savings_nonfood = nonfood_stats.get('class_a_amount', 0) * 0.10
     potential_savings = potential_savings_food + potential_savings_nonfood
     
-    # BUG-FIX #15: Use Iran timezone instead of UTC
-    today = get_iran_today()
-    current_start = today - timedelta(days=days)
-    previous_start = current_start - timedelta(days=days)
-    
+    # Calculate period comparison
     current_total = db.session.query(
         func.coalesce(func.sum(Transaction.total_amount), 0)
     ).filter(
@@ -202,6 +203,37 @@ def executive_summary():
     # 8. Items by ABC Class
     total_items = Item.query.filter(Item.is_active == True).count()
     
+    # REPORTING ENHANCEMENT #4: Financial Reconciliation for Auditor
+    # Calculate opening stock value at start of period
+    opening_value = db.session.query(
+        func.coalesce(func.sum(Item.current_stock * Item.unit_price), 0)
+    ).filter(Item.is_active == True).scalar() or 0
+    
+    # Total purchases in period (already calculated as total_purchase)
+    total_purchase_value = total_purchase
+    
+    # Total usage and waste in period
+    total_usage_waste = total_consumption + total_waste
+    
+    # Calculated closing value based on formula
+    calculated_closing = opening_value + total_purchase_value - total_usage_waste
+    
+    # Actual current stock value
+    actual_closing_value = total_stock_value
+    
+    # Variance (difference between calculated and actual)
+    reconciliation_variance = actual_closing_value - calculated_closing
+    
+    # Bundle financial reconciliation data
+    financial_reconciliation = {
+        'opening_value': opening_value,
+        'total_purchase': total_purchase_value,
+        'total_usage_waste': total_usage_waste,
+        'calculated_closing': calculated_closing,
+        'actual_closing': actual_closing_value,
+        'variance': reconciliation_variance
+    }
+    
     # Bundle all KPIs
     kpis = {
         'avg_daily_spend': avg_daily_spend,
@@ -230,7 +262,8 @@ def executive_summary():
                          potential_savings=potential_savings,
                          change_percentage=change_percentage,
                          action_items=action_items,
-                         kpis=kpis)
+                         kpis=kpis,
+                         financial_reconciliation=financial_reconciliation)
 
 @reports_bp.route('/pareto')
 @login_required

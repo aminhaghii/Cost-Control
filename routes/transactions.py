@@ -345,6 +345,22 @@ def create():
                 return render_template('transactions/create.html', items=items, today=today,
                                      WASTE_REASONS=WASTE_REASONS, DEPARTMENTS=DEPARTMENTS)
             
+            # SECURITY FEATURE #2: Anomaly detection for consumption transactions
+            if transaction_type == 'مصرف':
+                # Calculate average daily consumption over last 30 days
+                thirty_days_ago = get_iran_today() - timedelta(days=30)
+                avg_consumption = db.session.query(
+                    func.avg(Transaction.quantity)
+                ).filter(
+                    Transaction.item_id == item.id,
+                    Transaction.transaction_type == 'مصرف',
+                    Transaction.transaction_date >= thirty_days_ago,
+                    Transaction.is_deleted == False
+                ).scalar() or 0
+                
+                if avg_consumption > 0 and quantity > (avg_consumption * 3):
+                    flash(f'هشدار: مقدار مصرف وارد شده ({quantity:.1f}) بسیار بیشتر از میانگین مصرف ماهانه ({avg_consumption:.1f}) است. لطفاً دقت کنید.', 'warning')
+            
             # P0-2: Update stock using signed_quantity from transaction
             # Only update stock if approval NOT required
             # P1-FIX: Use atomic database update to prevent race conditions
@@ -465,6 +481,22 @@ def edit(id):
                 flash(stock_error, 'danger')
                 return render_template('transactions/edit.html', transaction=transaction, items=items)
             
+            # SECURITY FEATURE #2: Anomaly detection for consumption transactions in edit
+            if transaction_type == 'مصرف':
+                # Calculate average daily consumption over last 30 days
+                thirty_days_ago = get_iran_today() - timedelta(days=30)
+                avg_consumption = db.session.query(
+                    func.avg(Transaction.quantity)
+                ).filter(
+                    Transaction.item_id == new_item.id,
+                    Transaction.transaction_type == 'مصرف',
+                    Transaction.transaction_date >= thirty_days_ago,
+                    Transaction.is_deleted == False
+                ).scalar() or 0
+                
+                if avg_consumption > 0 and quantity > (avg_consumption * 3):
+                    flash(f'هشدار: مقدار مصرف وارد شده ({quantity:.1f}) بسیار بیشتر از میانگین مصرف ماهانه ({avg_consumption:.1f}) است. لطفاً دقت کنید.', 'warning')
+            
             # BUG #46 FIX: Lock before rollback and update
             db.session.execute(
                 select(Item).where(Item.id == old_item_id).with_for_update()
@@ -560,6 +592,13 @@ def delete(id):
     try:
         item = Item.query.get(transaction.item_id)
         if item:
+            # DATA INTEGRITY FIX #3: Prevent deletion of purchases if items have been consumed
+            if transaction.transaction_type == 'خرید':
+                # Check if deleting this purchase would make stock negative
+                if item.current_stock < transaction.quantity:
+                    flash('خطا: موجودی کالا کمتر از مقدار این خرید است (بخشی از کالا مصرف شده). ابتدا اسناد مصرف را اصلاح کنید.', 'danger')
+                    return redirect(url_for('transactions.list_transactions'))
+            
             # P0-2: Soft delete - mark as deleted
             transaction.is_deleted = True
             transaction.deleted_at = datetime.utcnow()
