@@ -208,10 +208,36 @@ def executive_summary():
     total_items = Item.query.filter(Item.is_active == True).count()
     
     # REPORTING ENHANCEMENT #4: Financial Reconciliation for Auditor
-    # Calculate opening stock value at start of period
-    opening_value = db.session.query(
-        func.coalesce(func.sum(Item.current_stock * Item.unit_price), 0)
-    ).filter(Item.is_active == True).scalar() or 0
+    # Calculate opening stock value by reversing period movements
+    # Opening_Stock = Current_Stock - (Purchase_Qty - Usage_Qty)
+    purchase_qty_by_item = db.session.query(
+        Transaction.item_id,
+        func.coalesce(func.sum(Transaction.quantity), 0).label('purchase_qty')
+    ).filter(
+        Transaction.transaction_type == 'خرید',
+        Transaction.transaction_date >= current_start,
+        Transaction.is_deleted == False
+    ).group_by(Transaction.item_id).all()
+    
+    usage_qty_by_item = db.session.query(
+        Transaction.item_id,
+        func.coalesce(func.sum(Transaction.quantity), 0).label('usage_qty')
+    ).filter(
+        Transaction.transaction_type.in_(['مصرف', 'ضایعات']),
+        Transaction.transaction_date >= current_start,
+        Transaction.is_deleted == False
+    ).group_by(Transaction.item_id).all()
+    
+    purchase_qty_map = {row.item_id: row.purchase_qty for row in purchase_qty_by_item}
+    usage_qty_map = {row.item_id: row.usage_qty for row in usage_qty_by_item}
+    
+    opening_value = 0
+    active_items = Item.query.filter(Item.is_active == True).all()
+    for item in active_items:
+        purchase_qty = purchase_qty_map.get(item.id, 0)
+        usage_qty = usage_qty_map.get(item.id, 0)
+        opening_stock = (item.current_stock or 0) - (purchase_qty - usage_qty)
+        opening_value += float(opening_stock) * float(item.unit_price or 0)
     
     # Total purchases in period (already calculated as total_purchase)
     total_purchase_value = total_purchase

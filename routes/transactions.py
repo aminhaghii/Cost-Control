@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, abort
 from flask_login import login_required, current_user
-from sqlalchemy import update, select
+from sqlalchemy import update, select, func
 from models import db, Transaction, Item, Alert, WarehouseSettings
 from models.transaction import WASTE_REASONS, DEPARTMENTS
 from datetime import date, datetime, timedelta, timezone
@@ -594,9 +594,10 @@ def delete(id):
         if item:
             # DATA INTEGRITY FIX #3: Prevent deletion of purchases if items have been consumed
             if transaction.transaction_type == 'خرید':
-                # Check if deleting this purchase would make stock negative
-                if item.current_stock < transaction.quantity:
-                    flash('خطا: موجودی کالا کمتر از مقدار این خرید است (بخشی از کالا مصرف شده). ابتدا اسناد مصرف را اصلاح کنید.', 'danger')
+                # Reload current stock to avoid stale values
+                current_item_stock = db.session.query(Item.current_stock).filter_by(id=item.id).scalar()
+                if (current_item_stock or 0) < transaction.quantity:
+                    flash('Cannot delete: Stock is less than purchase quantity (items consumed).', 'danger')
                     return redirect(url_for('transactions.list_transactions'))
             
             # P0-2: Soft delete - mark as deleted

@@ -6,7 +6,7 @@ from decimal import Decimal
 from sqlalchemy import func
 from models import db, Transaction, Item, Alert, WarehouseSettings, InventoryCount
 from models.transaction import WASTE_REASONS, DEPARTMENTS
-from services.hotel_scope_service import user_can_access_hotel, get_allowed_hotel_ids
+from services.hotel_scope_service import user_can_access_hotel, get_allowed_hotel_ids, SINGLE_HOTEL_MODE
 import logging
 
 logger = logging.getLogger(__name__)
@@ -86,7 +86,10 @@ class WarehouseService:
     @staticmethod
     def get_stock_status(hotel_id: int, category: str = None) -> list:
         """Get stock status for all items"""
-        query = Item.query.filter_by(hotel_id=hotel_id, is_active=True)
+        if SINGLE_HOTEL_MODE:
+            query = Item.query.filter_by(is_active=True)
+        else:
+            query = Item.query.filter_by(hotel_id=hotel_id, is_active=True)
         if category:
             query = query.filter_by(category=category)
         
