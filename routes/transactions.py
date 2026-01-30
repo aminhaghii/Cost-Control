@@ -600,6 +600,7 @@ def delete(id):
                     flash('Cannot delete: Stock is less than purchase quantity (items consumed).', 'danger')
                     return redirect(url_for('transactions.list_transactions'))
             
+            # Only proceed with delete if integrity check passed
             # P0-2: Soft delete - mark as deleted
             transaction.is_deleted = True
             transaction.deleted_at = datetime.utcnow()
