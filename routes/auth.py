@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, session, current_app
 from flask_login import login_user, logout_user, login_required, current_user
 from models import db, User, AuditLog
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 
 # BUG-FIX #3: Import database-backed rate limiting
@@ -72,7 +72,7 @@ def login():
                 return redirect(url_for('security.verify_2fa'))
             
             login_user(user, remember=remember)
-            user.last_login = datetime.utcnow()
+            user.last_login = datetime.now(timezone.utc)
             user.clear_failed_logins()
             LoginAttempt.clear_attempts(identifier)  # BUG-FIX #3
             

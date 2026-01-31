@@ -24,7 +24,10 @@ class WarehouseService:
         settings = WarehouseSettings.get_or_create(hotel_id)
         
         # Summary stats
-        items = Item.query.filter_by(hotel_id=hotel_id, is_active=True).all()
+        if SINGLE_HOTEL_MODE:
+            items = Item.query.filter_by(is_active=True).all()
+        else:
+            items = Item.query.filter_by(hotel_id=hotel_id, is_active=True).all()
         total_items = len(items)
         
         # Calculate total value from last known price
@@ -44,23 +47,39 @@ class WarehouseService:
         high_stock_count = sum(1 for i in items if i.max_stock and (i.current_stock or 0) >= i.max_stock)
         
         # Pending approvals
-        pending_approvals = Transaction.query.filter_by(
-            hotel_id=hotel_id,
-            approval_status='pending',
-            is_deleted=False
-        ).count()
+        if SINGLE_HOTEL_MODE:
+            pending_approvals = Transaction.query.filter_by(
+                approval_status='pending',
+                is_deleted=False
+            ).count()
+        else:
+            pending_approvals = Transaction.query.filter_by(
+                hotel_id=hotel_id,
+                approval_status='pending',
+                is_deleted=False
+            ).count()
         
         # Active alerts
-        active_alerts = Alert.query.filter_by(
-            hotel_id=hotel_id,
-            status='active'
-        ).order_by(Alert.created_at.desc()).all()
+        if SINGLE_HOTEL_MODE:
+            active_alerts = Alert.query.filter_by(
+                status='active'
+            ).order_by(Alert.created_at.desc()).all()
+        else:
+            active_alerts = Alert.query.filter_by(
+                hotel_id=hotel_id,
+                status='active'
+            ).order_by(Alert.created_at.desc()).all()
         
         # Recent movements
-        recent_movements = Transaction.query.filter_by(
-            hotel_id=hotel_id,
-            is_deleted=False
-        ).order_by(Transaction.created_at.desc()).limit(10).all()
+        if SINGLE_HOTEL_MODE:
+            recent_movements = Transaction.query.filter_by(
+                is_deleted=False
+            ).order_by(Transaction.created_at.desc()).limit(10).all()
+        else:
+            recent_movements = Transaction.query.filter_by(
+                hotel_id=hotel_id,
+                is_deleted=False
+            ).order_by(Transaction.created_at.desc()).limit(10).all()
         
         # Waste rate (last 30 days)
         waste_summary = WarehouseService.get_waste_rate(hotel_id, days=30)

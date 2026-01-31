@@ -49,17 +49,11 @@ def index():
         )
     ).scalar()
     
-    # BUG-FIX: Apply hotel scope to items count
-    items_query = Item.query.filter_by(is_active=True)
-    if allowed_hotel_ids is not None:
-        items_query = items_query.filter(Item.hotel_id.in_(allowed_hotel_ids))
-    total_items = items_query.count()
+    # SINGLE HOTEL MODE: Count all active items (no hotel filtering)
+    total_items = Item.query.filter_by(is_active=True).count()
     
-    # BUG-FIX: Apply hotel scope to alerts
-    alerts_query = Alert.query.filter_by(is_resolved=False)
-    if allowed_hotel_ids is not None:
-        alerts_query = alerts_query.filter(Alert.hotel_id.in_(allowed_hotel_ids))
-    alerts = alerts_query.order_by(Alert.created_at.desc()).limit(5).all()
+    # SINGLE HOTEL MODE: Get all unresolved alerts (no hotel filtering)
+    alerts = Alert.query.filter_by(is_resolved=False).order_by(Alert.created_at.desc()).limit(5).all()
     
     pareto_service = ParetoService()
     chart_data_food = pareto_service.get_chart_data(mode='خرید', category='Food', days=30, limit=10)

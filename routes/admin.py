@@ -564,6 +564,11 @@ def items_edit(item_id):
                 flash(error, 'danger')
             return render_template('admin/items/edit.html', item=item)
         
+        # P1 FIX: Warn if unit is being changed
+        if unit != old_values['unit']:
+            flash(f'هشدار: واحد کالا از "{old_values["unit"]}" به "{unit}" تغییر کرد. موجودی فعلی ({item.current_stock}) به عنوان "{unit}" تفسیر می‌شود. اگر نیاز به تبدیل دارید، موجودی را اصلاح کنید.', 'warning')
+            logger.warning(f'Unit changed for item {item_code}: {old_values["unit"]} -> {unit} by {current_user.username}')
+        
         # Update item
         item.item_code = item_code
         item.item_name_fa = item_name_fa

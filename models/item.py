@@ -24,6 +24,7 @@ UNIT_CONVERSIONS = {
     'بسته': ('count', 1.0),
     'قوطی': ('count', 1.0),
     'شیشه': ('count', 1.0),
+    'بطری': ('count', 1.0),
     'جفت': ('count', 2.0),
     'دست': ('count', 1.0),
     'رول': ('count', 1.0),
@@ -104,12 +105,13 @@ class Item(db.Model):
         logger = logging.getLogger(__name__)
         
         if from_unit not in UNIT_CONVERSIONS:
-            # BUG-FIX #1 & #14: Log and raise error instead of defaulting to 1.0
+            # New requirement: allow custom units defined by users dynamically.
+            # Treat unknown units as count-based with neutral factor (1.0) but log warning for admins.
             logger.warning(
-                f"Unknown unit '{from_unit}' encountered in conversion. "
-                f"Valid units: {', '.join(list(UNIT_CONVERSIONS.keys())[:10])}..."
+                "Unknown unit '%s' encountered in conversion. Defaulting factor to 1.0 (custom unit).",
+                from_unit
             )
-            raise ValueError(f"Unknown unit: '{from_unit}'. Valid units: {', '.join(UNIT_CONVERSIONS.keys())}")
+            return 1.0
         
         from_type, from_factor = UNIT_CONVERSIONS[from_unit]
         

@@ -151,7 +151,8 @@ def adjust_stock(item_id, delta_quantity, reason, user_id, hotel_id=None):
 def create_stock_transaction(item_id, transaction_type, quantity, unit_price, 
                               user_id, hotel_id=None, description=None, 
                               source='manual', is_opening_balance=False,
-                              import_batch_id=None):
+                              import_batch_id=None, allow_price_override=True,
+                              price_override_reason=None):
     """
     P0-2/P0-3: Centralized function to create any stock transaction
     Use this instead of creating Transaction objects directly.
@@ -167,6 +168,8 @@ def create_stock_transaction(item_id, transaction_type, quantity, unit_price,
         source: 'manual', 'import', 'opening_import', 'adjustment'
         is_opening_balance: True if opening balance
         import_batch_id: Link to import batch (optional)
+        allow_price_override: Allow price different from item's default (default True for service calls)
+        price_override_reason: Reason for price override if applicable
     
     Returns:
         Transaction object (not committed)
@@ -187,7 +190,9 @@ def create_stock_transaction(item_id, transaction_type, quantity, unit_price,
         description=description,
         source=source,
         is_opening_balance=is_opening_balance,
-        import_batch_id=import_batch_id
+        import_batch_id=import_batch_id,
+        allow_price_override=allow_price_override,
+        price_override_reason=price_override_reason
     )
     
     db.session.add(tx)

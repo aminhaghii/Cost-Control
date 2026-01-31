@@ -4,7 +4,7 @@ Security routes for 2FA, password management, and account security
 from flask import Blueprint, render_template, redirect, url_for, flash, request, session, send_file
 from flask_login import login_required, current_user
 from models import db, User, AuditLog
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import io
 import qrcode
 import base64
@@ -145,7 +145,7 @@ def verify_2fa():
                     from datetime import datetime as dt
                     if isinstance(last_attempt_time, str):
                         last_attempt_time = dt.fromisoformat(last_attempt_time)
-                    if (datetime.utcnow() - last_attempt_time) > timedelta(minutes=1):
+                    if (datetime.now(timezone.utc) - last_attempt_time.replace(tzinfo=timezone.utc)) > timedelta(minutes=1):
                         current_attempts = 0
                 
                 if current_attempts >= 5:
@@ -154,7 +154,7 @@ def verify_2fa():
                 
                 # Increment attempt counter
                 session[attempts_key] = current_attempts + 1
-                session[attempts_time_key] = datetime.utcnow().isoformat()
+                session[attempts_time_key] = datetime.now(timezone.utc).isoformat()
                 
             except Exception:
                 pass  # Don't block login if rate limiting fails
@@ -164,7 +164,7 @@ def verify_2fa():
         if user.verify_totp(token):
             from flask_login import login_user
             login_user(user, remember=session.get('pending_2fa_remember', False))
-            user.last_login = datetime.utcnow()
+            user.last_login = datetime.now(timezone.utc)
             user.clear_failed_logins()
             
             # Log successful 2FA login

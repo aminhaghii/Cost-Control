@@ -1,7 +1,7 @@
 from . import db
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import pyotp
 import secrets
 
@@ -30,8 +30,8 @@ class User(UserMixin, db.Model):
     department = db.Column(db.String(100), nullable=True)  # بخش/واحد
     phone = db.Column(db.String(20), nullable=True)
     is_active = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     last_login = db.Column(db.DateTime, nullable=True)
     created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     
@@ -55,7 +55,7 @@ class User(UserMixin, db.Model):
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
-        self.password_changed_at = datetime.utcnow()
+        self.password_changed_at = datetime.now(timezone.utc)
     
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
@@ -96,8 +96,14 @@ class User(UserMixin, db.Model):
     # Account lockout methods
     def is_locked(self):
         """Check if account is locked"""
-        if self.locked_until and self.locked_until > datetime.utcnow():
-            return True
+        if self.locked_until:
+            # Handle both naive and aware datetimes
+            now = datetime.now(timezone.utc)
+            locked_until = self.locked_until
+            if locked_until.tzinfo is None:
+                locked_until = locked_until.replace(tzinfo=timezone.utc)
+            if locked_until > now:
+                return True
         return False
     
     def record_failed_login(self):
@@ -106,7 +112,7 @@ class User(UserMixin, db.Model):
         P2-FIX: Use config value for lockout duration instead of hardcoded 15 minutes
         """
         self.failed_login_attempts = (self.failed_login_attempts or 0) + 1
-        self.last_failed_login = datetime.utcnow()
+        self.last_failed_login = datetime.now(timezone.utc)
         
         # P2-FIX: Get config values from app config
         try:
@@ -126,7 +132,7 @@ class User(UserMixin, db.Model):
             if self.is_admin():
                 multiplier = min(self.failed_login_attempts - max_attempts + 1, 10)
                 lockout_seconds = lockout_seconds * multiplier  # 5min, 10min, 15min, ...
-            self.locked_until = datetime.utcnow() + timedelta(seconds=lockout_seconds)
+            self.locked_until = datetime.now(timezone.utc) + timedelta(seconds=lockout_seconds)
     
     def clear_failed_logins(self):
         """Clear failed login attempts on successful login"""

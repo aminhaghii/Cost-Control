@@ -41,7 +41,7 @@ MIN_PRICE = 1
 transactions_bp = Blueprint('transactions', __name__, url_prefix='/transactions')
 
 
-def validate_transaction_data(quantity, unit_price, transaction_date_str):
+def validate_transaction_data(quantity, unit_price, transaction_date_str, allow_zero_price=False):
     """Validate transaction input data and return errors list"""
     errors = []
     
@@ -49,8 +49,11 @@ def validate_transaction_data(quantity, unit_price, transaction_date_str):
     if quantity is None or quantity <= 0:
         errors.append('مقدار باید بزرگتر از صفر باشد')
     
-    if unit_price is None or unit_price <= 0:
-        errors.append('قیمت واحد باید بزرگتر از صفر باشد')
+    # P1 FIX: Allow zero price for gifts/samples, but reject negative
+    if unit_price is None or unit_price < 0:
+        errors.append('قیمت واحد نمی‌تواند منفی باشد')
+    elif not allow_zero_price and unit_price == 0:
+        errors.append('قیمت واحد باید بزرگتر از صفر باشد (برای هدیه/سمپل از فیلد مخصوص استفاده کنید)')
     
     # Bug #2: Validate max values
     if quantity and quantity > MAX_QUANTITY:
