@@ -91,8 +91,8 @@
                                    title="مقدار کالا به واحد مشخص شده - باید بزرگتر از صفر باشد"></i>
                             </label>
                             <!-- BUG-VALIDATION-001: Prevent negative/zero input -->
-                            <input type="number" step="0.001" name="quantity" id="quantityInput"
-                                   class="form-control" placeholder="0" required min="0.001" max="999999">
+                            <input type="number" step="0.001" min="0.001" name="quantity" id="quantityInput"
+                                   class="form-control" placeholder="0" required max="999999">
                             <div class="invalid-feedback" id="quantityError">مقدار باید بزرگتر از صفر باشد</div>
                             <div class="valid-feedback"><i class="fas fa-check"></i> صحیح</div>
                         </div>
@@ -110,14 +110,14 @@
                             </label>
                             <!-- PRICE CONTROL: Auto-populated from item, readonly for normal users -->
                             {% if current_user.role in ['admin', 'manager', 'accountant'] %}
-                            <input type="text" name="unit_price" id="unitPriceInput"
+                            <input type="number" step="0.01" min="0.01" name="unit_price" id="unitPriceInput"
                                    class="form-control text-start" dir="ltr" placeholder="0" required>
                             <small class="text-warning d-block mt-1">
                                 <i class="fas fa-exclamation-triangle me-1"></i>
                                 تغییر قیمت از مقدار پیش‌فرض نیاز به دلیل دارد
                             </small>
                             {% else %}
-                            <input type="text" name="unit_price" id="unitPriceInput"
+                            <input type="number" step="0.01" min="0.01" name="unit_price" id="unitPriceInput"
                                    class="form-control text-start bg-light" dir="ltr" placeholder="0" required readonly>
                             <small class="text-muted d-block mt-1">
                                 <i class="fas fa-lock me-1"></i>
@@ -129,7 +129,17 @@
                             <div class="valid-feedback"><i class="fas fa-check"></i> صحیح</div>
                             <small class="text-info d-block mt-1" id="unitPriceWords"></small>
                         </div>
-                        
+
+                        <!-- Price Override Reason Field (hidden until needed) -->
+                        <div class="col-12 mb-3" id="price_override_section" style="display: none;">
+                            <label for="price_override_reason" class="form-label fw-bold">
+                                <i class="fas fa-comment-dollar me-1 text-warning"></i> دلیل تغییر قیمت
+                            </label>
+                            <input type="text" class="form-control" id="price_override_reason" name="price_override_reason" 
+                                   placeholder="مثال: تخفیف خرید عمده، مذاکره با تامین‌کننده">
+                            <small class="form-text text-muted">این قیمت با قیمت پیش‌فرض کالا متفاوت است. لطفاً دلیل را وارد کنید.</small>
+                        </div>
+
                         <div class="col-md-4 mb-3">
                             <label class="form-label fw-bold">
                                 <i class="fas fa-calculator me-1"></i> مبلغ کل (ریال)
@@ -349,12 +359,6 @@ function normalizeNumericInput(value) {
     return normalized;
 }
 
-// Parse formatted number back to integer
-function parseFormattedNumber(str) {
-    const normalized = normalizeNumericInput(str).replace(/,/g, '');
-    return parseInt(normalized, 10) || 0;
-}
-
 document.addEventListener('DOMContentLoaded', function() {
     const quantityInput = document.getElementById('quantityInput');
     const unitPriceInput = document.getElementById('unitPriceInput');
@@ -368,6 +372,82 @@ document.addEventListener('DOMContentLoaded', function() {
     const itemInfo = document.getElementById('itemInfo');
     const currentStock = document.getElementById('currentStock');
     const categorySelect = document.querySelector('select[name="category"]');
+    const priceOverrideSection = document.getElementById('price_override_section');
+    const priceOverrideReasonInput = document.getElementById('price_override_reason');
+    let defaultItemPrice = 0;
+    window.defaultItemPrice = 0;
+
+    function applyUnitPrice(priceValue, options = {}) {
+        const normalizedPrice = parseFloat(priceValue) || 0;
+        if (normalizedPrice > 0) {
+            unitPriceInput.value = normalizedPrice;
+            unitPriceHidden.value = normalizedPrice;
+            unitPriceInput.classList.remove('is-invalid');
+            unitPriceInput.classList.add('is-valid');
+            unitPriceWords.textContent = '« ' + numberToPersianWords(normalizedPrice) + ' »';
+        } else {
+            unitPriceInput.value = '';
+            unitPriceHidden.value = 0;
+            unitPriceInput.classList.remove('is-valid');
+            unitPriceWords.textContent = '';
+        }
+
+        if (!options.skipOverrideCheck) {
+            checkAndShowOverrideField();
+        }
+
+        updateTotalAmount();
+    }
+
+    function checkAndShowOverrideField() {
+        if (!priceOverrideSection || !priceOverrideReasonInput) {
+            return;
+        }
+
+        if (unitPriceInput.hasAttribute('readonly') || defaultItemPrice <= 0) {
+            priceOverrideSection.style.display = 'none';
+            priceOverrideReasonInput.required = false;
+            priceOverrideReasonInput.value = '';
+            return;
+        }
+
+        const enteredPrice = parseFloat(unitPriceInput.value) || 0;
+
+        if (enteredPrice > 0 && Math.abs(enteredPrice - defaultItemPrice) > 0.009) {
+            priceOverrideSection.style.display = 'block';
+            priceOverrideReasonInput.required = true;
+        } else {
+            priceOverrideSection.style.display = 'none';
+            priceOverrideReasonInput.required = false;
+            priceOverrideReasonInput.value = '';
+        }
+    }
+
+    function fetchDefaultItemPrice(itemId) {
+        if (!itemId) {
+            defaultItemPrice = 0;
+            window.defaultItemPrice = 0;
+            checkAndShowOverrideField();
+            return;
+        }
+
+        fetch(`/api/item/${itemId}`)
+            .then(response => response.ok ? response.json() : null)
+            .then(data => {
+                if (!data || data.unit_price === undefined || data.unit_price === null) {
+                    return;
+                }
+                defaultItemPrice = parseFloat(data.unit_price) || 0;
+                window.defaultItemPrice = defaultItemPrice;
+                if (defaultItemPrice > 0) {
+                    applyUnitPrice(defaultItemPrice, { skipOverrideCheck: true });
+                }
+                checkAndShowOverrideField();
+            })
+            .catch(() => {
+                // Silently ignore network errors
+            });
+    }
     
     // UX #9: Initialize Select2 with search
     $(itemSelect).select2({
@@ -426,23 +506,21 @@ document.addEventListener('DOMContentLoaded', function() {
             categorySelect.value = category;
             
             // PRICE CONTROL: Auto-populate price from item
-            const priceValue = parseInt(price, 10) || 0;
+            const priceValue = parseFloat(price) || 0;
+            defaultItemPrice = priceValue;
+            window.defaultItemPrice = defaultItemPrice;
             if (priceValue > 0) {
-                unitPriceInput.value = formatNumber(priceValue);
-                unitPriceHidden.value = priceValue;
-                unitPriceInput.classList.remove('is-invalid');
-                unitPriceInput.classList.add('is-valid');
-                
-                // Show Persian words for price
-                if (priceValue > 0) {
-                    unitPriceWords.textContent = '« ' + numberToPersianWords(priceValue) + ' »';
-                }
-                
-                // Update total amount
-                updateTotalAmount();
+                applyUnitPrice(priceValue, { skipOverrideCheck: true });
+            } else {
+                applyUnitPrice(0, { skipOverrideCheck: true });
             }
+            checkAndShowOverrideField();
+            fetchDefaultItemPrice(selected.value);
         } else {
             itemInfo.classList.add('d-none');
+            defaultItemPrice = 0;
+            window.defaultItemPrice = 0;
+            checkAndShowOverrideField();
         }
     });
     
@@ -490,22 +568,10 @@ document.addEventListener('DOMContentLoaded', function() {
         updateTotalAmount();
     });
     
-    // UX #7: Real-time price validation with formatting
-    unitPriceInput.addEventListener('input', function() {
-        const normalized = normalizeNumericInput(this.value);
-        // Remove non-digit characters after normalization
-        let rawValue = normalized.replace(/[^\d]/g, '');
-        const value = parseInt(rawValue, 10) || 0;
-        
-        // Update hidden field with raw value
+    function handleUnitPriceInput() {
+        const value = parseFloat(unitPriceInput.value) || 0;
         unitPriceHidden.value = value;
         
-        // Format display with commas
-        if (rawValue) {
-            this.value = formatNumber(value);
-        }
-        
-        // Show Persian words
         if (value > 0) {
             unitPriceWords.textContent = '« ' + numberToPersianWords(value) + ' »';
         } else {
@@ -515,24 +581,28 @@ document.addEventListener('DOMContentLoaded', function() {
         const errorEl = document.getElementById('priceError');
         
         if (value <= 0) {
-            this.classList.add('is-invalid');
-            this.classList.remove('is-valid');
+            unitPriceInput.classList.add('is-invalid');
+            unitPriceInput.classList.remove('is-valid');
             errorEl.textContent = 'قیمت باید بزرگتر از صفر باشد';
         } else if (value > 999999999999) {
-            this.classList.add('is-invalid');
-            this.classList.remove('is-valid');
+            unitPriceInput.classList.add('is-invalid');
+            unitPriceInput.classList.remove('is-valid');
             errorEl.textContent = 'قیمت نمی‌تواند بیشتر از ۹۹۹ میلیارد ریال باشد';
         } else {
-            this.classList.remove('is-invalid');
-            this.classList.add('is-valid');
+            unitPriceInput.classList.remove('is-invalid');
+            unitPriceInput.classList.add('is-valid');
         }
+        checkAndShowOverrideField();
         updateTotalAmount();
-    });
+    }
+
+    unitPriceInput.addEventListener('input', handleUnitPriceInput);
+    unitPriceInput.addEventListener('change', handleUnitPriceInput);
     
     // UX #8: Live total calculation
     function updateTotalAmount() {
         const quantity = parseFloat(quantityInput.value) || 0;
-        const price = parseFormattedNumber(unitPriceInput.value);
+        const price = parseFloat(unitPriceInput.value) || 0;
         const total = Math.round(quantity * price);
         
         totalAmountHidden.value = total;
@@ -562,7 +632,7 @@ document.addEventListener('DOMContentLoaded', function() {
             hasError = true;
         }
         
-        const priceValue = parseFormattedNumber(unitPriceInput.value);
+        const priceValue = parseFloat(unitPriceInput.value) || 0;
         if (isNaN(priceValue) || priceValue <= 0 || priceValue > 999999999999) {
             unitPriceInput.classList.add('is-invalid');
             hasError = true;
@@ -584,6 +654,12 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
+
+    if (itemSelect.value) {
+        fetchDefaultItemPrice(itemSelect.value);
+    }
+
+    checkAndShowOverrideField();
 });
 </script>
 

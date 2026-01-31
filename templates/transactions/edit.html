@@ -68,17 +68,17 @@
                                 <i class="fas fa-sort-numeric-up me-1"></i> مقدار
                             </label>
                             <!-- BUG-VALIDATION-001: Prevent negative/zero input -->
-                            <input type="number" step="0.001" name="quantity" 
-                                   class="form-control" value="{{ transaction.quantity }}" required min="0.001" max="999999">
+                            <input type="number" step="0.001" min="0.001" name="quantity" 
+                                   class="form-control" value="{{ transaction.quantity }}" required max="999999">
                         </div>
                         
                         <div class="col-md-4 mb-3">
                             <label class="form-label fw-bold">
                                 <i class="fas fa-money-bill me-1"></i> قیمت واحد (ریال)
                             </label>
-                            <input type="text" name="unit_price" id="unitPriceInput"
+                            <input type="number" step="0.01" min="0.01" name="unit_price" id="unitPriceInput"
                                    class="form-control text-start" dir="ltr" 
-                                   value="{{ "{:,.0f}".format(transaction.unit_price) }}" required>
+                                   value="{{ transaction.unit_price }}" required>
                             <small class="text-info d-block mt-1" id="unitPriceWords"></small>
                         </div>
                         
