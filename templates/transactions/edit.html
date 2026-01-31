@@ -207,26 +207,6 @@ function formatNumber(num) {
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
-function normalizeNumericInput(value) {
-    if (value === null || value === undefined) return '';
-    const persianMap = {
-        '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4',
-        '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9',
-        '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
-        '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
-    };
-    let normalized = String(value).trim();
-    normalized = normalized.replace(/[۰-۹٠-٩]/g, (d) => persianMap[d] || d);
-    normalized = normalized.replace(/[\s\u00A0\u202F\u2007\u066C٬]/g, '');
-    normalized = normalized.replace(/[،]/g, ',');
-    return normalized;
-}
-
-function parseFormattedNumber(str) {
-    const normalized = normalizeNumericInput(str).replace(/,/g, '');
-    return parseInt(normalized, 10) || 0;
-}
-
 document.addEventListener('DOMContentLoaded', function() {
     const quantityInput = document.querySelector('input[name="quantity"]');
     const unitPriceInput = document.getElementById('unitPriceInput');
@@ -235,42 +215,41 @@ document.addEventListener('DOMContentLoaded', function() {
     const totalAmountWords = document.getElementById('totalAmountWords');
     
     // Initialize Persian words on load
-    const initialPrice = parseFormattedNumber(unitPriceInput.value);
+    const initialPrice = parseFloat(unitPriceInput.value) || 0;
     if (initialPrice > 0) {
         unitPriceWords.textContent = '« ' + numberToPersianWords(initialPrice) + ' »';
     }
-    
-    const initialTotal = parseFloat(quantityInput.value) * initialPrice;
+
+    const initialTotal = (parseFloat(quantityInput.value) || 0) * initialPrice;
     if (initialTotal > 0) {
         totalAmountWords.textContent = '« ' + numberToPersianWords(initialTotal) + ' »';
     }
-    
-    unitPriceInput.addEventListener('input', function() {
-        const normalized = normalizeNumericInput(this.value);
-        let rawValue = normalized.replace(/[^\d]/g, '');
-        const value = parseInt(rawValue, 10) || 0;
-        
-        if (rawValue) {
-            this.value = formatNumber(value);
-        }
-        
+
+    function handleUnitPriceInput() {
+        const value = parseFloat(unitPriceInput.value) || 0;
         if (value > 0) {
             unitPriceWords.textContent = '« ' + numberToPersianWords(value) + ' »';
         } else {
             unitPriceWords.textContent = '';
         }
         updateTotalAmount();
-    });
-    
-    quantityInput.addEventListener('input', function() {
-        // Force integer value
-        this.value = Math.floor(Math.abs(this.value)) || '';
+    }
+
+    function handleQuantityInput() {
+        if (quantityInput.value && parseFloat(quantityInput.value) < 0) {
+            quantityInput.value = Math.abs(parseFloat(quantityInput.value));
+        }
         updateTotalAmount();
-    });
+    }
+
+    unitPriceInput.addEventListener('input', handleUnitPriceInput);
+    unitPriceInput.addEventListener('change', handleUnitPriceInput);
+    quantityInput.addEventListener('input', handleQuantityInput);
+    quantityInput.addEventListener('change', handleQuantityInput);
     
     function updateTotalAmount() {
         const quantity = parseFloat(quantityInput.value) || 0;
-        const price = parseFormattedNumber(unitPriceInput.value);
+        const price = parseFloat(unitPriceInput.value) || 0;
         const total = Math.round(quantity * price);
         
         if (total > 0) {

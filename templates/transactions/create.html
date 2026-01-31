@@ -405,9 +405,16 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         if (unitPriceInput.hasAttribute('readonly') || defaultItemPrice <= 0) {
-            priceOverrideSection.style.display = 'none';
-            priceOverrideReasonInput.required = false;
-            priceOverrideReasonInput.value = '';
+            const enteredPrice = parseFloat(unitPriceInput.value) || 0;
+
+            if (defaultItemPrice <= 0 && enteredPrice > 0 && !unitPriceInput.hasAttribute('readonly')) {
+                priceOverrideSection.style.display = 'block';
+                priceOverrideReasonInput.required = true;
+            } else {
+                priceOverrideSection.style.display = 'none';
+                priceOverrideReasonInput.required = false;
+                priceOverrideReasonInput.value = '';
+            }
             return;
         }
 
