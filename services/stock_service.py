@@ -111,6 +111,9 @@ def adjust_stock(item_id, delta_quantity, reason, user_id, hotel_id=None):
         adjust_stock(1, +10, "Found extra items", user_id=1)  # Add 10
         adjust_stock(1, -5, "Damaged goods", user_id=1)       # Remove 5
     """
+    if delta_quantity == 0:
+        raise ValueError("Adjustment quantity cannot be zero")
+
     item = Item.query.get(item_id)
     if not item:
         raise ValueError(f"Item {item_id} not found")
@@ -138,9 +141,10 @@ def adjust_stock(item_id, delta_quantity, reason, user_id, hotel_id=None):
     db.session.add(tx)
     
     # P1-FIX: Atomic stock update to prevent race conditions
+    # Use tx.signed_quantity to ensure we use the same value as the transaction logic (incl. conversion factors)
     db.session.execute(
         update(Item).where(Item.id == item_id)
-        .values(current_stock=Item.current_stock + delta_quantity)
+        .values(current_stock=Item.current_stock + tx.signed_quantity)
     )
     
     db.session.commit()
