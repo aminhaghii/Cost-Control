@@ -143,12 +143,14 @@ class InventoryCountService:
         variance = float(count.variance)
         
         # Create adjustment transaction
+        # BUG FIX: Pass required 'category' argument (using item's category)
         tx = Transaction.create_transaction(
             item_id=count.item_id,
             hotel_id=count.hotel_id,
             user_id=user_id,
             transaction_type='اصلاحی',
             quantity=abs(variance),
+            category=item.category,  # Added required argument
             direction=1 if variance > 0 else -1,
             unit_price=Decimal('0'),
             description=f'اصلاحی شمارش #{count.id}: {notes}',
@@ -250,7 +252,7 @@ class InventoryCountService:
         avg_variance = sum(abs(float(c.variance_percentage or 0)) for c in counts) / total
         
         # By reason
-        by_reason = {}
+        by_reason = {}\
         for c in counts:
             if c.variance_reason:
                 reason = c.variance_reason
