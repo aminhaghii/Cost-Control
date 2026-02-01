@@ -516,16 +516,11 @@ def edit(id):
             # Bug #8: Auto-set category from item
             category = auto_set_category(new_item)
             
-            # BUSINESS LOGIC FIX #3: Enforce weighted average cost for outflows in edit
-            # Consumption and Waste MUST use item's current cost, not user input
-            if transaction_type in ['مصرف', 'ضایعات']:
-                # Force use of item's weighted average cost
-                if unit_price != new_item.unit_price:
-                    logger.warning(f'User tried to set price {unit_price} for {transaction_type} in edit, forcing item cost {new_item.unit_price}')
-                price_decimal = Decimal(str(new_item.unit_price))
-            else:
-                # Purchase and Adjustment can have custom prices
-                price_decimal = Decimal(str(unit_price)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            # LOGIC FIX: PRESERVE HISTORICAL COST
+            # Do NOT force item.unit_price on edits of historical data.
+            # Trust the submitted price (which comes from existing record or user edit).
+            # Only use Decimal quantization.
+            price_decimal = Decimal(str(unit_price)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
             
             total_decimal = (quantity_decimal * price_decimal).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
             
@@ -593,13 +588,16 @@ def delete(id):
     check_record_access(current_user, transaction)
     
     try:
-        item = Item.query.get(transaction.item_id)
+        # BUG FIX: Use Row Locking to prevent race conditions during delete check
+        item = db.session.execute(
+            select(Item).where(Item.id == transaction.item_id).with_for_update()
+        ).scalar_one_or_none()
+        
         if item:
             # DATA INTEGRITY FIX #3: Prevent deletion of purchases if items have been consumed
             if transaction.transaction_type == 'خرید':
-                # Reload current stock to avoid stale values
-                current_item_stock = db.session.query(Item.current_stock).filter_by(id=item.id).scalar()
-                if (current_item_stock or 0) < transaction.quantity:
+                # Reload current stock to avoid stale values (already locked/fresh via select for update)
+                if (item.current_stock or 0) < transaction.quantity:
                     flash('Cannot delete: Stock is less than purchase quantity (items consumed).', 'danger')
                     return redirect(url_for('transactions.list_transactions'))
             
