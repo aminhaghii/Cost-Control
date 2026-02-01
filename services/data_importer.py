@@ -440,8 +440,7 @@ class DataImporter:
                         results.append(result)
                     
                     # Update batch stats
-                    self.import_batch.status = 'completed'
-                    self.import_batch.items_created = self.imported_items
+                    self.import_batch.status = 'completed'\n                    self.import_batch.items_created = self.imported_items
                     self.import_batch.items_updated = self.updated_items
                     self.import_batch.transactions_created = self.imported_transactions
                     self.import_batch.errors_count = len(self.row_errors)
@@ -786,6 +785,8 @@ class DataImporter:
                     user_id=user_id,
                     description='Opening balance - imported from Excel',
                     source='opening_import',
+                    # BUG FIX: direction must be provided for adjustments
+                    direction=1,  # Opening balance is always an increase
                     is_opening_balance=True,
                     import_batch_id=self.import_batch.id if self.import_batch else None
                 )

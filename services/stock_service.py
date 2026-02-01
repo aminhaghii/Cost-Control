@@ -111,6 +111,9 @@ def adjust_stock(item_id, delta_quantity, reason, user_id, hotel_id=None):
         adjust_stock(1, +10, "Found extra items", user_id=1)  # Add 10
         adjust_stock(1, -5, "Damaged goods", user_id=1)       # Remove 5
     """
+    if delta_quantity == 0:
+        raise ValueError("Adjustment quantity cannot be zero")
+
     item = Item.query.get(item_id)
     if not item:
         raise ValueError(f"Item {item_id} not found")
@@ -118,30 +121,30 @@ def adjust_stock(item_id, delta_quantity, reason, user_id, hotel_id=None):
     # P0-3: delta_quantity is signed, we convert to quantity + direction
     direction = 1 if delta_quantity >= 0 else -1
     quantity = abs(delta_quantity)  # quantity is always positive
-    signed_qty = quantity * direction  # This equals delta_quantity
+    # signed_quantity is calculated by the model method
     
-    tx = Transaction(
+    # BUG FIX: Use create_transaction factory instead of direct init
+    # This ensures consistency with model logic (P0-2 enforcement)
+    tx = Transaction.create_transaction(
         item_id=item_id,
         transaction_type='اصلاحی',
+        quantity=quantity,
         category=item.category,
         hotel_id=hotel_id or item.hotel_id,
-        quantity=quantity,  # P0-3: Always positive
-        direction=direction,  # P0-3: +1 or -1
-        signed_quantity=signed_qty,
-        unit_price=0,
-        total_amount=0,
-        source='adjustment',
-        description=reason,
         user_id=user_id,
-        transaction_date=get_iran_today()
+        direction=direction, # Explicitly pass direction
+        unit_price=0,        # Adjustments typically have 0 unit price effect on cost basis unless specified
+        description=reason,
+        source='adjustment'
     )
     
     db.session.add(tx)
     
     # P1-FIX: Atomic stock update to prevent race conditions
+    # Use tx.signed_quantity to ensure we use the same value as the transaction logic (incl. conversion factors)
     db.session.execute(
         update(Item).where(Item.id == item_id)
-        .values(current_stock=Item.current_stock + delta_quantity)
+        .values(current_stock=Item.current_stock + tx.signed_quantity)
     )
     
     db.session.commit()
