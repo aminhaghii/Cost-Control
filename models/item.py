@@ -104,34 +104,41 @@ class Item(db.Model):
         import logging
         logger = logging.getLogger(__name__)
         
-        if from_unit not in UNIT_CONVERSIONS:
-            # New requirement: allow custom units defined by users dynamically.
-            # Treat unknown units as count-based with neutral factor (1.0) but log warning for admins.
-            logger.warning(
-                "Unknown unit '%s' encountered in conversion. Defaulting factor to 1.0 (custom unit).",
-                from_unit
-            )
-            return 1.0
+        # Normalize input: trim spaces
+        from_unit_clean = from_unit.strip() if from_unit else ""
         
-        from_type, from_factor = UNIT_CONVERSIONS[from_unit]
+        if from_unit_clean not in UNIT_CONVERSIONS:
+            # Critical Fix: Do not default to 1.0 silently. This causes data corruption.
+            # If the unit is truly unknown, we must block it or force registration.
+            # For backward compatibility with existing custom units, we might need a flag,
+            # but for data integrity, we raise an error.
+            logger.error(
+                "Unknown unit '%s' encountered. Blocked to prevent calculation errors.",
+                from_unit_clean
+            )
+            # Raise clear error to user (will show as flash message)
+            raise ValueError(f"واحد '{from_unit_clean}' نامعتبر است. لطفاً از واحدهای استاندارد استفاده کنید.")
+        
+        from_type, from_factor = UNIT_CONVERSIONS[from_unit_clean]
         
         if to_unit is None:
             # Convert to base unit
             return from_factor
         
-        if to_unit not in UNIT_CONVERSIONS:
-            logger.warning(f"Unknown target unit '{to_unit}' in conversion")
-            raise ValueError(f"Unknown target unit: '{to_unit}'")
+        to_unit_clean = to_unit.strip() if to_unit else ""
+        if to_unit_clean not in UNIT_CONVERSIONS:
+            logger.warning(f"Unknown target unit '{to_unit_clean}' in conversion")
+            raise ValueError(f"Unknown target unit: '{to_unit_clean}'")
         
-        to_type, to_factor = UNIT_CONVERSIONS[to_unit]
+        to_type, to_factor = UNIT_CONVERSIONS[to_unit_clean]
         
         # BUG #3 FIX: Check for zero division
         if to_factor == 0:
-            logger.error(f"Invalid zero conversion factor for unit: {to_unit}")
-            raise ValueError(f"Invalid zero conversion factor for unit: {to_unit}")
+            logger.error(f"Invalid zero conversion factor for unit: {to_unit_clean}")
+            raise ValueError(f"Invalid zero conversion factor for unit: {to_unit_clean}")
         
         if from_type != to_type:
-            logger.error(f"Incompatible unit types: {from_type} vs {to_type} ({from_unit} -> {to_unit})")
+            logger.error(f"Incompatible unit types: {from_type} vs {to_type} ({from_unit_clean} -> {to_unit_clean})")
             raise ValueError(f"Cannot convert between incompatible unit types: {from_type} vs {to_type}")
         
         return from_factor / to_factor
