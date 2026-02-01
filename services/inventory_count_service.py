@@ -252,7 +252,7 @@ class InventoryCountService:
         avg_variance = sum(abs(float(c.variance_percentage or 0)) for c in counts) / total
         
         # By reason
-        by_reason = {}\
+        by_reason = {}
         for c in counts:
             if c.variance_reason:
                 reason = c.variance_reason
