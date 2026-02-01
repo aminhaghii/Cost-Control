@@ -226,19 +226,24 @@ class Transaction(db.Model):
 
         price_changed = False
         if submitted_price_decimal is not None:
-            price_changed = submitted_price_decimal != item_price_decimal
-            if price_changed:
-                # Price override - check permission via parameter
-                if not allow_price_override:
-                    raise ValueError("Price override requires admin/manager/accountant permission")
-
-                if not price_override_reason:
-                    raise ValueError("Price override requires a reason")
-
+            # If item has no base price yet, accept the submitted price as baseline
+            if item_price_decimal <= 0 and submitted_price_decimal > 0:
                 final_price = submitted_price_decimal
+                price_changed = False
             else:
-                # No actual change, treat as standard price usage
-                final_price = item_price_decimal
+                price_changed = submitted_price_decimal != item_price_decimal
+                if price_changed:
+                    # Price override - check permission via parameter
+                    if not allow_price_override:
+                        raise ValueError("Price override requires admin/manager/accountant permission")
+
+                    if not price_override_reason:
+                        raise ValueError("Price override requires a reason")
+
+                    final_price = submitted_price_decimal
+                else:
+                    # No actual change, treat as standard price usage
+                    final_price = item_price_decimal
         else:
             # Use item's base price when no price is submitted
             final_price = item_price_decimal

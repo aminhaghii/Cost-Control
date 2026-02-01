@@ -3,6 +3,15 @@
 {% block title %}ثبت تراکنش جدید{% endblock %}
 
 {% block content %}
+<!-- Breadcrumb Navigation -->
+<nav aria-label="breadcrumb" class="breadcrumb-custom">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}"><i class="fas fa-home"></i> داشبورد</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('transactions.list_transactions') }}">تراکنش‌ها</a></li>
+        <li class="breadcrumb-item active" aria-current="page">ثبت جدید</li>
+    </ol>
+</nav>
+
 <div class="page-header">
     <h2><i class="fas fa-plus-circle me-2"></i> ثبت تراکنش جدید</h2>
 </div>
@@ -62,7 +71,7 @@
                             <label class="form-label fw-bold">
                                 <i class="fas fa-tag me-1"></i> نوع تراکنش
                             </label>
-                            <select name="transaction_type" class="form-select" required>
+                            <select name="transaction_type" id="transactionType" class="form-select" required>
                                 <option value="خرید">خرید</option>
                                 <option value="مصرف">مصرف</option>
                                 <option value="ضایعات">ضایعات</option>
@@ -78,6 +87,35 @@
                                 <option value="Food">مواد غذایی</option>
                                 <option value="NonFood">مواد غیرغذایی</option>
                             </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Direction Field for Adjustment (FIX) -->
+                    <div class="row" id="directionSection" style="display: none;">
+                        <div class="col-12 mb-3">
+                            <div class="card border-warning">
+                                <div class="card-body">
+                                    <label class="form-label fw-bold">
+                                        <i class="fas fa-arrows-alt-v me-1 text-warning"></i> جهت اصلاح <span class="text-danger">*</span>
+                                    </label>
+                                    <div class="d-flex gap-4 mt-2">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="adjustment_direction" id="directionIncrease" value="increase">
+                                            <label class="form-check-label" for="directionIncrease">
+                                                <i class="fas fa-plus-circle text-success"></i> اضافه (+)
+                                                <small class="d-block text-muted">موجودی را بیشتر کنید</small>
+                                            </label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="adjustment_direction" id="directionDecrease" value="decrease">
+                                            <label class="form-check-label" for="directionDecrease">
+                                                <i class="fas fa-minus-circle text-danger"></i> کاهش (-)
+                                                <small class="d-block text-muted">موجودی را کم کنید</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
@@ -160,6 +198,24 @@
                     </div>
                     
                     <!-- ═══ Warehouse Management: Conditional Fields ═══ -->
+                    <!-- Form Progress Indicator -->
+                    <div class="form-progress mb-4" id="formProgress" style="display: none;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted small">پیشرفت فرم</span>
+                            <span class="text-primary small fw-bold" id="progressPercent">0%</span>
+                        </div>
+                        <div class="form-progress-bar">
+                            <div class="form-progress-fill" id="progressFill" style="width: 0%"></div>
+                        </div>
+                        <div class="form-progress-steps mt-2">
+                            <span class="form-progress-step" id="step1"><i class="fas fa-circle"></i> کالا</span>
+                            <span class="form-progress-step" id="step2"><i class="fas fa-circle"></i> نوع</span>
+                            <span class="form-progress-step" id="step3"><i class="fas fa-circle"></i> مقدار</span>
+                            <span class="form-progress-step" id="step4"><i class="fas fa-circle"></i> قیمت</span>
+                            <span class="form-progress-step" id="step5"><i class="fas fa-circle"></i> آماده</span>
+                        </div>
+                    </div>
+                    
                     <div class="mb-3" id="wasteReasonSection" style="display: none;">
                         <label class="form-label fw-bold">
                             <i class="fas fa-question-circle me-1 text-danger"></i> دلیل ضایعات <span class="text-danger">*</span>
@@ -372,6 +428,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const itemInfo = document.getElementById('itemInfo');
     const currentStock = document.getElementById('currentStock');
     const categorySelect = document.querySelector('select[name="category"]');
+    let currentStockValue = 0;
     const priceOverrideSection = document.getElementById('price_override_section');
     const priceOverrideReasonInput = document.getElementById('price_override_reason');
     let defaultItemPrice = 0;
@@ -404,22 +461,26 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        if (unitPriceInput.hasAttribute('readonly') || defaultItemPrice <= 0) {
-            const enteredPrice = parseFloat(unitPriceInput.value) || 0;
-
-            if (defaultItemPrice <= 0 && enteredPrice > 0 && !unitPriceInput.hasAttribute('readonly')) {
-                priceOverrideSection.style.display = 'block';
-                priceOverrideReasonInput.required = true;
-            } else {
-                priceOverrideSection.style.display = 'none';
-                priceOverrideReasonInput.required = false;
-                priceOverrideReasonInput.value = '';
-            }
+        // If readonly, user can't change price anyway
+        if (unitPriceInput.hasAttribute('readonly')) {
+            priceOverrideSection.style.display = 'none';
+            priceOverrideReasonInput.required = false;
+            priceOverrideReasonInput.value = '';
             return;
         }
 
         const enteredPrice = parseFloat(unitPriceInput.value) || 0;
 
+        // If item has no base price (defaultItemPrice <= 0), this is first-time pricing
+        // No override reason needed for first-time pricing
+        if (defaultItemPrice <= 0) {
+            priceOverrideSection.style.display = 'none';
+            priceOverrideReasonInput.required = false;
+            priceOverrideReasonInput.value = '';
+            return;
+        }
+
+        // If item has base price and user changed it significantly, require reason
         if (enteredPrice > 0 && Math.abs(enteredPrice - defaultItemPrice) > 0.009) {
             priceOverrideSection.style.display = 'block';
             priceOverrideReasonInput.required = true;
@@ -430,6 +491,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    const itemApiBaseUrl = "{{ url_for('transactions.api_get_item', item_id=0)[:-1] }}";
+
     function fetchDefaultItemPrice(itemId) {
         if (!itemId) {
             defaultItemPrice = 0;
@@ -438,7 +501,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        fetch(`/api/item/${itemId}`)
+        fetch(`${itemApiBaseUrl}${itemId}`)
             .then(response => response.ok ? response.json() : null)
             .then(data => {
                 if (!data || data.unit_price === undefined || data.unit_price === null) {
@@ -468,12 +531,25 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // Form Progress Tracking - MUST be declared before updateConditionalFields
+    const formProgress = document.getElementById('formProgress');
+    const progressFill = document.getElementById('progressFill');
+    const progressPercent = document.getElementById('progressPercent');
+    const step1 = document.getElementById('step1');
+    const step2 = document.getElementById('step2');
+    const step3 = document.getElementById('step3');
+    const step4 = document.getElementById('step4');
+    const step5 = document.getElementById('step5');
+    
     // ═══ Warehouse Management: Show/hide conditional fields ═══
     const transactionTypeSelect = document.querySelector('select[name="transaction_type"]');
     const wasteReasonSection = document.getElementById('wasteReasonSection');
     const departmentSection = document.getElementById('departmentSection');
     const referenceSection = document.getElementById('referenceSection');
+    const directionSection = document.getElementById('directionSection');
     const wasteReasonInput = document.getElementById('wasteReason');
+    const directionIncreaseInput = document.getElementById('directionIncrease');
+    const directionDecreaseInput = document.getElementById('directionDecrease');
 
     function updateConditionalFields() {
         const type = transactionTypeSelect.value;
@@ -482,7 +558,10 @@ document.addEventListener('DOMContentLoaded', function() {
         wasteReasonSection.style.display = 'none';
         departmentSection.style.display = 'none';
         referenceSection.style.display = 'none';
+        directionSection.style.display = 'none';
         wasteReasonInput.required = false;
+        if (directionIncreaseInput) directionIncreaseInput.required = false;
+        if (directionDecreaseInput) directionDecreaseInput.required = false;
         
         // Show relevant section based on type
         if (type === 'ضایعات') {
@@ -492,11 +571,90 @@ document.addEventListener('DOMContentLoaded', function() {
             departmentSection.style.display = 'block';
         } else if (type === 'خرید') {
             referenceSection.style.display = 'block';
+        } else if (type === 'اصلاحی') {
+            // FIX: Show direction field for Adjustment
+            directionSection.style.display = 'block';
+            if (directionIncreaseInput) directionIncreaseInput.required = true;
         }
+        
+        updateFormProgress();
     }
 
     transactionTypeSelect.addEventListener('change', updateConditionalFields);
     updateConditionalFields(); // Initial call
+    
+    function updateFormProgress() {
+        if (!formProgress) return;
+        
+        let completedSteps = 0;
+        const totalSteps = 5;
+        
+        // Step 1: Item selected
+        if (itemSelect.value) {
+            completedSteps++;
+            step1.classList.add('completed');
+            step1.classList.remove('active');
+        } else {
+            step1.classList.remove('completed');
+            step1.classList.add('active');
+        }
+        
+        // Step 2: Transaction type selected
+        if (transactionTypeSelect.value) {
+            completedSteps++;
+            step2.classList.add('completed');
+            step2.classList.remove('active');
+        } else {
+            step2.classList.remove('completed');
+            if (completedSteps === 1) step2.classList.add('active');
+        }
+        
+        // Step 3: Quantity entered
+        const qty = parseFloat(quantityInput.value);
+        if (qty > 0) {
+            completedSteps++;
+            step3.classList.add('completed');
+            step3.classList.remove('active');
+        } else {
+            step3.classList.remove('completed');
+            if (completedSteps === 2) step3.classList.add('active');
+        }
+        
+        // Step 4: Price entered
+        const price = parseFloat(unitPriceInput.value);
+        if (price > 0) {
+            completedSteps++;
+            step4.classList.add('completed');
+            step4.classList.remove('active');
+        } else {
+            step4.classList.remove('completed');
+            if (completedSteps === 3) step4.classList.add('active');
+        }
+        
+        // Step 5: All required fields complete
+        if (completedSteps === 4) {
+            completedSteps++;
+            step5.classList.add('completed');
+            step5.classList.remove('active');
+        } else {
+            step5.classList.remove('completed');
+            if (completedSteps === 4) step5.classList.add('active');
+        }
+        
+        const progress = (completedSteps / totalSteps) * 100;
+        progressFill.style.width = progress + '%';
+        progressPercent.textContent = Math.round(progress) + '%';
+        
+        // Show progress bar after first interaction
+        if (completedSteps > 0) {
+            formProgress.style.display = 'block';
+        }
+    }
+    
+    // Update progress on field changes
+    itemSelect.addEventListener('change', updateFormProgress);
+    quantityInput.addEventListener('input', updateFormProgress);
+    unitPriceInput.addEventListener('input', updateFormProgress);
     
     // Show item info when selected and auto-populate price
     $(itemSelect).on('change', function() {
@@ -506,25 +664,18 @@ document.addEventListener('DOMContentLoaded', function() {
             const category = selected.dataset.category || 'Food';
             const price = selected.dataset.price || '0';
             
-            currentStock.textContent = parseFloat(stock).toLocaleString('fa-IR') + ' ' + (selected.dataset.unit || '');
+            currentStockValue = parseFloat(stock) || 0;
+            currentStock.textContent = currentStockValue.toLocaleString('fa-IR') + ' ' + (selected.dataset.unit || '');
             itemInfo.classList.remove('d-none');
             
             // Auto-set category
             categorySelect.value = category;
             
-            // PRICE CONTROL: Auto-populate price from item
-            const priceValue = parseFloat(price) || 0;
-            defaultItemPrice = priceValue;
-            window.defaultItemPrice = defaultItemPrice;
-            if (priceValue > 0) {
-                applyUnitPrice(priceValue, { skipOverrideCheck: true });
-            } else {
-                applyUnitPrice(0, { skipOverrideCheck: true });
-            }
-            checkAndShowOverrideField();
+            // PRICE CONTROL: Fetch price from API (with fallback to last transaction)
             fetchDefaultItemPrice(selected.value);
         } else {
             itemInfo.classList.add('d-none');
+            currentStockValue = 0;
             defaultItemPrice = 0;
             window.defaultItemPrice = 0;
             checkAndShowOverrideField();
@@ -549,62 +700,143 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // BUG-VALIDATION-001: Real-time quantity validation (reject negative/zero)
-    quantityInput.addEventListener('input', function() {
-        const value = parseFloat(this.value);
-        const errorEl = document.getElementById('quantityError');
-        
-        if (isNaN(value) || value <= 0) {
-            this.classList.add('is-invalid');
-            this.classList.remove('is-valid');
-            if (value < 0) {
-                errorEl.textContent = 'مقدار نمی‌تواند منفی باشد';
-            } else if (value === 0) {
-                errorEl.textContent = 'مقدار باید بزرگتر از صفر باشد';
-            } else {
-                errorEl.textContent = 'لطفاً مقدار را وارد کنید';
-            }
-        } else if (value > 999999) {
-            this.classList.add('is-invalid');
-            this.classList.remove('is-valid');
-            errorEl.textContent = 'مقدار نمی‌تواند بیشتر از ۹۹۹,۹۹۹ باشد';
-        } else {
-            this.classList.remove('is-invalid');
-            this.classList.add('is-valid');
-        }
-        updateTotalAmount();
-    });
+    // CRITICAL FIX: Comprehensive real-time validation with strict limits
+    let validationTimeout = null;
     
-    function handleUnitPriceInput() {
-        const value = parseFloat(unitPriceInput.value) || 0;
-        unitPriceHidden.value = value;
+    function showValidationFeedback(input, isValid, message = '') {
+        const feedback = input.parentElement.querySelector('.invalid-feedback') || 
+                        input.parentElement.querySelector('.valid-feedback');
         
-        if (value > 0) {
-            unitPriceWords.textContent = '« ' + numberToPersianWords(value) + ' »';
+        if (isValid) {
+            input.classList.remove('is-invalid');
+            input.classList.add('is-valid');
+            if (feedback) {
+                feedback.textContent = message || 'خوب است';
+                feedback.className = 'valid-feedback';
+            }
         } else {
-            unitPriceWords.textContent = '';
+            input.classList.remove('is-valid');
+            input.classList.add('is-invalid');
+            if (feedback) {
+                feedback.textContent = message || 'مقدار نامعتبر است';
+                feedback.className = 'invalid-feedback';
+            }
         }
         
-        const errorEl = document.getElementById('priceError');
+        updateFormProgress();
+        updateSubmitButtonState();
+    }
+    
+    function validateQuantity() {
+        const value = parseFloat(quantityInput.value);
+        
+        if (isNaN(value) || value === '') {
+            showValidationFeedback(quantityInput, false, 'مقدار را وارد کنید');
+            return false;
+        }
         
         if (value <= 0) {
-            unitPriceInput.classList.add('is-invalid');
-            unitPriceInput.classList.remove('is-valid');
-            errorEl.textContent = 'قیمت باید بزرگتر از صفر باشد';
-        } else if (value > 999999999999) {
-            unitPriceInput.classList.add('is-invalid');
-            unitPriceInput.classList.remove('is-valid');
-            errorEl.textContent = 'قیمت نمی‌تواند بیشتر از ۹۹۹ میلیارد ریال باشد';
-        } else {
-            unitPriceInput.classList.remove('is-invalid');
-            unitPriceInput.classList.add('is-valid');
+            showValidationFeedback(quantityInput, false, 'مقدار باید بزرگتر از صفر باشد');
+            return false;
         }
-        checkAndShowOverrideField();
-        updateTotalAmount();
+        
+        if (value > 999999) {
+            showValidationFeedback(quantityInput, false, 'مقدار نمی‌تواند بیشتر از 999,999 باشد');
+            return false;
+        }
+        
+        // Check if this would result in negative stock for consumption/waste
+        const transactionType = document.querySelector('select[name="transaction_type"]').value;
+        if (transactionType === 'مصرف' || transactionType === 'ضایعات') {
+            if (value > currentStockValue) {
+                showValidationFeedback(quantityInput, false, `موجودی کافی نیست! فعلی: ${currentStockValue.toLocaleString('fa-IR')}`);
+                return false;
+            }
+        }
+        
+        showValidationFeedback(quantityInput, true, 'مقدار معتبر است');
+        return true;
     }
-
-    unitPriceInput.addEventListener('input', handleUnitPriceInput);
-    unitPriceInput.addEventListener('change', handleUnitPriceInput);
+    
+    function validatePrice() {
+        const value = parseFloat(unitPriceInput.value);
+        
+        if (isNaN(value) || value === '') {
+            showValidationFeedback(unitPriceInput, false, 'قیمت را وارد کنید');
+            return false;
+        }
+        
+        if (value < 0) {
+            showValidationFeedback(unitPriceInput, false, 'قیمت نمی‌تواند منفی باشد');
+            return false;
+        }
+        
+        if (value > 999999999) {
+            showValidationFeedback(unitPriceInput, false, 'قیمت فوق‌العاده بالا است!');
+            return false;
+        }
+        
+        // Warn for extremely high prices (likely user error)
+        if (value > 10000000) { // 10 million rials
+            showValidationFeedback(unitPriceInput, false, 'قیمت بسیار بالا - مطمئن هستید؟');
+            return false;
+        }
+        
+        showValidationFeedback(unitPriceInput, true, 'قیمت معتبر است');
+        return true;
+    }
+    
+    function updateSubmitButtonState() {
+        const submitBtn = document.querySelector('button[type="submit"]');
+        const isQuantityValid = validateQuantity();
+        const isPriceValid = validatePrice();
+        const isItemSelected = itemSelect.value !== '';
+        const isTypeSelected = document.querySelector('select[name="transaction_type"]').value !== '';
+        
+        const allValid = isQuantityValid && isPriceValid && isItemSelected && isTypeSelected;
+        
+        if (submitBtn) {
+            submitBtn.disabled = !allValid;
+            if (allValid) {
+                submitBtn.classList.remove('btn-secondary');
+                submitBtn.classList.add('btn-success');
+                submitBtn.innerHTML = '<i class="fas fa-save me-2"></i>ثبت تراکنش';
+            } else {
+                submitBtn.classList.remove('btn-success');
+                submitBtn.classList.add('btn-secondary');
+                submitBtn.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>ابتدا فرم را کامل کنید';
+            }
+        }
+    }
+    
+    // Real-time validation on input
+    quantityInput.addEventListener('input', function() {
+        clearTimeout(validationTimeout);
+        validationTimeout = setTimeout(() => {
+            validateQuantity();
+            updateTotalAmount();
+        }, 300);
+    });
+    
+    unitPriceInput.addEventListener('input', function() {
+        clearTimeout(validationTimeout);
+        validationTimeout = setTimeout(() => {
+            validatePrice();
+            updateTotalAmount();
+        }, 300);
+    });
+    
+    // Validate on transaction type change (affects stock validation)
+    document.querySelector('select[name="transaction_type"]').addEventListener('change', function() {
+        setTimeout(validateQuantity, 100); // Re-validate quantity based on new type
+        updateSubmitButtonState();
+    });
+    
+    // Validate on item selection change
+    itemSelect.addEventListener('change', function() {
+        setTimeout(validateQuantity, 100); // Re-validate quantity based on new stock
+        updateSubmitButtonState();
+    });
     
     // UX #8: Live total calculation
     function updateTotalAmount() {

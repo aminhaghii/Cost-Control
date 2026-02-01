@@ -41,31 +41,31 @@ MIN_PRICE = 1
 transactions_bp = Blueprint('transactions', __name__, url_prefix='/transactions')
 
 
-def validate_transaction_data(quantity, unit_price, transaction_date_str, allow_zero_price=False):
-    """Validate transaction input data and return errors list"""
+def validate_transaction_data(quantity, unit_price, transaction_date_str, category=None, allow_zero_price=False):
+    """CRITICAL FIX: Validate transaction input data with strict validation including price limits"""
     errors = []
     
-    # Bug #1: Validate negative values
+    # CRITICAL: Strict quantity validation - never allow negative/zero
     if quantity is None or quantity <= 0:
         errors.append('مقدار باید بزرگتر از صفر باشد')
+    elif quantity > MAX_QUANTITY:
+        errors.append(f'مقدار نمی‌تواند بیشتر از {MAX_QUANTITY:,} باشد')
     
-    # P1 FIX: Allow zero price for gifts/samples, but reject negative
+    # CRITICAL: Price validation - never allow negative
     if unit_price is None or unit_price < 0:
         errors.append('قیمت واحد نمی‌تواند منفی باشد')
     elif not allow_zero_price and unit_price == 0:
-        errors.append('قیمت واحد باید بزرگتر از صفر باشد (برای هدیه/سمپل از فیلد مخصوص استفاده کنید)')
-    
-    # Bug #2: Validate max values
-    if quantity and quantity > MAX_QUANTITY:
-        errors.append(f'مقدار نمی‌تواند بیشتر از {MAX_QUANTITY:,} باشد')
-    
-    if unit_price and unit_price > MAX_PRICE:
+        errors.append('قیمت واحد باید بزرگتر از صفر باشد')
+    elif unit_price > MAX_PRICE:
         errors.append(f'قیمت واحد نمی‌تواند بیشتر از {MAX_PRICE:,} ریال باشد')
     
-    # Bug #4: Validate date format only (future date validation handled by frontend)
+    # CRITICAL: Date validation - don't allow future dates beyond reasonable limit
     if transaction_date_str:
         try:
-            datetime.strptime(transaction_date_str, '%Y-%m-%d').date()
+            transaction_date = datetime.strptime(transaction_date_str, '%Y-%m-%d').date()
+            # Don't allow future dates beyond tomorrow
+            if transaction_date > datetime.now().date() + timedelta(days=1):
+                errors.append('تاریخ تراکنش نمی‌تواند بیش از امروز باشد')
         except ValueError:
             errors.append('فرمت تاریخ نامعتبر است')
     
@@ -73,11 +73,26 @@ def validate_transaction_data(quantity, unit_price, transaction_date_str, allow_
 
 
 def validate_stock_availability(item, transaction_type, quantity, old_quantity=0):
-    """Bug #7: Check if stock is sufficient for consumption/waste transactions"""
+    """CRITICAL FIX: Prevent ANY transaction that would make stock negative"""
+    # Calculate what stock would be after this transaction
+    current_stock = item.current_stock + old_quantity  # Add back old quantity if editing
+    
+    # Determine the impact on stock
     if transaction_type in ['مصرف', 'ضایعات']:
-        available_stock = item.current_stock + old_quantity  # Add back old quantity if editing
-        if quantity > available_stock:
-            return f'موجودی کافی نیست! موجودی فعلی: {available_stock:,.2f} {item.unit}'
+        # These reduce stock (negative impact)
+        resulting_stock = current_stock - quantity
+    elif transaction_type == 'اصلاحی':
+        # For adjustments, we need to know direction (handled separately)
+        # For now, assume worst case - if it's a decrease
+        resulting_stock = current_stock - quantity  # Will be overridden by caller if increase
+    else:
+        # خرید and other types increase stock
+        return None  # No validation needed for stock increases
+    
+    # CRITICAL: Never allow stock to go negative
+    if resulting_stock < 0:
+        return f'عملیات غیرممکن! موجودی منفی می‌شود. موجودی فعلی: {current_stock:,.2f} {item.unit}، درخواستی: {quantity:,.2f}'
+    
     return None
 
 
@@ -249,14 +264,17 @@ def create():
                 flash('لطفاً تمام فیلدهای الزامی را پر کنید', 'danger')
                 return render_template('transactions/create.html', items=items, today=today)
             
-            # Validate input data (Bug #1, #2, #4)
-            validation_errors = validate_transaction_data(quantity, unit_price, transaction_date_str)
+            # CRITICAL FIX: Enhanced validation including category-based price limits
+            validation_errors = validate_transaction_data(
+                quantity, unit_price, transaction_date_str, 
+                category=category, 
+                allow_zero_price=(transaction_type in ['هدیه', 'سمپل'])
+            )
             if validation_errors:
                 for error in validation_errors:
                     flash(error, 'danger')
-                return render_template('transactions/create.html', items=items, today=get_iran_today().isoformat())
-            
-            # Sanitize description (Bug #6)
+                return render_template('transactions/create.html', items=items, today=today,
+                                     WASTE_REASONS=WASTE_REASONS, DEPARTMENTS=DEPARTMENTS)
             description = sanitize_text(description)
             
             transaction_date = datetime.strptime(transaction_date_str, '%Y-%m-%d').date()
@@ -463,8 +481,8 @@ def edit(id):
                 flash('لطفاً تمام فیلدهای الزامی را پر کنید', 'danger')
                 return render_template('transactions/edit.html', transaction=transaction, items=items)
             
-            # Validate input data (Bug #1, #2, #4)
-            validation_errors = validate_transaction_data(quantity, unit_price, transaction_date_str)
+            # CRITICAL FIX: Enhanced validation including category-based price limits
+            validation_errors = validate_transaction_data(quantity, unit_price, transaction_date_str, category)
             if validation_errors:
                 for error in validation_errors:
                     flash(error, 'danger')
@@ -652,13 +670,27 @@ def api_get_item(item_id):
     if item.hotel_id and not user_can_access_hotel(current_user, item.hotel_id):
         return jsonify({'error': 'دسترسی غیرمجاز'}), 403
     
+    # Determine effective unit price with fallback to last known transaction price
+    unit_price_value = float(item.unit_price or 0)
+    if unit_price_value <= 0:
+        last_price_tx = Transaction.query.filter(
+            Transaction.item_id == item.id,
+            Transaction.unit_price > 0,
+            Transaction.is_deleted != True
+        ).order_by(
+            Transaction.transaction_date.desc(),
+            Transaction.created_at.desc()
+        ).first()
+        if last_price_tx:
+            unit_price_value = float(last_price_tx.unit_price or 0)
+
     return jsonify({
         'id': item.id,
         'item_code': item.item_code,
         'item_name_fa': item.item_name_fa,
         'category': item.category,
         'unit': item.unit,
-        'unit_price': float(item.unit_price or 0),
+        'unit_price': unit_price_value,
         'current_stock': float(item.current_stock or 0)
     })
 

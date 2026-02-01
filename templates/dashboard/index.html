@@ -12,47 +12,154 @@
     </div>
 </div>
 
-<!-- KPI Cards - UX #3: Interactive Cards -->
+<!-- Enhanced KPI Cards with Details -->
 <div class="row mb-4">
+    <!-- Total Items Card -->
     <div class="col-md-3 mb-3">
-        <a href="{{ url_for('transactions.list_transactions') }}?date_from={{ today }}&date_to={{ today }}" class="kpi-card-link">
-            <div class="kpi-card primary">
-                <i class="fas fa-exchange-alt kpi-icon"></i>
-                <div class="kpi-value">{{ today_transactions }}</div>
-                <div class="kpi-label">تراکنش امروز</div>
-                <i class="fas fa-arrow-left kpi-arrow"></i>
+        <div class="card kpi-card-enhanced border-info">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div class="kpi-icon-wrapper bg-info bg-opacity-10 rounded-3 p-3">
+                        <i class="fas fa-boxes fa-2x text-info"></i>
+                    </div>
+                    <a href="{{ url_for('reports.abc') }}" class="btn btn-sm btn-outline-info">
+                        <i class="fas fa-arrow-left"></i>
+                    </a>
+                </div>
+                <h3 class="mb-1 fw-bold">{{ total_items }}</h3>
+                <p class="text-muted mb-2 small">تعداد کالاها</p>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="badge bg-success-subtle text-success">فعال</span>
+                    <small class="text-muted">موجودی کامل</small>
+                </div>
             </div>
-        </a>
+        </div>
     </div>
+
+    <!-- Today Purchase Card -->
     <div class="col-md-3 mb-3">
-        <a href="{{ url_for('transactions.list_transactions') }}?type=خرید&date_from={{ today }}&date_to={{ today }}" class="kpi-card-link">
-            <div class="kpi-card success">
-                <i class="fas fa-shopping-cart kpi-icon"></i>
-                <div class="kpi-value number-fa">{{ "{:,.0f}".format(today_purchase) }}</div>
-                <div class="kpi-label">خرید امروز (ریال)</div>
-                <i class="fas fa-arrow-left kpi-arrow"></i>
+        <div class="card kpi-card-enhanced border-success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div class="kpi-icon-wrapper bg-success bg-opacity-10 rounded-3 p-3">
+                        <i class="fas fa-shopping-cart fa-2x text-success"></i>
+                    </div>
+                    <a href="{{ url_for('transactions.list_transactions') }}?type=خرید&date_from={{ today }}&date_to={{ today }}" class="btn btn-sm btn-outline-success">
+                        <i class="fas fa-arrow-left"></i>
+                    </a>
+                </div>
+                <h3 class="mb-1 fw-bold number-fa">{{ "{:,.0f}".format(today_purchase) }}</h3>
+                <p class="text-muted mb-2 small">خرید امروز (ریال)</p>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="badge bg-success-subtle text-success">
+                        <i class="fas fa-arrow-up"></i> فعال
+                    </span>
+                    <small class="text-muted">{{ today_transactions }} تراکنش</small>
+                </div>
             </div>
-        </a>
+        </div>
     </div>
+
+    <!-- Today Waste Card -->
     <div class="col-md-3 mb-3">
-        <a href="{{ url_for('transactions.list_transactions') }}?type=ضایعات&date_from={{ today }}&date_to={{ today }}" class="kpi-card-link">
-            <div class="kpi-card danger">
-                <i class="fas fa-trash kpi-icon"></i>
-                <div class="kpi-value number-fa">{{ "{:,.0f}".format(today_waste) }}</div>
-                <div class="kpi-label">ضایعات امروز (ریال)</div>
-                <i class="fas fa-arrow-left kpi-arrow"></i>
+        <div class="card kpi-card-enhanced border-danger">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div class="kpi-icon-wrapper bg-danger bg-opacity-10 rounded-3 p-3">
+                        <i class="fas fa-trash fa-2x text-danger"></i>
+                    </div>
+                    <a href="{{ url_for('transactions.list_transactions') }}?type=ضایعات&date_from={{ today }}&date_to={{ today }}" class="btn btn-sm btn-outline-danger">
+                        <i class="fas fa-arrow-left"></i>
+                    </a>
+                </div>
+                <h3 class="mb-1 fw-bold number-fa">{{ "{:,.0f}".format(today_waste) }}</h3>
+                <p class="text-muted mb-2 small">ضایعات امروز (ریال)</p>
+                <div class="d-flex justify-content-between align-items-center">
+                    {% set waste_ratio = (today_waste / today_purchase * 100) if today_purchase > 0 else 0 %}
+                    {% if waste_ratio > 10 %}
+                    <span class="badge bg-danger-subtle text-danger">
+                        <i class="fas fa-exclamation-triangle"></i> نیاز کنترل
+                    </span>
+                    {% elif waste_ratio > 5 %}
+                    <span class="badge bg-warning-subtle text-warning">
+                        <i class="fas fa-exclamation-circle"></i> متوسط
+                    </span>
+                    {% else %}
+                    <span class="badge bg-success-subtle text-success">
+                        <i class="fas fa-check-circle"></i> خوب
+                    </span>
+                    {% endif %}
+                    <small class="text-muted">{{ "%.1f"|format(waste_ratio) }}%</small>
+                </div>
             </div>
-        </a>
+        </div>
     </div>
+
+    <!-- Today Consumption Card -->
     <div class="col-md-3 mb-3">
-        <a href="{{ url_for('reports.abc') }}" class="kpi-card-link">
-            <div class="kpi-card info">
-                <i class="fas fa-boxes kpi-icon"></i>
-                <div class="kpi-value">{{ total_items }}</div>
-                <div class="kpi-label">تعداد کالاها</div>
-                <i class="fas fa-arrow-left kpi-arrow"></i>
+        <div class="card kpi-card-enhanced border-primary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div class="kpi-icon-wrapper bg-primary bg-opacity-10 rounded-3 p-3">
+                        <i class="fas fa-utensils fa-2x text-primary"></i>
+                    </div>
+                    <a href="{{ url_for('transactions.list_transactions') }}?type=مصرف&date_from={{ today }}&date_to={{ today }}" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-arrow-left"></i>
+                    </a>
+                </div>
+                <h3 class="mb-1 fw-bold number-fa">{{ "{:,.0f}".format(today_consumption) }}</h3>
+                <p class="text-muted mb-2 small">مصرف امروز (ریال)</p>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="badge bg-primary-subtle text-primary">
+                        <i class="fas fa-chart-line"></i> عملیاتی
+                    </span>
+                    <small class="text-muted">روزانه</small>
+                </div>
             </div>
-        </a>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions Row -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title mb-3">
+                    <i class="fas fa-bolt text-warning me-2"></i>دسترسی سریع
+                </h5>
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <a href="{{ url_for('transactions.create') }}" class="btn btn-lg btn-outline-primary w-100 d-flex flex-column align-items-center py-3 quick-action-btn">
+                            <i class="fas fa-plus-circle fa-2x mb-2"></i>
+                            <span class="fw-bold">خرید جدید</span>
+                            <small class="text-muted">ثبت سریع</small>
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{{ url_for('reports.pareto') }}" class="btn btn-lg btn-outline-success w-100 d-flex flex-column align-items-center py-3 quick-action-btn">
+                            <i class="fas fa-chart-bar fa-2x mb-2"></i>
+                            <span class="fw-bold">گزارش پارتو</span>
+                            <small class="text-muted">تحلیل مجدد</small>
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{{ url_for('warehouse.dashboard') }}" class="btn btn-lg btn-outline-info w-100 d-flex flex-column align-items-center py-3 quick-action-btn">
+                            <i class="fas fa-warehouse fa-2x mb-2"></i>
+                            <span class="fw-bold">چک انبار</span>
+                            <small class="text-muted">موجودی لحظه‌ای</small>
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{{ url_for('ai_analysis.reorder_suggestions') }}" class="btn btn-lg btn-outline-warning w-100 d-flex flex-column align-items-center py-3 quick-action-btn">
+                            <i class="fas fa-robot fa-2x mb-2"></i>
+                            <span class="fw-bold">پیشنهاد AI</span>
+                            <small class="text-muted">سفارش هوشمند</small>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
