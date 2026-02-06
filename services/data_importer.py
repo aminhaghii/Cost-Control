@@ -10,11 +10,15 @@ import os
 import re
 import hashlib
 import json
+import logging
 from datetime import datetime, date
 from decimal import Decimal
 from utils.timezone import get_iran_today
 import pandas as pd
+from sqlalchemy import func
 from models import db, Item, Transaction, ImportBatch
+
+logger = logging.getLogger(__name__)
 
 
 def compute_file_hash(file_path, timeout_seconds=30):
@@ -440,7 +444,8 @@ class DataImporter:
                         results.append(result)
                     
                     # Update batch stats
-                    self.import_batch.status = 'completed'\n                    self.import_batch.items_created = self.imported_items
+                    self.import_batch.status = 'completed'
+                    self.import_batch.items_created = self.imported_items
                     self.import_batch.items_updated = self.updated_items
                     self.import_batch.transactions_created = self.imported_transactions
                     self.import_batch.errors_count = len(self.row_errors)

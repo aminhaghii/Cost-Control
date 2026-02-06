@@ -61,7 +61,8 @@ def executive_summary():
         func.coalesce(func.sum(Transaction.total_amount), 0)
     ).filter(
         Transaction.transaction_type == 'مصرف',
-        Transaction.transaction_date >= current_start
+        Transaction.transaction_date >= current_start,
+        Transaction.is_deleted != True
     ).scalar() or 0
     # Normalize numeric types to float to avoid Decimal + float errors
     total_consumption_for_ratio = float(total_consumption_for_ratio)
@@ -80,7 +81,8 @@ def executive_summary():
         func.coalesce(func.sum(Transaction.total_amount), 0)
     ).filter(
         Transaction.transaction_type == 'خرید',
-        Transaction.transaction_date >= current_start
+        Transaction.transaction_date >= current_start,
+        Transaction.is_deleted != True
     ).scalar()
     
     previous_total = db.session.query(
@@ -88,7 +90,8 @@ def executive_summary():
     ).filter(
         Transaction.transaction_type == 'خرید',
         Transaction.transaction_date >= previous_start,
-        Transaction.transaction_date < current_start
+        Transaction.transaction_date < current_start,
+        Transaction.is_deleted != True
     ).scalar()
     
     change_percentage = ((current_total - previous_total) / previous_total * 100) if previous_total > 0 else 0
@@ -152,7 +155,8 @@ def executive_summary():
     # 2. Transaction Count & Average
     trans_count = db.session.query(func.count(Transaction.id)).filter(
         Transaction.transaction_type == 'خرید',
-        Transaction.transaction_date >= current_start
+        Transaction.transaction_date >= current_start,
+        Transaction.is_deleted != True
     ).scalar() or 0
     avg_transaction = total_purchase / trans_count if trans_count > 0 else 0
     
@@ -161,7 +165,8 @@ def executive_summary():
         func.coalesce(func.sum(Transaction.total_amount), 0)
     ).filter(
         Transaction.transaction_type == 'مصرف',
-        Transaction.transaction_date >= current_start
+        Transaction.transaction_date >= current_start,
+        Transaction.is_deleted != True
     ).scalar() or 0
     
     # 4. Inventory Turnover Ratio (Consumption / Avg Inventory)
@@ -401,10 +406,12 @@ def procurement_plan():
     suggestions = ai_service.get_procurement_plan(min_confidence=confidence)
     
     # Calculate totals
-    total_suggested_value = sum(
-        s['suggested_order'] * Item.query.get(s['item_id']).unit_price 
-        for s in suggestions
-    )
+    # BUG FIX: Handle case where item might not exist or unit_price is None
+    total_suggested_value = 0
+    for s in suggestions:
+        item = Item.query.get(s['item_id'])
+        if item and item.unit_price:
+            total_suggested_value += s['suggested_order'] * float(item.unit_price)
     
     # Pagination
     total_items = len(suggestions)

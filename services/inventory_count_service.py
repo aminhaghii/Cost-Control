@@ -3,7 +3,7 @@ Inventory Count Service - Physical stock counting operations
 """
 from datetime import datetime, date, timedelta
 from decimal import Decimal
-from sqlalchemy import func
+from sqlalchemy import func, update
 from models import db, Transaction, Item, Alert, InventoryCount, WarehouseSettings
 from models.inventory_count import VARIANCE_REASONS
 import logging
@@ -173,8 +173,11 @@ class InventoryCountService:
                 severity='warning'
             )
         else:
-            # Update stock immediately
-            item.current_stock = (item.current_stock or 0) + tx.signed_quantity
+            # Update stock immediately (atomic to prevent race conditions)
+            db.session.execute(
+                update(Item).where(Item.id == item.id)
+                .values(current_stock=Item.current_stock + tx.signed_quantity)
+            )
             tx.approval_status = 'not_required'
             if approver_id:
                 tx.approved_by_id = approver_id

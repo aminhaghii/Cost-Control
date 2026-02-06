@@ -80,6 +80,7 @@ def reorder_suggestions():
     ).join(Transaction, Transaction.item_id == Item.id)\
      .filter(Transaction.transaction_type == 'مصرف')\
      .filter(Transaction.transaction_date >= thirty_days_ago)\
+     .filter(Transaction.is_deleted != True)\
      .filter(Item.category == category)\
      .group_by(Item.id).all()
     
@@ -99,6 +100,7 @@ def reorder_suggestions():
     ).join(Transaction, Transaction.item_id == Item.id)\
      .filter(Transaction.transaction_type == 'خرید')\
      .filter(Transaction.transaction_date >= thirty_days_ago)\
+     .filter(Transaction.is_deleted != True)\
      .filter(Item.category == category)\
      .group_by(Item.id).all()
     
@@ -150,6 +152,7 @@ def waste_analysis():
     ).join(Transaction, Transaction.item_id == Item.id)\
      .filter(Transaction.transaction_type == 'ضایعات')\
      .filter(Transaction.transaction_date >= start_date)\
+     .filter(Transaction.is_deleted != True)\
      .filter(Item.category == category)\
      .order_by(Transaction.transaction_date.desc()).all()
     
@@ -186,15 +189,18 @@ def daily_insights():
     today = get_iran_today()
     
     today_transactions = Transaction.query.filter(
-        func.date(Transaction.transaction_date) == today
+        func.date(Transaction.transaction_date) == today,
+        Transaction.is_deleted != True
     ).count()
     
     today_purchases = db.session.query(func.sum(Transaction.total_amount))\
         .filter(Transaction.transaction_type == 'خرید')\
+        .filter(Transaction.is_deleted != True)\
         .filter(func.date(Transaction.transaction_date) == today).scalar() or 0
     
     today_waste = db.session.query(func.sum(Transaction.total_amount))\
         .filter(Transaction.transaction_type == 'ضایعات')\
+        .filter(Transaction.is_deleted != True)\
         .filter(func.date(Transaction.transaction_date) == today).scalar() or 0
     
     total_items = Item.query.count()

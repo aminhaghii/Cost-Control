@@ -471,13 +471,18 @@ class ChatService:
                     avg_daily = self._get_avg_daily_consumption(item.id, 30)
                     days_left = int(item.current_stock / avg_daily) if avg_daily > 0 else 999
                     
+                    # BUG FIX: Handle None values to prevent TypeError
+                    current_stock_val = float(item.current_stock or 0)
+                    min_stock_val = float(item.min_stock or 0)
+                    max_stock_val = float(item.max_stock or 0) if item.max_stock else None
+                    suggested = (max_stock_val - current_stock_val) if max_stock_val else (min_stock_val * 2)
                     critical_items.append({
                         "name": item.item_name_fa,
-                        "current": float(item.current_stock),
-                        "min": float(item.min_stock),
+                        "current": current_stock_val,
+                        "min": min_stock_val,
                         "unit": item.unit,
                         "days_to_stockout": days_left,
-                        "suggested_order": float(item.max_stock - item.current_stock) if item.max_stock else float(item.min_stock * 2)
+                        "suggested_order": suggested
                     })
                 
                 if item.max_stock and item.current_stock and item.current_stock >= item.max_stock:

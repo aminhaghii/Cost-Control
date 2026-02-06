@@ -389,6 +389,9 @@ def approvals():
                          pending=pending,
                          hotel_id=hotel_id,
                          WASTE_REASONS=WASTE_REASONS)
+
+
+@warehouse_bp.route('/approvals/<int:tx_id>/approve', methods=['POST'])
 @login_required
 def approve_transaction(tx_id):
     """Approve a pending transaction and update stock"""

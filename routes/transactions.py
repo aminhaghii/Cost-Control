@@ -64,7 +64,8 @@ def validate_transaction_data(quantity, unit_price, transaction_date_str, catego
         try:
             transaction_date = datetime.strptime(transaction_date_str, '%Y-%m-%d').date()
             # Don't allow future dates beyond tomorrow
-            if transaction_date > datetime.now().date() + timedelta(days=1):
+            from utils.timezone import get_iran_today
+            if transaction_date > get_iran_today() + timedelta(days=1):
                 errors.append('تاریخ تراکنش نمی‌تواند بیش از امروز باشد')
         except ValueError:
             errors.append('فرمت تاریخ نامعتبر است')

@@ -3,7 +3,7 @@ Warehouse Service - Core warehouse management operations
 """
 from datetime import datetime, date, timedelta
 from decimal import Decimal
-from sqlalchemy import func
+from sqlalchemy import func, update
 from models import db, Transaction, Item, Alert, WarehouseSettings, InventoryCount
 from models.transaction import WASTE_REASONS, DEPARTMENTS
 from services.hotel_scope_service import user_can_access_hotel, get_allowed_hotel_ids, SINGLE_HOTEL_MODE
@@ -43,7 +43,7 @@ class WarehouseService:
             if last_price_tx and item.current_stock:
                 total_value += float(item.current_stock) * float(last_price_tx.unit_price)
         
-        low_stock_count = sum(1 for i in items if (i.current_stock or 0) <= (i.min_stock or 0))
+        low_stock_count = sum(1 for i in items if (i.min_stock or 0) > 0 and (i.current_stock or 0) < (i.min_stock or 0))
         high_stock_count = sum(1 for i in items if i.max_stock and (i.current_stock or 0) >= i.max_stock)
         
         # Pending approvals
@@ -316,7 +316,12 @@ class WarehouseService:
         # If requires_approval was True from start, stock is NOT yet updated
         item = Item.query.get(tx.item_id)
         if item and tx.requires_approval:
-            item.current_stock = (item.current_stock or 0) + tx.signed_quantity
+            db.session.execute(
+                update(Item).where(Item.id == item.id)
+                .values(current_stock=Item.current_stock + tx.signed_quantity)
+            )
+            db.session.flush()
+            db.session.refresh(item)
             # Check and create stock alerts (now that stock is updated)
             from routes.transactions import check_and_create_stock_alert
             check_and_create_stock_alert(item)
@@ -351,7 +356,12 @@ class WarehouseService:
         if not tx.requires_approval:
             item = Item.query.get(tx.item_id)
             if item:
-                item.current_stock = (item.current_stock or 0) - tx.signed_quantity
+                db.session.execute(
+                    update(Item).where(Item.id == item.id)
+                    .values(current_stock=Item.current_stock - tx.signed_quantity)
+                )
+                db.session.flush()
+                db.session.refresh(item)
                 from routes.transactions import check_and_create_stock_alert
                 check_and_create_stock_alert(item)
         
@@ -397,7 +407,7 @@ class WarehouseService:
             max_stock = float(item.max_stock or 0) if item.max_stock else None
             
             # Low stock alert
-            if stock <= min_stock and settings.notify_on_low_stock:
+            if min_stock > 0 and stock < min_stock and settings.notify_on_low_stock:
                 Alert.create_if_not_exists(
                     hotel_id=hotel_id,
                     alert_type='low_stock',
