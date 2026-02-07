@@ -30,18 +30,35 @@ class WarehouseService:
             items = Item.query.filter_by(hotel_id=hotel_id, is_active=True).all()
         total_items = len(items)
         
-        # Calculate total value from last known price
+        # CRITICAL FIX: Calculate total value with single bulk query instead of N+1
+        # Get latest price for each item in ONE query
+        from sqlalchemy import distinct
+        subq = db.session.query(
+            Transaction.item_id,
+            func.max(Transaction.transaction_date).label('max_date')
+        ).filter(
+            Transaction.unit_price > 0,
+            Transaction.is_deleted == False
+        ).group_by(Transaction.item_id).subquery()
+        
+        # Join to get actual price from the latest transaction
+        latest_prices = db.session.query(
+            Transaction.item_id,
+            Transaction.unit_price
+        ).join(
+            subq,
+            (Transaction.item_id == subq.c.item_id) & 
+            (Transaction.transaction_date == subq.c.max_date)
+        ).filter(Transaction.unit_price > 0).distinct().all()
+        
+        # Build price lookup map
+        price_map = {item_id: float(price) for item_id, price in latest_prices}
+        
+        # Calculate total value
         total_value = 0
         for item in items:
-            # Fallback chain: last purchase -> any transaction with price -> 0
-            last_price_tx = Transaction.query.filter(
-                Transaction.item_id == item.id,
-                Transaction.unit_price > 0,
-                Transaction.is_deleted == False
-            ).order_by(Transaction.transaction_date.desc()).first()
-            
-            if last_price_tx and item.current_stock:
-                total_value += float(item.current_stock) * float(last_price_tx.unit_price)
+            if item.current_stock and item.id in price_map:
+                total_value += float(item.current_stock) * price_map[item.id]
         
         low_stock_count = sum(1 for i in items if (i.min_stock or 0) > 0 and (i.current_stock or 0) < (i.min_stock or 0))
         high_stock_count = sum(1 for i in items if i.max_stock and (i.current_stock or 0) >= i.max_stock)

@@ -132,7 +132,8 @@ def get_quick_stats():
         
         total_items = Item.query.count()
         today_trans = Transaction.query.filter(
-            func.date(Transaction.transaction_date) == get_iran_today()
+            func.date(Transaction.transaction_date) == get_iran_today(),
+            Transaction.is_deleted != True
         ).count()
         
         return jsonify({

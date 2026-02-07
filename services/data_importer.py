@@ -498,6 +498,8 @@ class DataImporter:
     
     def _import_sheet(self, excel_file, sheet_name):
         """Import data from a single sheet"""
+        sheet_hotel_id = None
+        original_hotel_id = self.hotel_id
         try:
             df = pd.read_excel(excel_file, sheet_name=sheet_name)
             

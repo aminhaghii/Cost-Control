@@ -9,6 +9,7 @@ services:
     environment:
       - FLASK_ENV=production
       - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
+      - USE_HTTPS=false  # Set to 'true' when running behind HTTPS reverse proxy (nginx, traefik, etc.)
       - GROQ_API_KEY=${GROQ_API_KEY}
     volumes:
       - ./database:/app/database

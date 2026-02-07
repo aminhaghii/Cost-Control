@@ -77,6 +77,44 @@ def create_app(config_class=Config):
     
     db.init_app(app)
     
+    # CRITICAL FIX: Auto-initialize database on first run
+    with app.app_context():
+        db_path = os.path.join(db_dir, 'inventory.db')
+        if not os.path.exists(db_path):
+            logger.info("Database not found. Initializing...")
+            try:
+                db.create_all()
+                
+                # Create default admin if not exists
+                from models import Hotel
+                admin_password = os.environ.get('ADMIN_INITIAL_PASSWORD', 'Admin@123456')
+                if not User.query.filter_by(username='admin').first():
+                    admin = User(
+                        username='admin',
+                        email='admin@hotel.local',
+                        full_name='System Administrator',
+                        role='admin',
+                        is_active=True
+                    )
+                    admin.set_password(admin_password)
+                    db.session.add(admin)
+                    logger.info("✅ Default admin user created")
+                
+                # Create default hotel
+                if not Hotel.query.filter_by(hotel_code='MAIN').first():
+                    hotel = Hotel(hotel_code='MAIN', hotel_name='Main Hotel', is_active=True)
+                    db.session.add(hotel)
+                    logger.info("✅ Default hotel created")
+                
+                db.session.commit()
+                logger.info("✅ Database initialized successfully")
+                if not os.environ.get('ADMIN_INITIAL_PASSWORD'):
+                    logger.warning("⚠️  Default password is 'Admin@123456' - CHANGE IMMEDIATELY!")
+            except Exception as e:
+                logger.error(f"❌ Database initialization failed: {e}")
+                db.session.rollback()
+                raise
+    
     # P1-1: SQLite pragmas for WAL mode and better concurrency
     @event.listens_for(Engine, "connect")
     def set_sqlite_pragma(dbapi_connection, connection_record):
@@ -113,6 +151,27 @@ def create_app(config_class=Config):
     @app.route('/favicon.ico')
     def favicon():
         return '', 204
+    
+    @app.route('/health')
+    def health():
+        """Health check endpoint for monitoring and container orchestration"""
+        try:
+            # Check database connectivity
+            db.session.execute('SELECT 1')
+            db_status = 'connected'
+            db_healthy = True
+        except Exception as e:
+            db_status = f'error: {str(e)}'
+            db_healthy = False
+        
+        health_data = {
+            'status': 'healthy' if db_healthy else 'unhealthy',
+            'database': db_status,
+            'version': '1.0.0'
+        }
+        
+        status_code = 200 if db_healthy else 503
+        return jsonify(health_data), status_code
     
     @app.template_filter('format_number')
     def format_number(value):

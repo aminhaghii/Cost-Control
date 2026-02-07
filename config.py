@@ -13,13 +13,14 @@ IS_PRODUCTION = FLASK_ENV == 'production'
 IS_DEVELOPMENT = FLASK_ENV == 'development'
 
 class Config:
-    # P2-FIX: Security warning if SECRET_KEY not set in production
+    # CRITICAL FIX: SECRET_KEY is REQUIRED in production
     _env_secret_key = os.environ.get('SECRET_KEY')
     if IS_PRODUCTION and not _env_secret_key:
-        logging.warning(
-            "⚠️ WARNING: SECRET_KEY not set in production environment! "
-            "Sessions will be invalidated on server restart. "
-            "Set SECRET_KEY environment variable for persistent sessions."
+        raise RuntimeError(
+            "🔴 CRITICAL: SECRET_KEY environment variable is REQUIRED in production!\n"
+            "Generate a secure key with: python -c 'import secrets; print(secrets.token_hex(32))'\n"
+            "Then set it in your environment: export SECRET_KEY='your-generated-key'\n"
+            "Or in docker-compose.yml under environment section."
         )
     SECRET_KEY = _env_secret_key or secrets.token_hex(32)
     
@@ -48,8 +49,9 @@ class Config:
     WTF_CSRF_TIME_LIMIT = 3600  # 1 hour CSRF token validity
     
     # P2-FIX: Session Security - Secure by Default
-    # Only disable secure cookie in explicit development mode
-    SESSION_COOKIE_SECURE = not IS_DEVELOPMENT  # True unless explicitly in development
+    # CRITICAL FIX: Only set Secure cookie when actually using HTTPS
+    USE_HTTPS = os.environ.get('USE_HTTPS', 'false').lower() == 'true'
+    SESSION_COOKIE_SECURE = IS_PRODUCTION and USE_HTTPS  # True only in production WITH HTTPS
     SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to session cookie
     # BUG #27 FIX: Use Strict in production to prevent CSRF via cross-site requests
     SESSION_COOKIE_SAMESITE = 'Strict' if IS_PRODUCTION else 'Lax'

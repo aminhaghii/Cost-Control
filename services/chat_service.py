@@ -573,7 +573,7 @@ class ChatService:
                         for r in waste_by_reason
                     ],
                     "top_wasted": [
-                        {"name": item['name'], "amount": float(item['amount'])}
+                        {"name": item['item'].item_name_fa, "amount": float(item['waste_amount'])}
                         for item in top_wasted
                     ]
                 }
@@ -619,8 +619,8 @@ class ChatService:
                 "inventory_counts": {
                     "overdue_count": len(items_needing_count),
                     "items": [
-                        {"name": item.item_name_fa}
-                        for item in items_needing_count[:5]
+                        {"name": item_entry['item'].item_name_fa}
+                        for item_entry in items_needing_count[:5]
                     ]
                 },
                 "unresolved_variances": {
@@ -683,7 +683,7 @@ class ChatService:
                 ],
                 "waste_reduction": [],
                 "count_priorities": [
-                    item.item_name_fa for item in items_needing_count[:5]
+                    item_entry['item'].item_name_fa for item_entry in items_needing_count[:5]
                 ]
             }
             
