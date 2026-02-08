@@ -46,7 +46,7 @@ class WarehouseSettings(db.Model):
         if not settings:
             settings = cls(hotel_id=hotel_id)
             db.session.add(settings)
-            db.session.commit()
+            db.session.flush()
         return settings
     
     def needs_count(self):

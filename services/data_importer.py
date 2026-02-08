@@ -563,7 +563,7 @@ class DataImporter:
                 if item:
                     items_added += 1
             
-            db.session.commit()
+            db.session.flush()
             self.imported_items += items_added
             
             # Restore original hotel_id after import
@@ -688,9 +688,13 @@ class DataImporter:
                 logger.error(f"Unit mismatch for item {name}: system has '{existing.unit}', file has '{unit}'. Skipped.")
                 return None  # Skip this row
             
-            # Update if needed
+            # Update if needed - convert to base unit for storage
             if current_stock > 0:
-                existing.current_stock = current_stock
+                try:
+                    factor = Item.get_conversion_factor(unit)
+                except (ValueError, Exception):
+                    factor = 1.0
+                existing.current_stock = current_stock * factor
             # P1-5: Ensure base_unit is set
             if not existing.base_unit:
                 existing.base_unit = existing.get_base_unit()
@@ -726,6 +730,14 @@ class DataImporter:
         else:
             min_stock_value = 0
         
+        # SS-5 FIX: Convert current_stock to base unit for storage
+        try:
+            stock_factor = Item.get_conversion_factor(unit)
+        except (ValueError, Exception):
+            stock_factor = 1.0
+        base_current_stock = current_stock * stock_factor
+        base_min_stock = min_stock_value * stock_factor
+        
         # Create new item
         new_item = Item(
             item_code=item_code,
@@ -735,8 +747,8 @@ class DataImporter:
             unit=unit,
             base_unit=base_unit,  # P1-5: Set base_unit
             hotel_id=self.hotel_id,
-            current_stock=current_stock,
-            min_stock=min_stock_value,
+            current_stock=base_current_stock,
+            min_stock=base_min_stock,
             is_active=True
         )
         
@@ -801,7 +813,7 @@ class DataImporter:
                 db.session.add(transaction)
                 self.imported_transactions += 1
         
-        db.session.commit()
+        db.session.flush()
         return self.imported_transactions
 
 

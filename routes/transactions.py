@@ -73,26 +73,34 @@ def validate_transaction_data(quantity, unit_price, transaction_date_str, catego
     return errors
 
 
-def validate_stock_availability(item, transaction_type, quantity, old_quantity=0):
-    """CRITICAL FIX: Prevent ANY transaction that would make stock negative"""
-    # Calculate what stock would be after this transaction
-    current_stock = item.current_stock + old_quantity  # Add back old quantity if editing
+def validate_stock_availability(item, transaction_type, quantity, old_signed_quantity=0):
+    """CRITICAL FIX: Prevent ANY transaction that would make stock negative.
     
-    # Determine the impact on stock
-    if transaction_type in ['مصرف', 'ضایعات']:
-        # These reduce stock (negative impact)
-        resulting_stock = current_stock - quantity
-    elif transaction_type == 'اصلاحی':
-        # For adjustments, we need to know direction (handled separately)
-        # For now, assume worst case - if it's a decrease
-        resulting_stock = current_stock - quantity  # Will be overridden by caller if increase
-    else:
-        # خرید and other types increase stock
-        return None  # No validation needed for stock increases
+    Args:
+        item: Item object
+        transaction_type: new transaction type
+        quantity: new unsigned quantity
+        old_signed_quantity: signed_quantity of the OLD transaction being edited
+            (positive for purchases, negative for consumption). Pass 0 for new transactions.
+            When editing on the SAME item, the old effect is reversed first, so
+            available_stock = current_stock - old_signed_quantity.
+    """
+    from models.transaction import TRANSACTION_DIRECTION
+    
+    # Reverse old transaction effect to get available stock
+    # old_signed_quantity is already signed: + for purchase, - for consumption
+    # Reversing means subtracting it: stock_after_reversal = current - old_signed
+    available_stock = (item.current_stock or 0) - old_signed_quantity
+    
+    # Determine the new transaction's signed effect
+    new_direction = TRANSACTION_DIRECTION.get(transaction_type, 1)
+    new_signed = quantity * new_direction  # negative for consumption/waste
+    
+    resulting_stock = available_stock + new_signed
     
     # CRITICAL: Never allow stock to go negative
-    if resulting_stock < 0:
-        return f'عملیات غیرممکن! موجودی منفی می‌شود. موجودی فعلی: {current_stock:,.2f} {item.unit}، درخواستی: {quantity:,.2f}'
+    if resulting_stock < -0.001:  # float tolerance
+        return f'عملیات غیرممکن! موجودی منفی می‌شود. موجودی فعلی: {available_stock:,.2f} {item.unit}، درخواستی: {quantity:,.2f}'
     
     return None
 
@@ -361,7 +369,7 @@ def create():
                 transaction.approval_status = 'pending'
             
             # Bug #7: Validate stock availability for consumption/waste
-            stock_error = validate_stock_availability(item, transaction_type, quantity)
+            stock_error = validate_stock_availability(item, transaction_type, quantity, old_signed_quantity=0)
             if stock_error:
                 flash(stock_error, 'danger')
                 return render_template('transactions/create.html', items=items, today=today,
@@ -497,11 +505,33 @@ def edit(id):
                 flash('کالای انتخابی یافت نشد', 'danger')
                 return render_template('transactions/edit.html', transaction=transaction, items=items)
             
-            # Bug #7: Validate stock availability for consumption/waste (consider old quantity)
-            stock_error = validate_stock_availability(new_item, transaction_type, quantity, old_quantity if old_item_id == item_id else 0)
-            if stock_error:
-                flash(stock_error, 'danger')
-                return render_template('transactions/edit.html', transaction=transaction, items=items)
+            # Bug #7: Validate stock availability for consumption/waste (direction-aware)
+            # For same-item edits: pass old signed_quantity so reversal is accounted for
+            # For cross-item edits: validate new item with 0 (no prior effect on it)
+            #   AND validate old item can survive reversal
+            if old_item_id == item_id:
+                stock_error = validate_stock_availability(
+                    new_item, transaction_type, quantity,
+                    old_signed_quantity=transaction.signed_quantity or 0
+                )
+                if stock_error:
+                    flash(stock_error, 'danger')
+                    return render_template('transactions/edit.html', transaction=transaction, items=items)
+            else:
+                # Cross-item: check new item can handle the new transaction
+                stock_error = validate_stock_availability(
+                    new_item, transaction_type, quantity, old_signed_quantity=0
+                )
+                if stock_error:
+                    flash(stock_error, 'danger')
+                    return render_template('transactions/edit.html', transaction=transaction, items=items)
+                # Cross-item: check old item can survive reversal of old transaction
+                old_item_for_check = Item.query.get(old_item_id)
+                if old_item_for_check and transaction.signed_quantity:
+                    old_stock_after_reversal = (old_item_for_check.current_stock or 0) - (transaction.signed_quantity or 0)
+                    if old_stock_after_reversal < -0.001:
+                        flash('حذف این تراکنش از کالای قبلی باعث منفی شدن موجودی آن می\u200cشود.', 'danger')
+                        return render_template('transactions/edit.html', transaction=transaction, items=items)
             
             # SECURITY FEATURE #2: Anomaly detection for consumption transactions in edit
             if transaction_type == 'مصرف':
@@ -519,28 +549,14 @@ def edit(id):
                 if avg_consumption > 0 and quantity > (avg_consumption * 3):
                     flash(f'هشدار: مقدار مصرف وارد شده ({quantity:.1f}) بسیار بیشتر از میانگین مصرف ماهانه ({avg_consumption:.1f}) است. لطفاً دقت کنید.', 'warning')
             
-            # BUG #46 FIX: Lock before rollback and update
-            db.session.execute(
-                select(Item).where(Item.id == old_item_id).with_for_update()
-            ).scalar_one_or_none()
-            
-            # BUG #1 FIX: Use atomic update to prevent race condition
-            if transaction.signed_quantity:
-                db.session.execute(
-                    db.update(Item).where(Item.id == old_item_id)
-                    .values(current_stock=Item.current_stock - transaction.signed_quantity)
-                )
-            old_item = Item.query.get(old_item_id)
+            # Save old signed_quantity BEFORE any mutation
+            old_signed_qty = transaction.signed_quantity or 0
             
             # Bug #8: Auto-set category from item
             category = auto_set_category(new_item)
             
             # LOGIC FIX: PRESERVE HISTORICAL COST
-            # Do NOT force item.unit_price on edits of historical data.
-            # Trust the submitted price (which comes from existing record or user edit).
-            # Only use Decimal quantization.
             price_decimal = Decimal(str(unit_price)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-            
             total_decimal = (quantity_decimal * price_decimal).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
             
             # Update transaction fields
@@ -553,32 +569,38 @@ def edit(id):
             transaction.total_amount = total_decimal
             transaction.description = description
             
-            # P0-2: Recalculate signed_quantity
-            old_signed_quantity = transaction.signed_quantity
+            # P0-2: Recalculate signed_quantity with new values
             transaction.calculate_signed_quantity()
-            new_signed_quantity = transaction.signed_quantity
+            new_signed_qty = transaction.signed_quantity
             
-            # BUSINESS LOGIC FIX #2: Check for retroactive stock negative
-            # When reducing purchase or changing to consumption, verify current stock won't go negative
-            stock_delta = new_signed_quantity - old_signed_quantity
-            if stock_delta < 0:  # Stock is reducing
-                # Check if this reduction would make current stock negative
-                if (new_item.current_stock + stock_delta) < 0:
-                    db.session.rollback()
-                    flash('ویرایش این تراکنش باعث منفی شدن موجودی فعلی انبار می‌شود (چون کالا مصرف شده است).', 'danger')
-                    return render_template('transactions/edit.html', transaction=transaction, items=items)
+            # === Atomic stock updates ===
+            if old_item_id == new_item.id:
+                # Same item: apply net delta in ONE update to avoid transient negative stock
+                net_delta = new_signed_qty - old_signed_qty
+                if abs(net_delta) > 0.000001:  # Only update if changed
+                    db.session.execute(
+                        db.update(Item).where(Item.id == new_item.id)
+                        .values(current_stock=Item.current_stock + net_delta)
+                    )
+            else:
+                # Cross-item: reverse from old, add to new
+                if old_signed_qty:
+                    db.session.execute(
+                        db.update(Item).where(Item.id == old_item_id)
+                        .values(current_stock=Item.current_stock - old_signed_qty)
+                    )
+                
+                if abs(new_signed_qty) > 0.000001:
+                    db.session.execute(
+                        db.update(Item).where(Item.id == new_item.id)
+                        .values(current_stock=Item.current_stock + new_signed_qty)
+                    )
             
-            # BUG #46 FIX: Lock before update
-            db.session.execute(
-                select(Item).where(Item.id == new_item.id).with_for_update()
-            ).scalar_one_or_none()
-            
-            # BUG #1 FIX: Use atomic update to prevent race condition
-            db.session.execute(
-                db.update(Item).where(Item.id == new_item.id)
-                .values(current_stock=Item.current_stock + transaction.signed_quantity)
-            )
-            # Refresh to get updated stock
+            # Step 3: Flush to materialize updates, then refresh both items
+            db.session.flush()
+            old_item = Item.query.get(old_item_id)
+            if old_item:
+                db.session.refresh(old_item)
             db.session.refresh(new_item)
             
             # Bug #9: Check and create stock alerts for both items

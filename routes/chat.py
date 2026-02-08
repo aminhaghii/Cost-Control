@@ -64,12 +64,12 @@ def process_message():
         return jsonify(result)
     
     except Exception as e:
-        # P0-5: Log errors (without sensitive data)
+        # P0-5: Log errors (without sensitive data) - Bug #16: Don't expose internal errors
         log_chat_action('error', current_user.id, f'type={type(e).__name__}')
-        logger.error(f"Chat error for user {current_user.id}: {type(e).__name__}")
+        logger.error(f"Chat error for user {current_user.id}: {type(e).__name__}: {str(e)}")
         return jsonify({
             'success': False,
-            'response': f'خطا در پردازش: {str(e)}',
+            'response': 'خطایی در پردازش پیام رخ داد. لطفاً دوباره تلاش کنید.',
             'suggestions': ['کمک']
         }), 500
 
@@ -96,7 +96,7 @@ def clear_history():
     try:
         # P0-5: Audit log
         log_chat_action('clear_history', current_user.id)
-        result = chat_service.clear_history(current_user.id)
+        result = chat_service.clear_history(current_user.id, user=current_user)
         return jsonify(result)
     except Exception as e:
         log_chat_action('clear_history_error', current_user.id, f'type={type(e).__name__}')
@@ -124,17 +124,27 @@ def get_suggestions():
 @chat_bp.route('/api/quick-stats')
 @login_required
 def get_quick_stats():
-    """Get quick stats for chat header"""
+    """Get quick stats for chat header (scoped to user's hotels)"""
     try:
         from models.item import Item
         from models.transaction import Transaction
         from sqlalchemy import func
+        from services.hotel_scope_service import get_allowed_hotel_ids
         
-        total_items = Item.query.count()
-        today_trans = Transaction.query.filter(
+        allowed_hotel_ids = get_allowed_hotel_ids(current_user)
+        
+        items_query = Item.query
+        trans_query = Transaction.query.filter(
             func.date(Transaction.transaction_date) == get_iran_today(),
             Transaction.is_deleted != True
-        ).count()
+        )
+        
+        if allowed_hotel_ids is not None:
+            items_query = items_query.filter(Item.hotel_id.in_(allowed_hotel_ids))
+            trans_query = trans_query.filter(Transaction.hotel_id.in_(allowed_hotel_ids))
+        
+        total_items = items_query.count()
+        today_trans = trans_query.count()
         
         return jsonify({
             'total_items': total_items,

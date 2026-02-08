@@ -11,7 +11,7 @@ from datetime import datetime
 from flask import Flask, redirect, url_for, jsonify
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
-from sqlalchemy import event
+from sqlalchemy import event, text
 from sqlalchemy.engine import Engine
 from config import Config
 from models import db, User
@@ -157,7 +157,7 @@ def create_app(config_class=Config):
         """Health check endpoint for monitoring and container orchestration"""
         try:
             # Check database connectivity
-            db.session.execute('SELECT 1')
+            db.session.execute(text('SELECT 1'))
             db_status = 'connected'
             db_healthy = True
         except Exception as e:

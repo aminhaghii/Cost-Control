@@ -58,6 +58,7 @@ class AuditLog(db.Model):
     RESOURCE_REPORT = 'report'
     RESOURCE_SYSTEM = 'system'
     RESOURCE_ALERT = 'alert'
+    RESOURCE_CHAT = 'chat'
     
     # Action labels in Persian
     ACTION_LABELS = {
@@ -70,7 +71,9 @@ class AuditLog(db.Model):
         'view': 'مشاهده',
         'export': 'خروجی گرفتن',
         'password_change': 'تغییر رمز عبور',
-        'role_change': 'تغییر نقش'
+        'role_change': 'تغییر نقش',
+        'chat_message': 'پیام چت',
+        'clear_history': 'پاک کردن تاریخچه چت'
     }
     
     RESOURCE_LABELS = {
@@ -79,7 +82,8 @@ class AuditLog(db.Model):
         'transaction': 'تراکنش',
         'report': 'گزارش',
         'system': 'سیستم',
-        'alert': 'هشدار'
+        'alert': 'هشدار',
+        'chat': 'چت هوشمند'
     }
     
     @property

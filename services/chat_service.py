@@ -13,20 +13,29 @@ from models.transaction import Transaction
 from models.chat_history import ChatHistory
 from models.alert import Alert
 from models.inventory_count import InventoryCount
+from models.audit_log import AuditLog
+from models.import_batch import ImportBatch
+from models.warehouse_settings import WarehouseSettings
+from models.user_hotel import UserHotel
 from models.transaction import WASTE_REASONS, DEPARTMENTS
 from services.pareto_service import ParetoService
 from services.abc_service import ABCService
 from services.warehouse_service import WarehouseService
 from services.waste_analysis_service import WasteAnalysisService
 from services.inventory_count_service import InventoryCountService
+from services.ai_service import AIService
 from services.hotel_scope_service import get_allowed_hotel_ids, get_user_hotels
 from utils.decimal_utils import to_decimal
 from decimal import Decimal
 import jdatetime
 import os
+import json
+import logging
 import requests
 from dotenv import load_dotenv
 from utils.timezone import get_iran_now, get_iran_today
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -41,7 +50,8 @@ class ChatService:
     
     def process_message(self, message: str, user_id: int = None, user=None) -> dict:
         """Process user message with conversation memory
-        P0-9: Uses scoped context based on user's allowed hotels"""
+        P0-9: Uses scoped context based on user's allowed hotels
+        FULL SYSTEM: Connected to all databases, logs, users, transactions"""
         try:
             # Get database context (scoped to user's hotels)
             db_context = self._get_full_database_context(user=user)
@@ -60,6 +70,9 @@ class ChatService:
                     ChatHistory.add_message(user_id, 'user', message)
                     ChatHistory.add_message(user_id, 'assistant', response)
                 
+                # Audit log: record chat interaction (without content for privacy)
+                self._log_chat_audit(user, 'chat_message', f'msg_len={len(message)}, resp_len={len(response)}')
+                
                 return {
                     'success': True,
                     'response': response,
@@ -74,20 +87,37 @@ class ChatService:
                 
         except Exception as e:
             # Bug #16: Don't expose internal errors to users
-            print(f"Error in process_message: {str(e)}")
+            logger.error(f"Error in process_message: {str(e)}")
             return {
                 'success': False,
                 'response': 'خطایی در پردازش پیام رخ داد. لطفاً دوباره تلاش کنید.',
                 'suggestions': ['کمک', 'خلاصه وضعیت']
             }
     
-    def clear_history(self, user_id: int) -> dict:
+    def clear_history(self, user_id: int, user=None) -> dict:
         """Clear chat history for a user"""
         try:
             ChatHistory.clear_user_history(user_id)
+            self._log_chat_audit(user, 'clear_history', f'user_id={user_id}')
             return {'success': True, 'message': 'تاریخچه گفتگو پاک شد.'}
         except Exception as e:
-            return {'success': False, 'message': f'خطا: {str(e)}'}
+            logger.error(f"Error clearing history: {str(e)}")
+            return {'success': False, 'message': 'خطا در پاک کردن تاریخچه'}
+    
+    @staticmethod
+    def _log_chat_audit(user, action: str, details: str = None):
+        """Log chat actions to AuditLog for full system traceability"""
+        try:
+            if user:
+                AuditLog.log(
+                    user=user,
+                    action=action,
+                    resource_type='chat',
+                    description=details
+                )
+                db.session.commit()
+        except Exception as e:
+            logger.warning(f"Failed to log chat audit: {e}")
     
     def get_history(self, user_id: int, limit: int = 50) -> list:
         """Get chat history for a user"""
@@ -97,7 +127,7 @@ class ChatService:
     def _call_groq(self, message: str, db_context: str, history: list = None) -> str:
         """Call GROQ API with database context and conversation history"""
         if not self.api_key:
-            print("ERROR: GROQ_API_KEY not found in environment")
+            logger.error("GROQ_API_KEY not found in environment")
             return None
         
         headers = {
@@ -165,28 +195,35 @@ class ChatService:
                 timeout=30
             )
             
-            print(f"GROQ Status: {response.status_code}")
+            logger.info(f"GROQ Status: {response.status_code}")
             
             if response.status_code == 200:
                 return response.json()['choices'][0]['message']['content']
             else:
-                print(f"GROQ Error: {response.text}")
+                logger.error(f"GROQ Error: {response.text}")
                 return None
                 
         except Exception as e:
-            print(f"GROQ Exception: {str(e)}")
+            logger.error(f"GROQ Exception: {str(e)}")
             return None
     
     def _get_full_database_context(self, user=None) -> str:
         """Get comprehensive database context for GROQ
+        FULL SYSTEM CONNECTION: databases, logs, users, transactions, imports, settings
         P0-9: Scoped to user's allowed hotels"""
         try:
             from models.hotel import Hotel
+            from models.user import User, ROLE_LABELS
             
             persian_date = jdatetime.date.today().strftime('%Y/%m/%d')
+            iran_now = get_iran_now()
+            iran_today = get_iran_today()
             
             # P0-9: Get allowed hotel IDs for scoping
             allowed_hotel_ids = get_allowed_hotel_ids(user) if user else None
+            
+            # ═══ USER CONTEXT ═══
+            user_context = self._get_user_context(user)
             
             # Build scoped queries
             items_query = Item.query
@@ -210,12 +247,12 @@ class ChatService:
                     Transaction.is_deleted != True
                 ).count()
                 if h_items > 0 or h_trans > 0:
-                    hotels_info.append(f"  - {hotel.hotel_name}: {h_items} item, {h_trans} transaction")
+                    hotels_info.append(f"  - {hotel.hotel_name}: {h_items} کالا, {h_trans} تراکنش")
             
-            hotels_summary = '\n'.join(hotels_info) if hotels_info else "  (No data available)"
+            hotels_summary = '\n'.join(hotels_info) if hotels_info else "  (داده‌ای موجود نیست)"
             
             # Transaction stats (30 days, scoped)
-            start_date = get_iran_now() - timedelta(days=30)
+            start_date = iran_now - timedelta(days=30)
             
             base_tx_filter = [
                 Transaction.transaction_date >= start_date,
@@ -245,7 +282,7 @@ class ChatService:
             waste_dec = to_decimal(waste_raw)
             waste_ratio = (waste_dec / purchases_dec * Decimal('100')) if purchases_dec > 0 else Decimal('0')
             
-            today_filter = [func.date(Transaction.transaction_date) == get_iran_today()]
+            today_filter = [func.date(Transaction.transaction_date) == iran_today]
             if allowed_hotel_ids is not None:
                 today_filter.append(Transaction.hotel_id.in_(allowed_hotel_ids))
             today_trans = Transaction.query.filter(*today_filter).count()
@@ -263,21 +300,49 @@ class ChatService:
             class_b_items = self._format_class_items(food_abc.get('B', [])[:5])
             class_c_items = self._format_class_items(food_abc.get('C', [])[:5])
             
-            # Top items
-            top_purchases = self._get_top_items('خرید', 5)
-            top_waste = self._get_top_items('ضایعات', 5)
+            # Top items (scoped to user)
+            top_purchases = self._get_top_items('خرید', 5, user=user)
+            top_waste = self._get_top_items('ضایعات', 5, user=user)
             
-            # ═══ ADD ITEM INVENTORY DETAILS ═══
-            # Get top 20 items with their current stock for AI context
+            # ═══ ITEM INVENTORY DETAILS ═══
             top_items_with_stock = self._get_items_with_stock(items_query, limit=20)
             
-            # ═══ ADD WAREHOUSE CONTEXT ═══
+            # ═══ WAREHOUSE CONTEXT ═══
             warehouse_ctx = self._get_warehouse_context(user, allowed_hotel_ids)
+            
+            # ═══ NEW: DEAD STOCK ANALYSIS ═══
+            dead_stock_ctx = self._get_dead_stock_context(allowed_hotel_ids)
+            
+            # ═══ NEW: WASTE TREND (multi-month) ═══
+            waste_trend_ctx = self._get_waste_trend_context(allowed_hotel_ids)
+            
+            # ═══ NEW: WAREHOUSE SETTINGS ═══
+            settings_ctx = self._get_warehouse_settings_context(allowed_hotel_ids)
+            
+            # ═══ NEW: IMPORT BATCH CONTEXT ═══
+            import_ctx = self._get_import_context(allowed_hotel_ids)
+            
+            # ═══ NEW: RECENT AUDIT LOG ACTIVITY ═══
+            audit_ctx = self._get_audit_context(user)
+            
+            # ═══ NEW: RECENT STOCK MOVEMENTS ═══
+            movements_ctx = self._get_recent_movements_context(allowed_hotel_ids)
+            
+            # ═══ NEW: SYSTEM USERS SUMMARY ═══
+            users_ctx = self._get_users_context(user)
             
             context = f"""
 تاریخ: {persian_date}
+زمان: {iran_now.strftime('%H:%M')}
 
-آمار کلی:
+═══════════════════════════════════════════
+👤 اطلاعات کاربر جاری
+═══════════════════════════════════════════
+{user_context}
+
+═══════════════════════════════════════════
+📋 آمار کلی سیستم
+═══════════════════════════════════════════
 - تعداد کل اقلام: {total_items} قلم
 - اقلام غذایی: {food_items} قلم
 - اقلام غیرغذایی: {nonfood_items} قلم
@@ -286,13 +351,17 @@ class ChatService:
 🏨 توزیع بر اساس هتل:
 {hotels_summary}
 
-مالی (30 روز اخیر):
+═══════════════════════════════════════════
+💰 مالی (30 روز اخیر)
+═══════════════════════════════════════════
 - مجموع خرید: {float(purchases_dec):,.0f} ریال
 - مجموع مصرف: {float(consumption_dec):,.0f} ریال
 - مجموع ضایعات: {float(waste_dec):,.0f} ریال
 - نسبت ضایعات به خرید: {float(waste_ratio):.2f}%
 
-طبقه‌بندی ABC غذایی:
+═══════════════════════════════════════════
+📊 طبقه‌بندی ABC غذایی
+═══════════════════════════════════════════
 کلاس A (حیاتی - 80% ارزش): {food_stats['class_a_count']} قلم - {food_stats['class_a_amount']:,.0f} ریال
 {class_a_items}
 
@@ -314,12 +383,12 @@ class ChatService:
 {top_waste}
 
 ═══════════════════════════════════════════
-� موجودی کالاهای اصلی (Top Items Inventory)
+📦 موجودی کالاهای اصلی (Top Items Inventory)
 ═══════════════════════════════════════════
 {top_items_with_stock}
 
 ═══════════════════════════════════════════
-�� وضعیت انبار (Warehouse Status)
+🏭 وضعیت انبار (Warehouse Status)
 ═══════════════════════════════════════════
 موجودی بحرانی: {warehouse_ctx['stock_status']['critical_count']} قلم
 موجودی اضافی: {warehouse_ctx['stock_status']['overstocked_count']} قلم
@@ -339,8 +408,21 @@ class ChatService:
 دلایل اصلی ضایعات:
 {self._format_waste_reasons(warehouse_ctx['waste_analysis']['current_month']['by_reason'])}
 
+ضایعات بر اساس واحد مقصد:
+{self._format_waste_departments(warehouse_ctx['waste_analysis']['current_month'].get('by_department', []))}
+
 پرضایعات‌ترین کالاها:
 {self._format_top_wasted(warehouse_ctx['waste_analysis']['current_month']['top_wasted'])}
+
+═══════════════════════════════════════════
+📈 روند ضایعات (Waste Trend - 6 ماه)
+═══════════════════════════════════════════
+{waste_trend_ctx}
+
+═══════════════════════════════════════════
+💀 کالاهای راکد (Dead Stock)
+═══════════════════════════════════════════
+{dead_stock_ctx}
 
 ═══════════════════════════════════════════
 ⏳ اقدامات معلق (Pending Actions)
@@ -365,11 +447,36 @@ class ChatService:
 
 اولویت شمارش:
 {self._format_suggestions(warehouse_ctx['smart_suggestions']['count_priorities'])}
+
+═══════════════════════════════════════════
+🔄 آخرین حرکات انبار (Recent Movements)
+═══════════════════════════════════════════
+{movements_ctx}
+
+═══════════════════════════════════════════
+⚙️ تنظیمات انبار (Warehouse Settings)
+═══════════════════════════════════════════
+{settings_ctx}
+
+═══════════════════════════════════════════
+📥 آخرین واردات داده (Recent Imports)
+═══════════════════════════════════════════
+{import_ctx}
+
+═══════════════════════════════════════════
+👥 کاربران سیستم
+═══════════════════════════════════════════
+{users_ctx}
+
+═══════════════════════════════════════════
+📝 فعالیت‌های اخیر سیستم (Audit Log)
+═══════════════════════════════════════════
+{audit_ctx}
 """
             return context
             
         except Exception as e:
-            print(f"Error getting context: {str(e)}")
+            logger.error(f"Error getting context: {str(e)}")
             return "اطلاعات دیتابیس در دسترس نیست"
     
     def _format_class_items(self, items: list) -> str:
@@ -384,10 +491,10 @@ class ChatService:
             lines.append(f"  - {name}: {amount:,.0f} ریال ({pct:.1f}%)")
         return '\n'.join(lines)
     
-    def _get_top_items(self, transaction_type: str, limit: int) -> str:
-        """Get top items by transaction type"""
+    def _get_top_items(self, transaction_type: str, limit: int, user=None) -> str:
+        """Get top items by transaction type (scoped to user's hotels)"""
         try:
-            df = self.pareto_service.calculate_pareto(transaction_type, 'Food', 30)
+            df = self.pareto_service.calculate_pareto(transaction_type, 'Food', 30, user=user)
             if df.empty:
                 return "داده‌ای موجود نیست"
             
@@ -424,12 +531,12 @@ class ChatService:
             
             return '\n'.join(lines)
         except Exception as e:
-            print(f"Error getting items with stock: {e}")
+            logger.warning(f"Error getting items with stock: {e}")
             return "داده‌ای موجود نیست"
     
     def _get_avg_daily_consumption(self, item_id: int, days: int = 30) -> float:
-        """Calculate average daily consumption for an item"""
-        start_date = date.today() - timedelta(days=days)
+        """Calculate average daily consumption for an item (uses Iran timezone)"""
+        start_date = get_iran_today() - timedelta(days=days)
         
         total_consumption = db.session.query(func.sum(Transaction.quantity)).filter(
             Transaction.item_id == item_id,
@@ -504,59 +611,87 @@ class ChatService:
                 "healthy_count": len(items) - len(critical_items) - len(overstocked_items)
             }
             
-            # ═══ WASTE ANALYSIS ═══
-            today = date.today()
+            # ═══ WASTE ANALYSIS (aggregated across scoped hotels) ═══
+            today = get_iran_today()
             month_start = today.replace(day=1)
-            
-            waste_service = WasteAnalysisService()
-            # For waste analysis, use first hotel or skip if None (admin without hotel selection)
-            first_hotel_id = hotel_ids[0] if hotel_ids and len(hotel_ids) > 0 else None
-            
-            if first_hotel_id:
-                current_waste = waste_service.get_waste_summary(
-                    hotel_id=first_hotel_id,
-                    start_date=month_start,
-                    end_date=today
-                )
-                
-                waste_by_reason = waste_service.get_waste_by_reason(
-                    hotel_id=first_hotel_id,
-                    start_date=month_start,
-                    end_date=today
-                )
-                
-                top_wasted = waste_service.get_top_wasted_items(
-                    hotel_id=first_hotel_id,
-                    start_date=month_start,
-                    end_date=today,
-                    limit=5
-                )
-            else:
-                # Admin without hotel filter - aggregate across all hotels
-                from models.hotel import Hotel
-                all_hotels = Hotel.query.all()
-                if all_hotels:
-                    first_hotel_id = all_hotels[0].id
-                    current_waste = waste_service.get_waste_summary(
-                        hotel_id=first_hotel_id,
-                        start_date=month_start,
-                        end_date=today
-                    )
-                    waste_by_reason = waste_service.get_waste_by_reason(
-                        hotel_id=first_hotel_id,
-                        start_date=month_start,
-                        end_date=today
-                    )
-                    top_wasted = waste_service.get_top_wasted_items(
-                        hotel_id=first_hotel_id,
-                        start_date=month_start,
-                        end_date=today,
-                        limit=5
-                    )
-                else:
-                    current_waste = {'waste_rate': 0, 'total_waste': 0, 'status': 'unknown'}
-                    waste_by_reason = []
-                    top_wasted = []
+
+            tx_base = [
+                Transaction.transaction_date.between(month_start, today),
+                Transaction.is_deleted == False,
+            ]
+            if hotel_ids is not None:
+                tx_base.append(Transaction.hotel_id.in_(hotel_ids))
+
+            total_purchase = db.session.query(func.sum(Transaction.total_amount)).filter(
+                Transaction.transaction_type == 'خرید',
+                Transaction.is_opening_balance == False,
+                *tx_base
+            ).scalar() or Decimal(0)
+
+            total_waste = db.session.query(func.sum(Transaction.total_amount)).filter(
+                Transaction.transaction_type == 'ضایعات',
+                *tx_base
+            ).scalar() or Decimal(0)
+
+            waste_rate = (float(total_waste) / float(total_purchase) * 100) if total_purchase else 0
+            status = 'good' if waste_rate < 3 else ('warning' if waste_rate < 5 else 'critical')
+            current_waste = {
+                'total_purchase': float(total_purchase),
+                'total_waste': float(total_waste),
+                'waste_rate': round(waste_rate, 2),
+                'status': status,
+            }
+
+            # Breakdown by reason
+            reason_rows = db.session.query(
+                Transaction.waste_reason,
+                func.sum(Transaction.total_amount).label('amount')
+            ).filter(
+                Transaction.transaction_type == 'ضایعات',
+                *tx_base
+            ).group_by(Transaction.waste_reason).all()
+
+            waste_by_reason = []
+            total_waste_float = float(total_waste or 0)
+            for reason, amount in reason_rows:
+                amount_f = float(amount or 0)
+                waste_by_reason.append({
+                    'reason': reason or 'other',
+                    'amount': amount_f,
+                    'percentage': round((amount_f / total_waste_float * 100), 1) if total_waste_float else 0,
+                })
+            waste_by_reason.sort(key=lambda x: x['amount'], reverse=True)
+
+            # Breakdown by destination department
+            dept_rows = db.session.query(
+                Transaction.destination_department,
+                func.sum(Transaction.total_amount).label('amount')
+            ).filter(
+                Transaction.transaction_type == 'ضایعات',
+                Transaction.destination_department != None,
+                *tx_base
+            ).group_by(Transaction.destination_department).all()
+
+            waste_by_department = []
+            for dept, amount in dept_rows:
+                amount_f = float(amount or 0)
+                waste_by_department.append({
+                    'department': DEPARTMENTS.get(dept, dept or 'نامشخص'),
+                    'amount': amount_f,
+                    'percentage': round((amount_f / total_waste_float * 100), 1) if total_waste_float else 0,
+                })
+            waste_by_department.sort(key=lambda x: x['amount'], reverse=True)
+
+            # Top wasted items
+            top_rows = db.session.query(
+                Item.item_name_fa,
+                func.sum(Transaction.total_amount).label('amount')
+            ).join(Transaction, Transaction.item_id == Item.id).filter(
+                Transaction.transaction_type == 'ضایعات',
+                *tx_base
+            ).group_by(Item.id).order_by(func.sum(Transaction.total_amount).desc()).limit(5).all()
+
+            top_wasted = [{'item_name': name, 'waste_amount': float(amount or 0)} for name, amount in top_rows]
             
             context["waste_analysis"] = {
                 "current_month": {
@@ -572,8 +707,9 @@ class ChatService:
                         }
                         for r in waste_by_reason
                     ],
+                    "by_department": waste_by_department,
                     "top_wasted": [
-                        {"name": item['item'].item_name_fa, "amount": float(item['waste_amount'])}
+                        {"name": item['item_name'], "amount": float(item['waste_amount'])}
                         for item in top_wasted
                     ]
                 }
@@ -585,20 +721,29 @@ class ChatService:
                 Transaction.approval_status == 'pending',
                 Transaction.is_deleted == False
             )
-            if hotel_ids:
+            if hotel_ids is not None:
                 pending_txs = pending_txs.filter(Transaction.hotel_id.in_(hotel_ids))
             pending_txs = pending_txs.all()
             
+            # Items needing count across all scoped hotels
+            from models.hotel import Hotel
             count_service = InventoryCountService()
-            items_needing_count = count_service.get_items_needing_count(
-                hotel_id=first_hotel_id,
-                days_threshold=30
-            )
+            items_needing_count = []
+            if hotel_ids is not None:
+                hotel_ids_for_counts = list(hotel_ids)
+            else:
+                hotel_ids_for_counts = [h.id for h in Hotel.query.filter_by(is_active=True).all()]
+
+            for hid in hotel_ids_for_counts[:10]:
+                try:
+                    items_needing_count.extend(count_service.get_items_needing_count(hotel_id=hid, days_threshold=30))
+                except Exception:
+                    continue
             
             unresolved = InventoryCount.query.filter(
                 InventoryCount.status.in_(['pending', 'investigating'])
             )
-            if hotel_ids:
+            if hotel_ids is not None:
                 unresolved = unresolved.filter(InventoryCount.hotel_id.in_(hotel_ids))
             unresolved = unresolved.all()
             
@@ -638,7 +783,7 @@ class ChatService:
             
             # ═══ ACTIVE ALERTS ═══
             alerts = Alert.query.filter(Alert.status == 'active')
-            if hotel_ids:
+            if hotel_ids is not None:
                 alerts = alerts.filter(Alert.hotel_id.in_(hotel_ids))
             alerts = alerts.order_by(Alert.created_at.desc()).limit(10).all()
             
@@ -695,7 +840,7 @@ class ChatService:
                 )
             
         except Exception as e:
-            print(f"Error building warehouse context: {str(e)}")
+            logger.error(f"Error building warehouse context: {str(e)}")
         
         return context
     
@@ -713,6 +858,14 @@ class ChatService:
         return "\n".join([
             f"• {r['reason']}: {r['percentage']}% ({r['amount']:,.0f} ریال)"
             for r in reasons
+        ])
+
+    def _format_waste_departments(self, departments: list) -> str:
+        if not departments:
+            return "اطلاعاتی موجود نیست"
+        return "\n".join([
+            f"• {d['department']}: {d['percentage']}% ({d['amount']:,.0f} ریال)"
+            for d in departments
         ])
     
     def _format_top_wasted(self, items: list) -> str:
@@ -758,5 +911,373 @@ class ChatService:
             return ['کلاس A', 'کلاس B', 'کلاس C']
         elif any(k in msg for k in ['پارتو', 'تحلیل']):
             return ['نمودار پارتو', 'برترین خریدها', 'توصیه‌ها']
+        elif any(k in msg for k in ['راکد', 'dead', 'منجمد']):
+            return ['سرمایه منجمد', 'کالاهای بدون مصرف', 'پیشنهاد خرید']
+        elif any(k in msg for k in ['کاربر', 'user', 'دسترسی']):
+            return ['لیست کاربران', 'فعالیت‌های اخیر', 'خلاصه وضعیت']
+        elif any(k in msg for k in ['واردات', 'import', 'اکسل']):
+            return ['آخرین واردات', 'وضعیت داده‌ها', 'خلاصه وضعیت']
+        elif any(k in msg for k in ['تنظیمات', 'setting', 'تایید']):
+            return ['تنظیمات انبار', 'اقدامات معلق', 'خلاصه وضعیت']
         else:
             return ['خلاصه وضعیت', 'تحلیل پارتو', 'برترین خریدها', 'ضایعات']
+    
+    # ═══════════════════════════════════════════════════════════════
+    # NEW: Full System Context Methods
+    # ═══════════════════════════════════════════════════════════════
+    
+    def _get_user_context(self, user) -> str:
+        """Get current user's context for AI personalization"""
+        try:
+            if not user:
+                return "کاربر ناشناس"
+            
+            from models.user import ROLE_LABELS
+            
+            role_label = ROLE_LABELS.get(user.role, user.role)
+            hotels = get_user_hotels(user)
+            allowed_ids = get_allowed_hotel_ids(user)
+            if allowed_ids is not None:
+                hotel_names = 'همه هتل‌ها'
+            elif not hotels:
+                hotel_names = 'هیچ هتل'
+            else:
+                hotel_names = ', '.join([h.hotel_name for h in hotels])
+            
+            # Count user's recent transactions
+            recent_tx_count = Transaction.query.filter(
+                Transaction.user_id == user.id,
+                Transaction.transaction_date >= get_iran_today() - timedelta(days=7),
+                Transaction.is_deleted == False
+            ).count()
+            
+            lines = [
+                f"نام: {user.full_name or user.username}",
+                f"نقش: {role_label}",
+                f"بخش: {user.department or 'مشخص نشده'}",
+                f"هتل‌های مجاز: {hotel_names}",
+                f"سطح دسترسی: {'مدیر سیستم (دسترسی کامل)' if user.is_admin() else 'مدیر انبار' if user.is_manager() else 'کارمند'}",
+                f"تراکنش‌های 7 روز اخیر کاربر: {recent_tx_count}",
+            ]
+            return '\n'.join(lines)
+        except Exception as e:
+            logger.warning(f"Error getting user context: {e}")
+            return "اطلاعات کاربر در دسترس نیست"
+    
+    def _get_dead_stock_context(self, hotel_ids) -> str:
+        """Get dead stock analysis (scoped to allowed hotels when provided)"""
+        try:
+            today = get_iran_today()
+            cutoff_date = today - timedelta(days=60)
+
+            query = Item.query.filter(
+                Item.is_active == True,
+                Item.current_stock > 0
+            )
+            if hotel_ids is not None:
+                query = query.filter(Item.hotel_id.in_(hotel_ids))
+
+            items = query.all()
+
+            dead_items = []
+            total_frozen_capital = 0
+
+            for item in items:
+                last_consumption = db.session.query(
+                    func.max(Transaction.transaction_date)
+                ).filter(
+                    Transaction.item_id == item.id,
+                    Transaction.transaction_type == 'مصرف',
+                    Transaction.is_deleted == False
+                ).scalar()
+
+                is_dead = False
+                days_inactive = None
+
+                if last_consumption is None:
+                    is_dead = True
+                    days_inactive = (today - item.created_at.date()).days if item.created_at else 999
+                elif last_consumption < cutoff_date:
+                    is_dead = True
+                    days_inactive = (today - last_consumption).days
+
+                if is_dead:
+                    current_stock = float(item.current_stock or 0)
+                    unit_price = float(item.unit_price or 0)
+                    frozen_value = current_stock * unit_price
+                    total_frozen_capital += frozen_value
+
+                    dead_items.append({
+                        'item_id': item.id,
+                        'item_name': item.item_name_fa,
+                        'unit': item.unit,
+                        'current_stock': current_stock,
+                        'frozen_value': frozen_value,
+                        'days_inactive': days_inactive,
+                        'status': 'never_used' if last_consumption is None else 'inactive'
+                    })
+
+            dead_items.sort(key=lambda x: x['frozen_value'], reverse=True)
+
+            if not dead_items:
+                return "هیچ کالای راکدی یافت نشد ✅"
+            
+            lines = [
+                f"تعداد کالاهای راکد (بدون مصرف 60+ روز): {len(dead_items)} قلم",
+                f"سرمایه منجمد: {total_frozen_capital:,.0f} ریال",
+                "",
+                "کالاهای راکد اصلی:"
+            ]
+            
+            for item in dead_items[:7]:
+                status = "هرگز مصرف نشده" if item['status'] == 'never_used' else f"{item['days_inactive']} روز بدون مصرف"
+                lines.append(
+                    f"  - {item['item_name']}: {item['current_stock']:.1f} {item['unit']} "
+                    f"(ارزش: {item['frozen_value']:,.0f} ریال) [{status}]"
+                )
+            
+            return '\n'.join(lines)
+        except Exception as e:
+            logger.warning(f"Error getting dead stock context: {e}")
+            return "اطلاعات کالاهای راکد در دسترس نیست"
+    
+    def _get_waste_trend_context(self, hotel_ids: list) -> str:
+        """Get multi-month waste trend from WasteAnalysisService"""
+        try:
+            from datetime import timedelta
+            
+            trend = []
+            today = get_iran_today()
+            
+            for i in range(6 - 1, -1, -1):
+                target_date = today - timedelta(days=i * 30)
+                month_start = date(target_date.year, target_date.month, 1)
+                if target_date.month == 12:
+                    month_end = date(target_date.year + 1, 1, 1) - timedelta(days=1)
+                else:
+                    month_end = date(target_date.year, target_date.month + 1, 1) - timedelta(days=1)
+                
+                base = [
+                    Transaction.transaction_date.between(month_start, month_end),
+                    Transaction.is_deleted == False,
+                ]
+                if hotel_ids is not None:
+                    base.append(Transaction.hotel_id.in_(hotel_ids))
+                
+                waste = db.session.query(func.sum(Transaction.total_amount)).filter(
+                    Transaction.transaction_type == 'ضایعات',
+                    *base
+                ).scalar() or 0
+                
+                purchase = db.session.query(func.sum(Transaction.total_amount)).filter(
+                    Transaction.transaction_type == 'خرید',
+                    Transaction.is_opening_balance == False,
+                    *base
+                ).scalar() or 0
+                
+                rate = (float(waste) / float(purchase) * 100) if purchase else 0
+                trend.append({
+                    'month': month_start.strftime('%Y-%m'),
+                    'waste_amount': float(waste),
+                    'purchase_amount': float(purchase),
+                    'waste_rate': round(rate, 2),
+                })
+            
+            if not trend:
+                return "داده‌ای موجود نیست"
+            
+            lines = []
+            for month_data in trend:
+                rate = month_data['waste_rate']
+                status_icon = "✅" if rate < 3 else ("⚠️" if rate < 5 else "🔴")
+                lines.append(
+                    f"  - {month_data['month']}: نرخ ضایعات {rate}% {status_icon} "
+                    f"(ضایعات: {month_data['waste_amount']:,.0f} ریال, خرید: {month_data['purchase_amount']:,.0f} ریال)"
+                )
+            
+            # Add trend direction
+            if len(trend) >= 2:
+                first_rate = trend[0]['waste_rate']
+                last_rate = trend[-1]['waste_rate']
+                if last_rate > first_rate * 1.1:
+                    lines.append("\n⚠️ روند ضایعات: افزایشی - نیاز به توجه فوری")
+                elif last_rate < first_rate * 0.9:
+                    lines.append("\n✅ روند ضایعات: کاهشی - عملکرد خوب")
+                else:
+                    lines.append("\nروند ضایعات: ثابت")
+            
+            return '\n'.join(lines)
+        except Exception as e:
+            logger.warning(f"Error getting waste trend context: {e}")
+            return "اطلاعات روند ضایعات در دسترس نیست"
+    
+    def _get_warehouse_settings_context(self, hotel_ids: list) -> str:
+        """Get warehouse settings for AI context"""
+        try:
+            from models.hotel import Hotel
+            
+            hotels = []
+            if hotel_ids is not None:
+                if len(hotel_ids) == 0:
+                    return "تنظیماتی موجود نیست"
+                hotels = Hotel.query.filter(Hotel.id.in_(hotel_ids)).all()
+            else:
+                hotels = Hotel.query.filter_by(is_active=True).all()
+            
+            if not hotels:
+                return "تنظیماتی موجود نیست"
+            
+            lines = []
+            for hotel in hotels[:3]:  # Limit to 3 hotels
+                settings = WarehouseSettings.query.filter_by(hotel_id=hotel.id).first()
+                if settings:
+                    lines.append(f"  {hotel.hotel_name}:")
+                    lines.append(f"    - آستانه تایید ضایعات: {float(settings.waste_approval_threshold or 0):,.0f} ریال")
+                    lines.append(f"    - آستانه تایید اصلاحی: {float(settings.adjustment_approval_threshold or 0):.1f} واحد")
+                    lines.append(f"    - آستانه هشدار ضایعات: {float(settings.waste_alert_percentage or 0):.1f}%")
+                    lines.append(f"    - فرکانس شمارش: هر {settings.count_frequency_days or 30} روز")
+                    lines.append(f"    - آخرین شمارش کامل: {settings.last_full_count_date or 'انجام نشده'}")
+                    needs = "بله ⚠️" if settings.needs_count() else "خیر ✅"
+                    lines.append(f"    - نیاز به شمارش: {needs}")
+                else:
+                    lines.append(f"  {hotel.hotel_name}: تنظیمات پیش‌فرض (بدون سفارشی‌سازی)")
+            
+            return '\n'.join(lines)
+        except Exception as e:
+            logger.warning(f"Error getting warehouse settings context: {e}")
+            return "اطلاعات تنظیمات در دسترس نیست"
+    
+    def _get_import_context(self, hotel_ids: list) -> str:
+        """Get recent data import batches for AI context"""
+        try:
+            query = ImportBatch.query.filter_by(is_active=True)
+            if hotel_ids is not None:
+                if len(hotel_ids) == 0:
+                    return "هیچ واردات داده‌ای ثبت نشده است"
+                query = query.filter(ImportBatch.hotel_id.in_(hotel_ids))
+            
+            recent_imports = query.order_by(ImportBatch.created_at.desc()).limit(5).all()
+            
+            if not recent_imports:
+                return "هیچ واردات داده‌ای ثبت نشده است"
+            
+            lines = []
+            for batch in recent_imports:
+                date_str = batch.created_at.strftime('%Y/%m/%d %H:%M') if batch.created_at else 'نامشخص'
+                uploader = batch.uploaded_by.full_name if batch.uploaded_by else 'نامشخص'
+                lines.append(
+                    f"  - {batch.filename} ({date_str}): "
+                    f"{batch.items_created} کالای جدید, {batch.items_updated} بروزرسانی, "
+                    f"{batch.transactions_created} تراکنش, {batch.errors_count} خطا "
+                    f"[وضعیت: {batch.status}] [توسط: {uploader}]"
+                )
+            
+            return '\n'.join(lines)
+        except Exception as e:
+            logger.warning(f"Error getting import context: {e}")
+            return "اطلاعات واردات در دسترس نیست"
+    
+    def _get_audit_context(self, user) -> str:
+        """Get recent audit log entries for AI context (admin sees all; others only own logs)"""
+        try:
+            if not user:
+                return "اطلاعات فعالیت‌ها در دسترس نیست"
+
+            query = AuditLog.query
+            if not user.is_admin():
+                query = query.filter(AuditLog.user_id == user.id)
+
+            recent_logs = query.order_by(AuditLog.created_at.desc()).limit(10).all()
+            
+            if not recent_logs:
+                return "فعالیتی ثبت نشده است"
+            
+            lines = []
+            for log in recent_logs:
+                date_str = log.created_at.strftime('%m/%d %H:%M') if log.created_at else ''
+                action_label = AuditLog.ACTION_LABELS.get(log.action, log.action)
+                resource_label = AuditLog.RESOURCE_LABELS.get(log.resource_type, log.resource_type)
+                lines.append(
+                    f"  - [{date_str}] {log.username} ({log.user_role}): "
+                    f"{action_label} {resource_label}"
+                    f"{' - ' + log.resource_name if log.resource_name else ''}"
+                )
+            
+            return '\n'.join(lines)
+        except Exception as e:
+            logger.warning(f"Error getting audit context: {e}")
+            return "اطلاعات فعالیت‌ها در دسترس نیست"
+    
+    def _get_recent_movements_context(self, hotel_ids: list) -> str:
+        """Get recent stock movements for AI context"""
+        try:
+            query = Transaction.query.filter(Transaction.is_deleted == False)
+            if hotel_ids is not None:
+                query = query.filter(Transaction.hotel_id.in_(hotel_ids))
+            
+            recent = query.order_by(Transaction.created_at.desc()).limit(10).all()
+            
+            if not recent:
+                return "حرکتی ثبت نشده است"
+            
+            lines = []
+            for tx in recent:
+                date_str = tx.transaction_date.strftime('%m/%d') if tx.transaction_date else ''
+                item_name = tx.item.item_name_fa if tx.item else 'نامشخص'
+                user_name = tx.user.full_name if tx.user else 'نامشخص'
+                amount_str = f"{float(tx.total_amount or 0):,.0f}" if tx.total_amount else '0'
+                
+                direction_icon = "📥" if tx.direction == 1 else "📤"
+                lines.append(
+                    f"  - [{date_str}] {direction_icon} {tx.transaction_type}: "
+                    f"{item_name} - {tx.quantity:.1f} {tx.unit or ''} "
+                    f"({amount_str} ریال) [توسط: {user_name}]"
+                )
+            
+            return '\n'.join(lines)
+        except Exception as e:
+            logger.warning(f"Error getting movements context: {e}")
+            return "اطلاعات حرکات در دسترس نیست"
+    
+    def _get_users_context(self, user) -> str:
+        """Get system users summary for AI context (admin only)"""
+        try:
+            from models.user import User, ROLE_LABELS
+            
+            # Only show user details to admin
+            if not user or not user.is_admin():
+                return "فقط مدیر سیستم دسترسی به اطلاعات کاربران دارد"
+            
+            users = User.query.filter_by(is_active=True).all()
+            
+            if not users:
+                return "کاربری ثبت نشده است"
+            
+            # Summary
+            total = len(users)
+            admins = sum(1 for u in users if u.role == 'admin')
+            managers = sum(1 for u in users if u.role == 'manager')
+            staff = sum(1 for u in users if u.role == 'staff')
+            
+            lines = [
+                f"تعداد کل کاربران فعال: {total}",
+                f"  - مدیر سیستم: {admins}",
+                f"  - مدیر انبار: {managers}",
+                f"  - کارمند: {staff}",
+                "",
+                "لیست کاربران:"
+            ]
+            
+            for u in users[:10]:
+                role_label = ROLE_LABELS.get(u.role, u.role)
+                last_login = u.last_login.strftime('%Y/%m/%d %H:%M') if u.last_login else 'هرگز'
+                locked = " [🔒 قفل]" if u.is_locked() else ""
+                twofa = " [2FA]" if u.is_2fa_enabled else ""
+                lines.append(
+                    f"  - {u.full_name or u.username} ({role_label}){locked}{twofa} - آخرین ورود: {last_login}"
+                )
+            
+            return '\n'.join(lines)
+        except Exception as e:
+            logger.warning(f"Error getting users context: {e}")
+            return "اطلاعات کاربران در دسترس نیست"
