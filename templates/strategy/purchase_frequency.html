@@ -1,0 +1,79 @@
+{% extends 'strategy/base_strategy.html' %}
+{% block title %}تکرار خرید{% endblock %}
+{% block strategy_help_title %}راهنمای کامل تحلیل تکرار خرید{% endblock %}
+{% block strategy_help_body %}
+<h6>هدف این تحلیل چیست؟</h6>
+<p>این تحلیل ریتم سفارش کالاها را نشان می‌دهد؛ یعنی هر کالا با چه فاصله زمانی و چه تعداد دفعات خریداری می‌شود. خروجی آن برای تنظیم نقطه سفارش و جلوگیری از کمبود یا خرید اضافه بسیار کاربردی است.</p>
+
+<h6>شاخص‌های کلیدی</h6>
+<ul>
+    <li><strong>تعداد خرید:</strong> هر کالا در بازه انتخابی چند بار خرید شده است.</li>
+    <li><strong>میانگین فاصله (روز):</strong> بین دو خرید متوالی یک کالا به طور میانگین چند روز فاصله بوده است.</li>
+    <li><strong>کالاهای تک‌خرید:</strong> اقلامی که تنها یک‌بار خرید شده‌اند و داده ریتم آن‌ها ضعیف‌تر است.</li>
+    <li><strong>طبقه تکرار:</strong> برچسبی مثل بسیار مکرر/مکرر/متوسط/کم‌تکرار برای تصمیم‌گیری سریع.</li>
+</ul>
+
+<h6>نحوه تفسیر خروجی</h6>
+<ul>
+    <li>نمودار میله‌ای نشان می‌دهد کدام کالاها بیشترین تعداد خرید را داشته‌اند.</li>
+    <li>در جدول، اگر تعداد خرید بالا و فاصله زمانی کوتاه باشد، کالا برای عملیات روزمره حیاتی‌تر است.</li>
+    <li>کالاهای کم‌تکرار اما پرهزینه باید جداگانه از منظر سیاست خرید بررسی شوند.</li>
+</ul>
+
+<h6>اقدام مدیریتی پیشنهادی</h6>
+<ul>
+    <li>برای کالاهای بسیار مکرر، نقطه سفارش خودکار و حداقل موجودی ایمن تعریف کنید.</li>
+    <li>برای کالاهای کم‌تکرار، از خرید مازاد جلوگیری و خرید را نزدیک زمان مصرف انجام دهید.</li>
+    <li>با ترکیب این تحلیل و ABC، روی کالاهای پرتکرار و پرارزش تمرکز مدیریتی بیشتری بگذارید.</li>
+</ul>
+{% endblock %}
+{% block strategy_content %}
+<div class="page-header"><h2><i class="fas fa-redo text-info me-2"></i> تکرار خرید / ریتم سفارش</h2></div>
+
+{% if result.summary and result.summary.total_items > 0 %}
+<div class="row g-3 mb-4">
+    <div class="col-md-3"><div class="kpi-card info"><div class="kpi-value">{{ result.summary.most_frequent_count }}</div><div class="kpi-label">{{ result.summary.most_frequent }}</div></div></div>
+    <div class="col-md-3"><div class="kpi-card primary"><div class="kpi-value">{{ result.summary.avg_interval }}</div><div class="kpi-label">میانگین فاصله (روز)</div></div></div>
+    <div class="col-md-3"><div class="kpi-card warning"><div class="kpi-value">{{ result.summary.single_purchase_items }}</div><div class="kpi-label">کالا با یک خرید</div></div></div>
+    <div class="col-md-3"><div class="kpi-card success"><div class="kpi-value">{{ result.summary.total_items }}</div><div class="kpi-label">کل کالاها</div></div></div>
+</div>
+
+<div class="card mb-4 strategy-chart-card">
+    <div class="card-header"><i class="fas fa-chart-bar me-2"></i> تعداد خرید هر کالا</div>
+    <div class="card-body"><canvas id="freqChart" class="strategy-chart-canvas"></canvas></div>
+</div>
+
+<div class="card">
+    <div class="card-body table-responsive">
+        <table class="table table-hover table-sm">
+            <thead><tr><th>کد</th><th>نام کالا</th><th>تعداد خرید</th><th>فاصله میانگین (روز)</th><th>مبلغ کل</th><th>طبقه</th></tr></thead>
+            <tbody>
+            {% for _, row in result.data.iterrows() %}
+            <tr>
+                <td>{{ row.item_code }}</td><td>{{ row.item_name_fa }}</td>
+                <td>{{ row.purchase_count }}</td>
+                <td>{{ row.avg_interval_days }}</td>
+                <td class="number-fa">{{ '{:,.0f}'.format(row.total_amount) }}</td>
+                <td><span class="badge {% if row.freq_class == 'بسیار مکرر' %}bg-danger{% elif row.freq_class == 'مکرر' %}bg-warning text-dark{% elif row.freq_class == 'متوسط' %}bg-info{% else %}bg-secondary{% endif %}">{{ row.freq_class }}</span></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+new Chart(document.getElementById('freqChart'), {
+    type: 'bar',
+    data: {
+        labels: {{ result.chart.labels | tojson }},
+        datasets: [{ label: 'تعداد خرید', data: {{ result.chart.counts | tojson }}, backgroundColor: '#0288D1' }]
+    },
+    options: { responsive: true, indexAxis: 'y', plugins: { legend: { display: false } } }
+});
+</script>
+{% else %}
+<div class="alert alert-info"><i class="fas fa-info-circle me-2"></i> داده کافی یافت نشد.</div>
+{% endif %}
+{% endblock %}

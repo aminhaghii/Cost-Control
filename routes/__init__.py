@@ -9,6 +9,7 @@ from .api_docs import api_docs_bp
 from .admin import admin_bp
 from .security import security_bp
 from .warehouse import warehouse_bp
+from .strategy import strategy_bp
 
 def register_blueprints(app):
     app.register_blueprint(auth_bp)
@@ -22,3 +23,4 @@ def register_blueprints(app):
     app.register_blueprint(admin_bp)
     app.register_blueprint(security_bp)
     app.register_blueprint(warehouse_bp)
+    app.register_blueprint(strategy_bp)

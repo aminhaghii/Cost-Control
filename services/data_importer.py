@@ -284,6 +284,41 @@ def standardize_unit(unit_str):
     return UNIT_MAP.get(unit_str, unit_str)
 
 
+def normalize_transaction_type(value):
+    """Normalize Persian/English transaction labels to system values."""
+    if value is None:
+        return None
+
+    text = str(value).strip().lower()
+    type_map = {
+        'خرید': 'خرید',
+        'purchase': 'خرید',
+        'buy': 'خرید',
+        'procurement': 'خرید',
+        'مصرف': 'مصرف',
+        'consume': 'مصرف',
+        'consumption': 'مصرف',
+        'ضایعات': 'ضایعات',
+        'waste': 'ضایعات',
+        'اصلاحی': 'اصلاحی',
+        'adjustment': 'اصلاحی',
+    }
+    return type_map.get(text)
+
+
+def normalize_category(value):
+    """Normalize category names to Food/NonFood."""
+    if value is None:
+        return None
+
+    text = str(value).strip().lower()
+    if text in ['food', 'مواد غذایی', 'غذایی']:
+        return 'Food'
+    if text in ['nonfood', 'non-food', 'غیرغذایی', 'غیر غذایی']:
+        return 'NonFood'
+    return None
+
+
 class DataImporter:
     """Import inventory data from Excel files with P0-2 idempotency"""
     
@@ -334,7 +369,7 @@ class DataImporter:
         
         return mapping
     
-    def import_excel(self, file_path, selected_sheets=None, allow_replace=False):
+    def import_excel(self, file_path, selected_sheets=None, allow_replace=False, import_mode='inventory'):
         """
         Import data from Excel file with P0-2 idempotency check
         P1-FIX: Uses nested transaction for proper rollback on failure
@@ -343,6 +378,7 @@ class DataImporter:
             file_path: Path to Excel file
             selected_sheets: List of sheet names to import (None = all)
             allow_replace: If True, replace existing import batch
+            import_mode: 'inventory' (legacy) or 'pareto_transactions'
         
         Returns:
             dict with import statistics
@@ -440,7 +476,10 @@ class DataImporter:
                     results = []
                     
                     for sheet_name in sheet_names:
-                        result = self._import_sheet(excel_file, sheet_name)
+                        if import_mode == 'pareto_transactions':
+                            result = self._import_pareto_transactions_sheet(excel_file, sheet_name)
+                        else:
+                            result = self._import_sheet(excel_file, sheet_name)
                         results.append(result)
                     
                     # Update batch stats
@@ -453,7 +492,8 @@ class DataImporter:
                         self.import_batch.error_details = json.dumps(self.row_errors[:100], ensure_ascii=False)
                     
                     # P0-1/P0-2: Create initial stock transactions for imported stock
-                    self.create_initial_stock_transactions(self.user_id or 1)
+                    if import_mode != 'pareto_transactions':
+                        self.create_initial_stock_transactions(self.user_id or 1)
                     
                     # Commit the nested transaction (savepoint)
                     nested.commit()
@@ -462,6 +502,7 @@ class DataImporter:
                     
                     return {
                         'success': True,
+                        'import_mode': import_mode,
                         'batch_id': self.import_batch.id,
                         'total_items': self.imported_items,
                         'items_updated': self.updated_items,
@@ -495,6 +536,193 @@ class DataImporter:
             logging.getLogger(__name__).error(f"Import failed and rolled back: {str(e)}")
             
             return {'success': False, 'error': str(e)}
+
+    def _detect_transaction_columns(self, df):
+        """Detect transaction-oriented columns for Pareto import."""
+        columns = {}
+
+        for col in df.columns:
+            col_str = str(col).strip().lower()
+
+            if any(x in col_str for x in ['کد کالا', 'item code', 'item_code', 'code']):
+                columns['item_code'] = col
+            elif any(x in col_str for x in ['نام کالا', 'شرح', 'item name', 'name']):
+                columns['item_name'] = col
+            elif any(x in col_str for x in ['نوع تراکنش', 'transaction type', 'type']):
+                columns['transaction_type'] = col
+            elif any(x in col_str for x in ['گروه', 'category']):
+                columns['category'] = col
+            elif any(x in col_str for x in ['قیمت واحد', 'unit price', 'price']):
+                columns['unit_price'] = col
+            elif any(x in col_str for x in ['مقدار', 'تعداد', 'quantity', 'qty']):
+                columns['quantity'] = col
+            elif any(x in col_str for x in ['واحد', 'unit']) and 'قیمت' not in col_str and 'price' not in col_str:
+                columns['unit'] = col
+            elif any(x in col_str for x in ['مبلغ کل', 'total amount', 'amount', 'value']):
+                columns['total_amount'] = col
+            elif any(x in col_str for x in ['تاریخ', 'date', 'transaction date']):
+                columns['transaction_date'] = col
+            elif any(x in col_str for x in ['توضیحات', 'description', 'desc']):
+                columns['description'] = col
+
+        return columns
+
+    def _resolve_item_for_transaction(self, row, columns):
+        """Resolve existing item by code/name or create it if not found."""
+        item_code = row.get(columns.get('item_code')) if columns.get('item_code') else None
+        item_name = row.get(columns.get('item_name')) if columns.get('item_name') else None
+
+        if item_name is not None:
+            item_name = str(item_name).strip()
+        if item_code is not None:
+            item_code = str(item_code).strip()
+
+        query = Item.query
+        if self.hotel_id:
+            query = query.filter_by(hotel_id=self.hotel_id)
+
+        item = None
+        if item_code:
+            item = query.filter_by(item_code=item_code).first()
+        if not item and item_name:
+            item = query.filter_by(item_name_fa=item_name).first()
+
+        if item:
+            return item
+
+        if not item_name:
+            raise ValueError('نام کالا برای ردیف تراکنش الزامی است')
+
+        category_value = row.get(columns.get('category')) if columns.get('category') else None
+        unit_value = row.get(columns.get('unit')) if columns.get('unit') else 'عدد'
+
+        category = normalize_category(category_value) or self._guess_category(item_name)
+        unit = standardize_unit(unit_value)
+
+        return self._get_or_create_item(
+            name=item_name,
+            unit=unit,
+            category=category,
+            current_stock=0,
+            weekly_consumption=0,
+            monthly_consumption=0,
+            hotel='pareto_import'
+        )
+
+    def _parse_transaction_date(self, value):
+        """Parse transaction date from Excel values."""
+        if value is None or value == '' or pd.isna(value):
+            return get_iran_today()
+
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, date):
+            return value
+
+        text = str(value).strip()
+        date_formats = ['%Y-%m-%d', '%Y/%m/%d', '%d/%m/%Y', '%d-%m-%Y']
+        for fmt in date_formats:
+            try:
+                return datetime.strptime(text, fmt).date()
+            except ValueError:
+                continue
+
+        parsed = pd.to_datetime(text, errors='coerce')
+        if pd.notna(parsed):
+            return parsed.date()
+
+        raise ValueError(f'فرمت تاریخ نامعتبر است: {value}')
+
+    def _import_pareto_transactions_sheet(self, excel_file, sheet_name):
+        """Import transaction rows from Excel for Pareto analysis."""
+        try:
+            df = pd.read_excel(excel_file, sheet_name=sheet_name)
+            if df.empty:
+                return {'sheet': sheet_name, 'status': 'empty', 'transactions': 0}
+
+            columns = self._detect_transaction_columns(df)
+            required = ['quantity', 'unit_price']
+            missing_required = [c for c in required if not columns.get(c)]
+            if missing_required:
+                self.warnings.append(
+                    f"شیت {sheet_name}: ستون‌های الزامی تراکنش یافت نشد: {', '.join(missing_required)}"
+                )
+                return {'sheet': sheet_name, 'status': 'no_required_columns', 'transactions': 0}
+
+            imported_count = 0
+            skipped_count = 0
+
+            for idx, row in df.iterrows():
+                row_number = int(idx) + 2
+                try:
+                    item = self._resolve_item_for_transaction(row, columns)
+                    if not item:
+                        skipped_count += 1
+                        continue
+
+                    raw_type = row.get(columns.get('transaction_type')) if columns.get('transaction_type') else 'خرید'
+                    transaction_type = normalize_transaction_type(raw_type) or 'خرید'
+
+                    quantity = clean_number_robust(row.get(columns['quantity']))
+                    unit_price = clean_number_robust(row.get(columns['unit_price']))
+                    total_amount = clean_number_robust(row.get(columns['total_amount'])) if columns.get('total_amount') else None
+
+                    if quantity is None or quantity <= 0:
+                        raise ValueError('مقدار باید بیشتر از صفر باشد')
+                    if unit_price is None or unit_price < 0:
+                        raise ValueError('قیمت واحد نامعتبر است')
+
+                    category_value = row.get(columns.get('category')) if columns.get('category') else None
+                    tx_category = normalize_category(category_value) or item.category
+                    tx_date = self._parse_transaction_date(row.get(columns.get('transaction_date')) if columns.get('transaction_date') else None)
+                    description = row.get(columns.get('description')) if columns.get('description') else None
+                    tx_unit = standardize_unit(row.get(columns.get('unit'))) if columns.get('unit') else (item.unit or 'عدد')
+
+                    tx = Transaction.create_transaction(
+                        item_id=item.id,
+                        transaction_type=transaction_type,
+                        quantity=quantity,
+                        unit_price=unit_price,
+                        category=tx_category,
+                        hotel_id=item.hotel_id,
+                        user_id=self.user_id or 1,
+                        description=str(description).strip() if description and not pd.isna(description) else 'Imported from Excel (Pareto)',
+                        source='pareto_excel_import',
+                        import_batch_id=self.import_batch.id if self.import_batch else None,
+                        unit=tx_unit,
+                        allow_price_override=True,
+                        price_override_reason='Excel Pareto import'
+                    )
+                    tx.transaction_date = tx_date
+
+                    # If PMS file has an explicit total amount, trust it for spend analytics.
+                    if total_amount is not None and total_amount >= 0:
+                        tx.total_amount = Decimal(str(total_amount)).quantize(Decimal('0.01'))
+
+                    db.session.add(tx)
+
+                    # Keep stock aligned with imported transactions
+                    item.current_stock = float(item.current_stock or 0) + float(tx.signed_quantity)
+
+                    self.imported_transactions += 1
+                    imported_count += 1
+                except Exception as row_error:
+                    skipped_count += 1
+                    err = f'شیت {sheet_name} ردیف {row_number}: {str(row_error)}'
+                    self.errors.append(err)
+                    self.row_errors.append({'sheet': sheet_name, 'row': row_number, 'error': str(row_error)})
+
+            db.session.flush()
+
+            return {
+                'sheet': sheet_name,
+                'status': 'success',
+                'transactions': imported_count,
+                'skipped': skipped_count
+            }
+        except Exception as e:
+            self.errors.append(f"شیت {sheet_name}: {str(e)}")
+            return {'sheet': sheet_name, 'status': 'error', 'error': str(e), 'transactions': 0}
     
     def _import_sheet(self, excel_file, sheet_name):
         """Import data from a single sheet"""
@@ -595,8 +823,8 @@ class DataImporter:
             if any(x in col_str for x in ['شرح', 'نام کالا', 'کالا']):
                 columns['name'] = col
             
-            # Unit column
-            elif 'واحد' in col_str:
+            # Unit column (exclude 'قیمت واحد' which is the price column)
+            elif 'واحد' in col_str and 'قیمت' not in col_str and 'price' not in col_str:
                 columns['unit'] = col
             
             # Stock column

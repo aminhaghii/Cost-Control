@@ -13,6 +13,8 @@
             <i class="fas fa-boxes me-1"></i> مشاهده کالاها
         </a>
     </div>
+
+{% set is_pareto_import = (import_mode == 'pareto_transactions' or result.import_mode == 'pareto_transactions') %}
 </div>
 
 <!-- Summary Cards -->
@@ -20,8 +22,8 @@
     <div class="col-md-3">
         <div class="card bg-success text-white">
             <div class="card-body text-center">
-                <h3 class="mb-0">{{ result.total_items }}</h3>
-                <small>کالای وارد شده</small>
+                <h3 class="mb-0">{{ result.total_transactions if is_pareto_import else result.total_items }}</h3>
+                <small>{{ 'تراکنش وارد شده' if is_pareto_import else 'کالای وارد شده' }}</small>
             </div>
         </div>
     </div>
@@ -64,8 +66,8 @@
                         <th>#</th>
                         <th>نام شیت</th>
                         <th>وضعیت</th>
-                        <th>تعداد کالا</th>
-                        <th>دسته‌بندی</th>
+                        <th>{{ 'تعداد تراکنش' if is_pareto_import else 'تعداد کالا' }}</th>
+                        <th>{{ 'ردیف ردشده' if is_pareto_import else 'دسته‌بندی' }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -80,11 +82,16 @@
                             <span class="badge bg-secondary"><i class="fas fa-minus me-1"></i> خالی</span>
                             {% elif sheet.status == 'no_name_column' %}
                             <span class="badge bg-warning"><i class="fas fa-exclamation me-1"></i> بدون ستون نام</span>
+                            {% elif sheet.status == 'no_required_columns' %}
+                            <span class="badge bg-warning"><i class="fas fa-exclamation me-1"></i> ستون الزامی ناقص</span>
                             {% else %}
                             <span class="badge bg-danger"><i class="fas fa-times me-1"></i> خطا</span>
                             {% endif %}
                         </td>
-                        <td>{{ sheet.items }}</td>
+                        <td>{{ sheet.transactions if is_pareto_import else sheet.items }}</td>
+                        {% if is_pareto_import %}
+                        <td>{{ sheet.skipped or 0 }}</td>
+                        {% else %}
                         <td>
                             {% if sheet.category == 'Food' %}
                             <span class="badge bg-success">مواد غذایی</span>
@@ -94,6 +101,7 @@
                             <span class="badge bg-secondary">ترکیبی</span>
                             {% endif %}
                         </td>
+                        {% endif %}
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -142,9 +150,9 @@
     <div class="card-body">
         <div class="row">
             <div class="col-md-4">
-                <a href="{{ url_for('admin.items_list') }}" class="btn btn-outline-primary btn-lg w-100">
-                    <i class="fas fa-boxes fa-2x mb-2 d-block"></i>
-                    مشاهده کالاها
+                <a href="{{ url_for('reports.pareto') if is_pareto_import else url_for('admin.items_list') }}" class="btn btn-outline-primary btn-lg w-100">
+                    <i class="{{ 'fas fa-chart-bar' if is_pareto_import else 'fas fa-boxes' }} fa-2x mb-2 d-block"></i>
+                    {{ 'مشاهده گزارش پارتو' if is_pareto_import else 'مشاهده کالاها' }}
                 </a>
             </div>
             <div class="col-md-4">
@@ -156,7 +164,7 @@
             <div class="col-md-4">
                 <a href="{{ url_for('reports.pareto') }}" class="btn btn-outline-info btn-lg w-100">
                     <i class="fas fa-chart-bar fa-2x mb-2 d-block"></i>
-                    گزارش پارتو
+                    تحلیل پارتو
                 </a>
             </div>
         </div>

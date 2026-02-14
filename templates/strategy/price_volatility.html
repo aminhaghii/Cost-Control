@@ -1,0 +1,91 @@
+{% extends 'strategy/base_strategy.html' %}
+{% block title %}نوسان قیمت{% endblock %}
+{% block strategy_help_title %}راهنمای کامل تحلیل نوسان قیمت{% endblock %}
+{% block strategy_help_body %}
+<h6>این تحلیل به چه درد می‌خورد؟</h6>
+<p>تحلیل نوسان قیمت میزان بی‌ثباتی قیمت خرید هر کالا را اندازه‌گیری می‌کند تا کالاهای پرریسک از نظر تغییرات قیمتی شناسایی شوند. این تحلیل برای کنترل ریسک بودجه و برنامه‌ریزی تأمین بسیار مهم است.</p>
+
+<h6>شاخص اصلی: ضریب تغییرات قیمت (CV)</h6>
+<ul>
+    <li><strong>CV بالا</strong> یعنی قیمت کالا به‌صورت نامنظم تغییر می‌کند.</li>
+    <li><strong>CV متوسط</strong> یعنی تغییرات وجود دارد اما قابل کنترل است.</li>
+    <li><strong>CV پایین</strong> یعنی قیمت نسبتاً پایدار است.</li>
+</ul>
+
+<h6>چطور خروجی را تفسیر کنیم؟</h6>
+<ul>
+    <li>نمودار میله‌ای، شدت نوسان قیمت هر کالا را مقایسه می‌کند.</li>
+    <li>در جدول، حداقل/حداکثر/میانگین قیمت کنار هم آمده تا دامنه واقعی تغییرات مشخص شود.</li>
+    <li>کالاهایی که هم CV بالا دارند و هم تعداد خرید بالاست، ریسک اصلی هزینه هستند.</li>
+</ul>
+
+<h6>اقدام مدیریتی پیشنهادی</h6>
+<ul>
+    <li>برای کالاهای پرنوسان، چند تأمین‌کننده فعال داشته باشید و وابستگی را کم کنید.</li>
+    <li>برای کالاهای پایدار، قرارداد بلندمدت قیمت می‌تواند سودآور باشد.</li>
+    <li>برای کالاهای پرمصرف و پرنوسان، خرید مرحله‌ای و سقف قیمتی تعریف کنید.</li>
+</ul>
+{% endblock %}
+{% block strategy_content %}
+<div class="page-header"><h2><i class="fas fa-bolt text-warning me-2"></i> نوسان قیمت کالاها</h2></div>
+
+{% if result.summary and result.summary.most_volatile != '-' %}
+<div class="row g-3 mb-4">
+    <div class="col-md-3"><div class="kpi-card danger"><div class="kpi-value">{{ result.summary.high_risk_count }}</div><div class="kpi-label">کالای پرریسک (CV &gt; 0.3)</div></div></div>
+    <div class="col-md-3"><div class="kpi-card warning"><div class="kpi-value">{{ result.summary.avg_cv }}</div><div class="kpi-label">میانگین CV</div></div></div>
+    <div class="col-md-3"><div class="kpi-card danger"><div class="kpi-value">{{ result.summary.most_volatile_cv }}</div><div class="kpi-label">{{ result.summary.most_volatile }}</div></div></div>
+    <div class="col-md-3"><div class="kpi-card success"><div class="kpi-value">{{ result.summary.most_stable }}</div><div class="kpi-label">پایدارترین کالا</div></div></div>
+</div>
+
+<div class="card mb-4 strategy-chart-card">
+    <div class="card-header"><i class="fas fa-chart-bar me-2"></i> نمودار نوسان قیمت</div>
+    <div class="card-body"><canvas id="volChart" class="strategy-chart-canvas"></canvas></div>
+</div>
+
+<div class="card">
+    <div class="card-body table-responsive">
+        <table class="table table-hover table-sm">
+            <thead><tr><th>کد</th><th>نام کالا</th><th>میانگین قیمت</th><th>حداقل</th><th>حداکثر</th><th>بازه</th><th>CV</th><th>تعداد خرید</th></tr></thead>
+            <tbody>
+            {% for _, row in result.data.iterrows() %}
+            <tr class="{% if row.price_cv > 0.3 %}table-danger{% endif %}">
+                <td>{{ row.item_code }}</td><td>{{ row.item_name_fa }}</td>
+                <td class="number-fa">{{ '{:,.0f}'.format(row.mean_price) }}</td>
+                <td class="number-fa">{{ '{:,.0f}'.format(row.min_price) }}</td>
+                <td class="number-fa">{{ '{:,.0f}'.format(row.max_price) }}</td>
+                <td class="number-fa">{{ '{:,.0f}'.format(row.price_range) }}</td>
+                <td><span class="badge {% if row.price_cv > 0.3 %}bg-danger{% elif row.price_cv > 0.1 %}bg-warning text-dark{% else %}bg-success{% endif %}">{{ row.price_cv }}</span></td>
+                <td>{{ row.purchase_count }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script type="application/json" id="price-volatility-data">{{ {'labels': result.chart.labels, 'values': result.chart.cv_values} | tojson }}</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const volDataEl = document.getElementById('price-volatility-data');
+const volRaw = volDataEl ? JSON.parse(volDataEl.textContent || '{}') : {};
+const volLabels = volRaw.labels || [];
+const volValues = volRaw.values || [];
+const volColors = volValues.map(v => v > 0.3 ? '#e53935' : v > 0.1 ? '#ff9800' : '#4caf50');
+
+new Chart(document.getElementById('volChart'), {
+    type: 'bar',
+    data: {
+        labels: volLabels,
+        datasets: [{
+            label: 'ضریب تغییرات قیمت',
+            data: volValues,
+            backgroundColor: volColors
+        }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } } }
+});
+</script>
+{% else %}
+<div class="alert alert-info"><i class="fas fa-info-circle me-2"></i> داده کافی یافت نشد.</div>
+{% endif %}
+{% endblock %}

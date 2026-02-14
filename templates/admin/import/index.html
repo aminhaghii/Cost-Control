@@ -19,6 +19,15 @@
             <div class="card-body">
                 <form method="POST" enctype="multipart/form-data" id="uploadForm">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">نوع ورود داده:</label>
+                        <select name="import_mode" class="form-select" required>
+                            <option value="inventory">کالا و موجودی (Inventory)</option>
+                            <option value="pareto_transactions">تراکنش‌های پارتو (خرید/مصرف/ضایعات)</option>
+                        </select>
+                        <div class="form-text">برای تحلیل پارتو، گزینه «تراکنش‌های پارتو» را انتخاب کنید.</div>
+                    </div>
                     
                     <div class="mb-3">
                         <label class="form-label fw-bold">انتخاب فایل Excel:</label>
@@ -29,12 +38,18 @@
                     <div class="alert alert-info small">
                         <i class="fas fa-info-circle me-1"></i>
                         <strong>فرمت مورد انتظار:</strong>
-                        <ul class="mb-0 mt-2">
+                        <ul class="mb-2 mt-2">
                             <li>ستون نام کالا (شرح / نام کالا)</li>
                             <li>ستون واحد</li>
                             <li>ستون موجودی (اختیاری)</li>
                             <li>ستون قیمت خرید (اختیاری)</li>
                             <li>ستون مصرف هفتگی/ماهانه (اختیاری)</li>
+                        </ul>
+                        <strong>برای حالت «تراکنش‌های پارتو»:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>ستون‌های الزامی: مقدار، قیمت واحد</li>
+                            <li>ستون‌های پیشنهادی: کد کالا، نام کالا، نوع تراکنش، گروه، واحد، تاریخ، مبلغ کل</li>
+                            <li>نوع تراکنش‌های قابل تشخیص: خرید، مصرف، ضایعات، اصلاحی (یا معادل انگلیسی)</li>
                         </ul>
                     </div>
                     
@@ -74,9 +89,13 @@
                                        class="btn btn-sm btn-outline-info" title="پیش‌نمایش">
                                         <i class="fas fa-eye"></i>
                                     </a>
-                                    <a href="{{ url_for('admin.import_existing_file', filename=file.name) }}" 
+                                    <a href="{{ url_for('admin.import_existing_file', filename=file.name, mode='inventory') }}" 
                                        class="btn btn-sm btn-outline-success" title="وارد کردن">
                                         <i class="fas fa-file-import"></i>
+                                    </a>
+                                    <a href="{{ url_for('admin.import_existing_file', filename=file.name, mode='pareto_transactions') }}"
+                                       class="btn btn-sm btn-outline-primary" title="ورود پارتو">
+                                        <i class="fas fa-chart-line"></i>
                                     </a>
                                 </td>
                             </tr>
@@ -100,11 +119,11 @@
             </div>
             <div class="card-body">
                 <p class="small text-muted">اگر فایل Excel در پوشه پروژه قرار دارد:</p>
-                <a href="{{ url_for('admin.import_existing_file', filename='aghllam.xlsx') }}" 
+                <a href="{{ url_for('admin.import_existing_file', filename='aghllam.xlsx', mode='inventory') }}" 
                    class="btn btn-success btn-sm mb-2 d-block">
                     <i class="fas fa-file-excel me-1"></i> aghllam.xlsx
                 </a>
-                <a href="{{ url_for('admin.import_existing_file', filename='گزارش_تحلیلی_جامع.xlsx') }}" 
+                <a href="{{ url_for('admin.import_existing_file', filename='گزارش_تحلیلی_جامع.xlsx', mode='pareto_transactions') }}" 
                    class="btn btn-success btn-sm d-block">
                     <i class="fas fa-file-excel me-1"></i> گزارش_تحلیلی_جامع.xlsx
                 </a>
@@ -122,25 +141,89 @@
             <div class="col-md-4">
                 <h6><i class="fas fa-1 text-primary me-2"></i> ساختار فایل</h6>
                 <p class="small text-muted">
-                    فایل Excel باید دارای ستون‌های نام کالا و واحد باشد. 
-                    سایر ستون‌ها مثل موجودی، قیمت و مصرف اختیاری هستند.
+                    در حالت موجودی، فایل باید ستون‌های نام کالا و واحد داشته باشد.
+                    در حالت پارتو، حداقل ستون‌های مقدار و قیمت واحد الزامی است.
                 </p>
             </div>
             <div class="col-md-4">
                 <h6><i class="fas fa-2 text-primary me-2"></i> شیت‌های مختلف</h6>
                 <p class="small text-muted">
-                    هر شیت به عنوان یک دسته‌بندی جداگانه (هتل/انبار) در نظر گرفته می‌شود.
-                    سیستم خودکار دسته‌بندی Food/NonFood را تشخیص می‌دهد.
+                    هر شیت جداگانه پردازش می‌شود. برای پارتو، هر شیت می‌تواند
+                    شامل تراکنش‌های PMS باشد و تاریخ/مبلغ برای تحلیل استفاده می‌شود.
                 </p>
             </div>
             <div class="col-md-4">
                 <h6><i class="fas fa-3 text-primary me-2"></i> کالاهای تکراری</h6>
                 <p class="small text-muted">
-                    اگر کالایی با همان نام وجود داشته باشد، فقط قیمت و موجودی آن به‌روز می‌شود.
-                    کد کالای جدید خودکار تولید می‌شود.
+                    در حالت پارتو، کالا ابتدا با کد/نام جستجو می‌شود؛
+                    اگر وجود نداشته باشد، به‌صورت خودکار ایجاد و سپس تراکنش ثبت می‌گردد.
                 </p>
             </div>
         </div>
     </div>
 </div>
+
+{% if import_history %}
+<div class="card mt-4">
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+        <span><i class="fas fa-history me-2"></i> سوابق ورود داده</span>
+        <span class="text-muted small">آخرین {{ import_history|length }} ورود</span>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>شناسه</th>
+                        <th>نام فایل</th>
+                        <th>تاریخ</th>
+                        <th>نوع</th>
+                        <th>آیتم</th>
+                        <th>تراکنش</th>
+                        <th>وضعیت</th>
+                        <th>عملیات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for batch in import_history %}
+                    <tr>
+                        <td>#{{ batch.id }}</td>
+                        <td>{{ batch.filename }}</td>
+                        <td>{{ batch.created_at.strftime('%Y/%m/%d %H:%M') if batch.created_at else '-' }}</td>
+                        <td>
+                            {% if batch.transactions_created and batch.transactions_created > 0 %}
+                            <span class="badge bg-primary">پارتو</span>
+                            {% else %}
+                            <span class="badge bg-secondary">موجودی</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ batch.items_created }}</td>
+                        <td>{{ batch.transactions_created }}</td>
+                        <td>
+                            {% if batch.status == 'completed' %}
+                            <span class="badge bg-success">موفق</span>
+                            {% elif batch.status == 'replaced' %}
+                            <span class="badge bg-warning">جایگزین شده</span>
+                            {% elif batch.status == 'failed' %}
+                            <span class="badge bg-danger">ناموفق</span>
+                            {% else %}
+                            <span class="badge bg-secondary">{{ batch.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <form method="POST" action="{{ url_for('admin.delete_import_batch', batch_id=batch.id) }}" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('آیا از حذف این بَچ و تراکنش‌های مرتبط مطمئن هستید؟');">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}

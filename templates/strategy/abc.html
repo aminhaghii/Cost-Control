@@ -1,0 +1,97 @@
+{% extends 'strategy/base_strategy.html' %}
+{% block title %}تحلیل ABC (ارزشی){% endblock %}
+{% block strategy_help_title %}راهنمای کامل تحلیل ABC (ارزشی){% endblock %}
+{% block strategy_help_body %}
+<h6>این تحلیل دقیقاً چه کاری انجام می‌دهد؟</h6>
+<p>تحلیل ABC کالاها را بر اساس سهم آن‌ها از کل هزینه خرید دسته‌بندی می‌کند تا مشخص شود تمرکز مدیریتی باید روی کدام کالاها باشد. در این روش، معمولاً تعداد کمی از کالاها بیشترین سهم هزینه را دارند و بقیه کالاها اثر مالی کمتری دارند.</p>
+
+<h6>منطق دسته‌بندی</h6>
+<ul>
+    <li><strong>کلاس A:</strong> کالاهای بسیار مهم از نظر ارزش ریالی (حدود ۸۰٪ ارزش خرید).</li>
+    <li><strong>کلاس B:</strong> کالاهای میانی از نظر اهمیت هزینه‌ای (حدود ۱۵٪).</li>
+    <li><strong>کلاس C:</strong> کالاهای کم‌اثر از نظر مالی (حدود ۵٪).</li>
+</ul>
+
+<h6>چطور خروجی را بخوانیم؟</h6>
+<ul>
+    <li>در نمودار پارتو، ستون‌ها مبلغ خرید هر کالا را نشان می‌دهند و خط، درصد تجمعی را نمایش می‌دهد.</li>
+    <li>در جدول، ستون «تجمعی» نشان می‌دهد هر کالا تا چه حد ما را به سقف ۸۰٪ نزدیک یا از آن عبور می‌دهد.</li>
+    <li>ضریب جینی هرچه بالاتر باشد یعنی تمرکز هزینه روی تعداد کمتری کالا قرار گرفته است.</li>
+</ul>
+
+<h6>اقدام مدیریتی پیشنهادی</h6>
+<ul>
+    <li>برای <strong>A</strong>: قرارداد تأمین، کنترل قیمت و موجودی ایمن‌تری تعریف کنید.</li>
+    <li>برای <strong>B</strong>: پایش دوره‌ای و مذاکره فصلی کافی است.</li>
+    <li>برای <strong>C</strong>: ساده‌سازی خرید، کاهش تنوع و خرید به‌موقع پیشنهاد می‌شود.</li>
+</ul>
+{% endblock %}
+{% block strategy_content %}
+<div class="page-header"><h2><i class="fas fa-sort-amount-down text-success me-2"></i> تحلیل ABC (ارزشی)</h2></div>
+
+{% if result.summary and result.summary.total_items > 0 %}
+<div class="row g-3 mb-4">
+    <div class="col-md-3"><div class="kpi-card success"><div class="kpi-value">{{ result.summary.class_a_count }}</div><div class="kpi-label">کلاس A (۸۰٪ ارزش)</div></div></div>
+    <div class="col-md-3"><div class="kpi-card warning"><div class="kpi-value">{{ result.summary.class_b_count }}</div><div class="kpi-label">کلاس B (۱۵٪ ارزش)</div></div></div>
+    <div class="col-md-3"><div class="kpi-card danger"><div class="kpi-value">{{ result.summary.class_c_count }}</div><div class="kpi-label">کلاس C (۵٪ ارزش)</div></div></div>
+    <div class="col-md-3"><div class="kpi-card info"><div class="kpi-value">{{ result.summary.gini_coefficient }}</div><div class="kpi-label">ضریب جینی</div></div></div>
+</div>
+
+<div class="card mb-4 strategy-chart-card">
+    <div class="card-header"><i class="fas fa-chart-bar me-2"></i> نمودار پارتو</div>
+    <div class="card-body"><canvas id="abcChart" class="strategy-chart-canvas"></canvas></div>
+</div>
+
+<div class="card">
+    <div class="card-header"><i class="fas fa-table me-2"></i> جدول کالاها</div>
+    <div class="card-body table-responsive">
+        <table class="table table-hover table-sm">
+            <thead><tr><th>#</th><th>کد</th><th>نام کالا</th><th>مبلغ</th><th>درصد</th><th>تجمعی</th><th>کلاس</th></tr></thead>
+            <tbody>
+            {% for _, row in result.data.iterrows() %}
+            <tr>
+                <td>{{ row.row_num }}</td><td>{{ row.item_code }}</td><td>{{ row.item_name }}</td>
+                <td class="number-fa">{{ '{:,.0f}'.format(row.amount) }}</td>
+                <td>{{ row.percentage }}%</td><td>{{ row.cumulative_percentage }}%</td>
+                <td><span class="badge badge-{{ row.abc_class|lower }}">{{ row.abc_class }}</span></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const ctx = document.getElementById('abcChart').getContext('2d');
+new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: {{ result.chart.labels | tojson }},
+        datasets: [{
+            label: 'مبلغ خرید',
+            data: {{ result.chart.amounts | tojson }},
+            backgroundColor: 'rgba(46,125,50,0.6)',
+            yAxisID: 'y'
+        }, {
+            label: 'درصد تجمعی',
+            data: {{ result.chart.cumulative | tojson }},
+            type: 'line',
+            borderColor: '#C62828',
+            fill: false,
+            yAxisID: 'y1'
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            y: { position: 'right', title: { display: true, text: 'مبلغ (ریال)' } },
+            y1: { position: 'left', min: 0, max: 100, title: { display: true, text: 'درصد تجمعی' } }
+        }
+    }
+});
+</script>
+{% else %}
+<div class="alert alert-info"><i class="fas fa-info-circle me-2"></i> داده خریدی یافت نشد. ابتدا فایل Excel را وارد کنید.</div>
+{% endif %}
+{% endblock %}

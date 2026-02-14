@@ -1,0 +1,200 @@
+{% extends 'strategy/base_strategy.html' %}
+{% block title %}تحلیل‌های استراتژیک{% endblock %}
+{% block strategy_help_title %}راهنمای کامل داشبورد تحلیل‌های استراتژیک{% endblock %}
+{% block strategy_help_body %}
+<h6>این داشبورد چه کاربردی دارد؟</h6>
+<p>این صفحه نقطه شروع تصمیم‌گیری تحلیلی شماست. تمام تحلیل‌های کلیدی خرید، هزینه، نوسان و پیش‌بینی در همین بخش جمع شده‌اند تا بدون جابه‌جایی زیاد، به تحلیل مناسب برسید.</p>
+
+<h6>چطور از این صفحه بهترین استفاده را بگیرید؟</h6>
+<ul>
+    <li>ابتدا بازه زمانی و گروه کالا را تنظیم کنید تا تحلیل‌ها با همان فیلتر اجرا شوند.</li>
+    <li>KPIهای بالای صفحه را برای تشخیص وضعیت کلی (هزینه، ریسک، تمرکز) بررسی کنید.</li>
+    <li>سپس وارد کارت تحلیل مرتبط شوید: ارزش (ABC)، نوسان (XYZ)، قیمت، بودجه یا پیش‌بینی.</li>
+</ul>
+
+<h6>ترتیب پیشنهادی تحلیل برای تصمیم مدیریتی</h6>
+<ul>
+    <li><strong>مرحله ۱ - اولویت‌بندی:</strong> ABC و ABC-XYZ برای تشخیص اقلام مهم و پرریسک</li>
+    <li><strong>مرحله ۲ - کنترل ریسک هزینه:</strong> روند قیمت، نوسان قیمت و ناهنجاری‌ها</li>
+    <li><strong>مرحله ۳ - کنترل بودجه و برنامه‌ریزی:</strong> روند هزینه، مصرف بودجه، پیش‌بینی هزینه</li>
+    <li><strong>مرحله ۴ - عملیات خرید:</strong> تکرار خرید و روند تقاضا برای تنظیم سفارش</li>
+</ul>
+
+<h6>خروجی نهایی مورد انتظار</h6>
+<p>پس از مرور این تحلیل‌ها، باید بتوانید برای هر گروه کالا تصمیم عملی بگیرید: چه چیزی را با چه اولویتی بخرید، کجا هزینه را مهار کنید و کجا ریسک تأمین را کاهش دهید.</p>
+{% endblock %}
+
+{% block strategy_content %}
+<div class="page-header">
+    <h2><i class="fas fa-chess-queen me-2"></i> داشبورد تحلیل‌های استراتژیک</h2>
+    <p class="text-muted mb-0">تمام ابزارهای تحلیلی برای تصمیم‌گیری خرید و مدیریت هزینه</p>
+</div>
+
+{% if overview.has_data %}
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="kpi-card primary">
+            <div class="kpi-value">{{ overview.abc_summary.total_items|default(0) }}</div>
+            <div class="kpi-label">کالای فعال</div>
+            <i class="fas fa-boxes kpi-icon"></i>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="kpi-card success">
+            <div class="kpi-value">{{ '{:,.0f}'.format(overview.spend_summary.total_spend|default(0)) }}</div>
+            <div class="kpi-label">کل هزینه (ریال)</div>
+            <i class="fas fa-coins kpi-icon"></i>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="kpi-card warning">
+            <div class="kpi-value">{{ overview.abc_summary.class_a_count|default(0) }}</div>
+            <div class="kpi-label">کالای کلاس A</div>
+            <i class="fas fa-star kpi-icon"></i>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="kpi-card danger">
+            <div class="kpi-value">{{ overview.anomaly_summary.total_anomalies|default(0) }}</div>
+            <div class="kpi-label">ناهنجاری شناسایی‌شده</div>
+            <i class="fas fa-exclamation-triangle kpi-icon"></i>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="row g-3">
+    <!-- Card: ABC -->
+    <div class="col-md-4">
+        <a href="{{ url_for('strategy.abc', days=days, category=category) }}" class="text-decoration-none">
+            <div class="card h-100 border-start border-success border-4">
+                <div class="card-body">
+                    <h6><i class="fas fa-sort-amount-down text-success me-2"></i> ABC (ارزشی)</h6>
+                    <p class="small text-muted mb-0">طبقه‌بندی کالاها بر اساس سهم ارزشی: A (۸۰٪)، B (۱۵٪)، C (۵٪)</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <!-- Card: XYZ -->
+    <div class="col-md-4">
+        <a href="{{ url_for('strategy.xyz', days=days, category=category) }}" class="text-decoration-none">
+            <div class="card h-100 border-start border-info border-4">
+                <div class="card-body">
+                    <h6><i class="fas fa-wave-square text-info me-2"></i> XYZ (نوسان خرید)</h6>
+                    <p class="small text-muted mb-0">شناسایی کالاهای پایدار (X)، متوسط (Y) و بی‌ثبات (Z)</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <!-- Card: ABC-XYZ -->
+    <div class="col-md-4">
+        <a href="{{ url_for('strategy.abc_xyz', days=days, category=category) }}" class="text-decoration-none">
+            <div class="card h-100 border-start border-primary border-4">
+                <div class="card-body">
+                    <h6><i class="fas fa-border-all text-primary me-2"></i> ماتریس ABC-XYZ <span class="badge bg-warning text-dark">کلیدی</span></h6>
+                    <p class="small text-muted mb-0">ترکیب ارزش و نوسان برای سیاست خرید هر کالا</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <!-- Card: Price Trend -->
+    <div class="col-md-4">
+        <a href="{{ url_for('strategy.price_trend', days=days, category=category) }}" class="text-decoration-none">
+            <div class="card h-100 border-start border-danger border-4">
+                <div class="card-body">
+                    <h6><i class="fas fa-chart-line text-danger me-2"></i> روند قیمت / تورم</h6>
+                    <p class="small text-muted mb-0">تشخیص تورم تأمین و جهش قیمت در طول زمان</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <!-- Card: Price Volatility -->
+    <div class="col-md-4">
+        <a href="{{ url_for('strategy.price_volatility', days=days, category=category) }}" class="text-decoration-none">
+            <div class="card h-100 border-start border-warning border-4">
+                <div class="card-body">
+                    <h6><i class="fas fa-bolt text-warning me-2"></i> نوسان قیمت</h6>
+                    <p class="small text-muted mb-0">شناسایی کالاهای پرریسک از نظر بی‌ثباتی قیمت</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <!-- Card: Spend Trend -->
+    <div class="col-md-4">
+        <a href="{{ url_for('strategy.spend_trend', days=days, category=category) }}" class="text-decoration-none">
+            <div class="card h-100 border-start border-primary border-4">
+                <div class="card-body">
+                    <h6><i class="fas fa-chart-area text-primary me-2"></i> روند هزینه</h6>
+                    <p class="small text-muted mb-0">روند هزینه کل هفتگی/ماهانه و هشدار افزایش</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <!-- Card: Category Mix -->
+    <div class="col-md-4">
+        <a href="{{ url_for('strategy.category_mix', days=days) }}" class="text-decoration-none">
+            <div class="card h-100 border-start border-success border-4">
+                <div class="card-body">
+                    <h6><i class="fas fa-chart-pie text-success me-2"></i> ترکیب گروه‌ها</h6>
+                    <p class="small text-muted mb-0">سهم هزینه هر گروه (غذایی/غیرغذایی) از کل</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <!-- Card: Budget Burndown -->
+    <div class="col-md-4">
+        <a href="{{ url_for('strategy.budget_burndown', days=30) }}" class="text-decoration-none">
+            <div class="card h-100 border-start border-danger border-4">
+                <div class="card-body">
+                    <h6><i class="fas fa-fire-alt text-danger me-2"></i> مصرف بودجه</h6>
+                    <p class="small text-muted mb-0">سرعت مصرف بودجه و تخمین روزهای باقیمانده</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <!-- Card: Purchase Frequency -->
+    <div class="col-md-4">
+        <a href="{{ url_for('strategy.purchase_frequency', days=days, category=category) }}" class="text-decoration-none">
+            <div class="card h-100 border-start border-info border-4">
+                <div class="card-body">
+                    <h6><i class="fas fa-redo text-info me-2"></i> تکرار خرید</h6>
+                    <p class="small text-muted mb-0">فاصله زمانی و الگوی تکرار خرید هر کالا</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <!-- Card: Demand Proxy -->
+    <div class="col-md-4">
+        <a href="{{ url_for('strategy.demand_proxy', days=days, category=category) }}" class="text-decoration-none">
+            <div class="card h-100 border-start border-success border-4">
+                <div class="card-body">
+                    <h6><i class="fas fa-arrow-up text-success me-2"></i> روند تقاضا</h6>
+                    <p class="small text-muted mb-0">تقریب تقاضا از الگوی خرید‌ها</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <!-- Card: Anomalies -->
+    <div class="col-md-4">
+        <a href="{{ url_for('strategy.anomalies', days=days, category=category) }}" class="text-decoration-none">
+            <div class="card h-100 border-start border-warning border-4">
+                <div class="card-body">
+                    <h6><i class="fas fa-exclamation-triangle text-warning me-2"></i> تشخیص ناهنجاری</h6>
+                    <p class="small text-muted mb-0">خریدهای غیرعادی از نظر مقدار/قیمت/مبلغ</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <!-- Card: Forecast -->
+    <div class="col-md-4">
+        <a href="{{ url_for('strategy.forecast', days=days, category=category) }}" class="text-decoration-none">
+            <div class="card h-100 border-start border-primary border-4">
+                <div class="card-body">
+                    <h6><i class="fas fa-chart-line text-primary me-2"></i> پیش‌بینی هزینه</h6>
+                    <p class="small text-muted mb-0">پیش‌بینی هزینه خرید هفته‌های آینده</p>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>
+{% endblock %}

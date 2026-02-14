@@ -1,0 +1,96 @@
+{% extends 'strategy/base_strategy.html' %}
+{% block title %}ماتریس ABC-XYZ{% endblock %}
+{% block strategy_help_title %}راهنمای کامل ماتریس ABC-XYZ{% endblock %}
+{% block strategy_help_body %}
+<h6>این تحلیل چه کاربردی دارد؟</h6>
+<p>ماتریس ABC-XYZ دو بُعد مهم را هم‌زمان ترکیب می‌کند: <strong>ارزش مالی کالا</strong> (ABC) و <strong>پایداری الگوی خرید</strong> (XYZ). نتیجه، یک نقشه عملیاتی برای سیاست خرید هر کالا است.</p>
+
+<h6>منطق ۹ خانه‌ای ماتریس</h6>
+<ul>
+    <li><strong>A/B/C</strong>: اهمیت مالی کالا (از پرارزش تا کم‌ارزش)</li>
+    <li><strong>X/Y/Z</strong>: میزان نوسان خرید (از پایدار تا بی‌ثبات)</li>
+    <li>ترکیب این دو، کلاس‌هایی مثل AX، BY، CZ را می‌سازد که هرکدام سیاست متفاوت می‌خواهند.</li>
+</ul>
+
+<h6>نحوه خواندن خروجی</h6>
+<ul>
+    <li>در جدول ۹ خانه‌ای، تعداد کالا و مبلغ هر خانه نمایش داده می‌شود.</li>
+    <li>خانه‌های مهم مثل <strong>AX</strong> معمولاً نیازمند قرارداد پایدار هستند.</li>
+    <li>خانه‌های پرریسک مثل <strong>AZ</strong> یا <strong>CZ</strong> معمولاً نیازمند کنترل شدیدتر یا ساده‌سازی سبد هستند.</li>
+</ul>
+
+<h6>اقدام مدیریتی پیشنهادی بر اساس کلاس</h6>
+<ul>
+    <li><strong>AX:</strong> تأمین مطمئن، قیمت توافقی، سفارش منظم</li>
+    <li><strong>AY/BY:</strong> بازبینی دوره‌ای، ذخیره ایمنی متوسط</li>
+    <li><strong>AZ/BZ:</strong> موجودی محافظه‌کارانه، پایش نزدیک تأمین‌کننده</li>
+    <li><strong>CZ:</strong> بررسی حذف/جایگزینی یا خرید موردی با حداقل موجودی</li>
+</ul>
+{% endblock %}
+{% block strategy_content %}
+<div class="page-header"><h2><i class="fas fa-border-all text-primary me-2"></i> ماتریس ABC-XYZ</h2></div>
+
+{% if result.matrix %}
+<div class="row g-3 mb-4">
+    <div class="col-md-3"><div class="kpi-card primary"><div class="kpi-value">{{ result.summary.total_items }}</div><div class="kpi-label">کل کالاها</div></div></div>
+    <div class="col-md-3"><div class="kpi-card success"><div class="kpi-value">{{ result.summary.ax_count }}</div><div class="kpi-label">AX (پرارزش + پایدار)</div></div></div>
+    <div class="col-md-3"><div class="kpi-card danger"><div class="kpi-value">{{ result.summary.cz_count }}</div><div class="kpi-label">CZ (کم‌ارزش + بی‌ثبات)</div></div></div>
+    <div class="col-md-3"><div class="kpi-card info"><div class="kpi-value">{{ result.summary.top_class }}</div><div class="kpi-label">بیشترین کلاس</div></div></div>
+</div>
+
+<!-- Matrix Grid -->
+<div class="card mb-4">
+    <div class="card-header"><i class="fas fa-th me-2"></i> ماتریس ۹ خانه‌ای</div>
+    <div class="card-body">
+        <table class="table table-bordered text-center">
+            <thead>
+                <tr><th></th><th class="bg-success text-white">X (پایدار)</th><th class="bg-warning">Y (متوسط)</th><th class="bg-danger text-white">Z (بی‌ثبات)</th></tr>
+            </thead>
+            <tbody>
+                {% for abc in ['A', 'B', 'C'] %}
+                <tr>
+                    <th class="{% if abc == 'A' %}bg-success text-white{% elif abc == 'B' %}bg-warning{% else %}bg-danger text-white{% endif %}">{{ abc }}</th>
+                    {% for xyz in ['X', 'Y', 'Z'] %}
+                    {% set key = abc ~ xyz %}
+                    {% set cell = result.matrix.get(key, {'count': 0, 'amount': 0}) %}
+                    <td class="{% if abc == 'A' and xyz == 'X' %}table-success{% elif abc == 'C' and xyz == 'Z' %}table-danger{% endif %}">
+                        <strong>{{ cell.count }}</strong> کالا<br>
+                        <small class="text-muted">{{ '{:,.0f}'.format(cell.amount) }} ریال</small>
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="row mt-3">
+            <div class="col-md-4"><div class="alert alert-success py-2 small"><strong>AX:</strong> قرارداد بلندمدت، سفارش منظم</div></div>
+            <div class="col-md-4"><div class="alert alert-warning py-2 small"><strong>AZ/BY:</strong> ذخیره ایمنی بیشتر، مذاکره قیمت</div></div>
+            <div class="col-md-4"><div class="alert alert-danger py-2 small"><strong>CZ:</strong> حذف یا جایگزینی، حداقل موجودی</div></div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><i class="fas fa-table me-2"></i> جدول کامل</div>
+    <div class="card-body table-responsive">
+        <table class="table table-hover table-sm">
+            <thead><tr><th>کد</th><th>نام کالا</th><th>مبلغ</th><th>ABC</th><th>XYZ</th><th>ماتریس</th><th>CV</th></tr></thead>
+            <tbody>
+            {% for _, row in result.data.iterrows() %}
+            <tr>
+                <td>{{ row.item_code }}</td><td>{{ row.item_name }}</td>
+                <td class="number-fa">{{ '{:,.0f}'.format(row.amount) }}</td>
+                <td><span class="badge badge-{{ row.abc_class|lower }}">{{ row.abc_class }}</span></td>
+                <td><span class="badge {% if row.xyz_class == 'X' %}bg-success{% elif row.xyz_class == 'Y' %}bg-warning text-dark{% else %}bg-danger{% endif %}">{{ row.xyz_class }}</span></td>
+                <td><strong>{{ row.matrix_class }}</strong></td>
+                <td>{{ row.cv }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-info"><i class="fas fa-info-circle me-2"></i> داده کافی یافت نشد.</div>
+{% endif %}
+{% endblock %}

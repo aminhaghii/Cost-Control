@@ -4,7 +4,7 @@ Complete management panel for admin and manager roles
 """
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_required, current_user
-from models import db, User, Item, Transaction, Alert, AuditLog, ROLES, ROLE_LABELS
+from models import db, User, Item, Transaction, Alert, AuditLog, ROLES, ROLE_LABELS, ImportBatch
 from utils.decorators import admin_required, manager_required
 from datetime import datetime, timedelta
 from sqlalchemy import func, desc
@@ -855,26 +855,39 @@ def data_import():
             filename = secure_filename(file.filename)
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             file.save(filepath)
+
+            import_mode = request.form.get('import_mode', 'inventory')
+            if import_mode not in ['inventory', 'pareto_transactions']:
+                import_mode = 'inventory'
             
             # Import the data
             # P3-FIX: Pass user context to DataImporter for proper auditing
             from services.data_importer import DataImporter
             
             importer = DataImporter(user_id=current_user.id, hotel_id=None)
-            result = importer.import_excel(filepath)
+            result = importer.import_excel(filepath, import_mode=import_mode)
             
             if result['success']:
                 # Log the import
+                imported_count = result.get('total_transactions', 0) if import_mode == 'pareto_transactions' else result.get('total_items', 0)
+                resource_type = AuditLog.RESOURCE_TRANSACTION if import_mode == 'pareto_transactions' else AuditLog.RESOURCE_ITEM
+                mode_label = 'تراکنش پارتو' if import_mode == 'pareto_transactions' else 'کالا'
                 AuditLog.log(
                     user=current_user,
                     action=AuditLog.ACTION_CREATE,
-                    resource_type=AuditLog.RESOURCE_ITEM,
-                    description=f'وارد کردن داده از فایل: {filename} ({result["total_items"]} کالا)',
+                    resource_type=resource_type,
+                    description=f'وارد کردن داده از فایل: {filename} ({imported_count} {mode_label})',
                     request=request
                 )
                 db.session.commit()
-                
-                flash(f'داده‌ها با موفقیت وارد شدند: {result["total_items"]} کالا از {len(result["sheets"])} شیت', 'success')
+
+                if import_mode == 'pareto_transactions':
+                    flash(
+                        f'تراکنش‌های پارتو با موفقیت وارد شدند: {result.get("total_transactions", 0)} تراکنش از {len(result["sheets"])} شیت',
+                        'success'
+                    )
+                else:
+                    flash(f'داده‌ها با موفقیت وارد شدند: {result["total_items"]} کالا از {len(result["sheets"])} شیت', 'success')
                 
                 # BUG-FIX #5: Delete uploaded file after successful import
                 try:
@@ -884,7 +897,7 @@ def data_import():
                     logger.warning(f'Failed to delete file {filename}: {e}')
                 
                 # Show detailed results
-                return render_template('admin/import/result.html', result=result, filename=filename)
+                return render_template('admin/import/result.html', result=result, filename=filename, import_mode=import_mode)
             else:
                 flash(f'خطا در وارد کردن داده: {result.get("error", "خطای نامشخص")}', 'danger')
                 
@@ -911,7 +924,8 @@ def data_import():
                     'modified': datetime.fromtimestamp(os.path.getmtime(filepath))
                 })
     
-    return render_template('admin/import/index.html', existing_files=existing_files)
+    import_history = ImportBatch.query.order_by(desc(ImportBatch.created_at)).limit(50).all()
+    return render_template('admin/import/index.html', existing_files=existing_files, import_history=import_history)
 
 
 @admin_bp.route('/import/file/<filename>')
@@ -932,24 +946,53 @@ def import_existing_file(filename):
     # P3-FIX: Pass user context to DataImporter for proper auditing
     from services.data_importer import DataImporter
     
+    import_mode = request.args.get('mode', 'inventory')
+    if import_mode not in ['inventory', 'pareto_transactions']:
+        import_mode = 'inventory'
+
     importer = DataImporter(user_id=current_user.id, hotel_id=None)
-    result = importer.import_excel(filepath)
+    result = importer.import_excel(filepath, import_mode=import_mode)
     
     if result['success']:
+        imported_count = result.get('total_transactions', 0) if import_mode == 'pareto_transactions' else result.get('total_items', 0)
+        resource_type = AuditLog.RESOURCE_TRANSACTION if import_mode == 'pareto_transactions' else AuditLog.RESOURCE_ITEM
+        mode_label = 'تراکنش پارتو' if import_mode == 'pareto_transactions' else 'کالا'
+
         AuditLog.log(
             user=current_user,
             action=AuditLog.ACTION_CREATE,
-            resource_type=AuditLog.RESOURCE_ITEM,
-            description=f'وارد کردن داده از فایل: {filename} ({result["total_items"]} کالا)',
+            resource_type=resource_type,
+            description=f'وارد کردن داده از فایل: {filename} ({imported_count} {mode_label})',
             request=request
         )
         db.session.commit()
-        
-        flash(f'داده‌ها با موفقیت وارد شدند: {result["total_items"]} کالا', 'success')
-        return render_template('admin/import/result.html', result=result, filename=filename)
+
+        if import_mode == 'pareto_transactions':
+            flash(f'تراکنش‌های پارتو با موفقیت وارد شدند: {result.get("total_transactions", 0)} تراکنش', 'success')
+        else:
+            flash(f'داده‌ها با موفقیت وارد شدند: {result["total_items"]} کالا', 'success')
+
+        return render_template('admin/import/result.html', result=result, filename=filename, import_mode=import_mode)
     else:
         flash(f'خطا: {result.get("error", "خطای نامشخص")}', 'danger')
     
+    return redirect(url_for('admin.data_import'))
+
+
+@admin_bp.route('/import/batch/<int:batch_id>/delete', methods=['POST'])
+@admin_required
+def delete_import_batch(batch_id):
+    """Allow admins to delete an import batch and its generated transactions"""
+    batch = ImportBatch.query.get_or_404(batch_id)
+
+    tx_deleted = Transaction.query.filter_by(import_batch_id=batch.id).delete(synchronize_session=False)
+    db.session.delete(batch)
+    db.session.commit()
+
+    flash(
+        f'بَچ {batch.filename} (شناسه {batch.id}) حذف شد و {tx_deleted} تراکنش مرتبط پاک شد.',
+        'success'
+    )
     return redirect(url_for('admin.data_import'))
 
 

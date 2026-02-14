@@ -1,0 +1,79 @@
+{% extends 'strategy/base_strategy.html' %}
+{% block title %}ترکیب گروه‌ها{% endblock %}
+{% block strategy_help_title %}راهنمای کامل تحلیل ترکیب گروه‌ها{% endblock %}
+{% block strategy_help_body %}
+<h6>هدف این تحلیل چیست؟</h6>
+<p>این تحلیل نشان می‌دهد هزینه خرید شما بین گروه‌های مختلف (مثل غذایی و غیرغذایی) چگونه توزیع شده است. با این دید، می‌توانید تشخیص دهید چه بخشی از بودجه بیشترین فشار را ایجاد می‌کند.</p>
+
+<h6>چه خروجی‌هایی می‌بینیم؟</h6>
+<ul>
+    <li><strong>کل هزینه:</strong> مجموع مبلغ خرید کل گروه‌ها در بازه انتخابی.</li>
+    <li><strong>گروه غالب:</strong> گروهی که بیشترین سهم هزینه را دارد.</li>
+    <li><strong>سهم گروه غالب:</strong> درصدی از کل هزینه که یک گروه مصرف کرده است.</li>
+</ul>
+
+<h6>نحوه تفسیر نمودارها</h6>
+<ul>
+    <li>نمودار دایره‌ای سهم نسبی هر گروه را سریع نشان می‌دهد.</li>
+    <li>نمودار میله‌ای اختلاف مبلغ واقعی گروه‌ها را دقیق‌تر نمایش می‌دهد.</li>
+    <li>اگر سهم یک گروه خیلی بالا باشد، ریسک تمرکز بودجه ایجاد می‌شود.</li>
+</ul>
+
+<h6>اقدام مدیریتی پیشنهادی</h6>
+<ul>
+    <li>برای گروه غالب، کنترل قیمت و سیاست خرید دقیق‌تری تعریف کنید.</li>
+    <li>گروه‌های کم‌سهم اما ضروری را از نظر تأمین پایدار رها نکنید.</li>
+    <li>ترکیب گروه‌ها را ماهانه پایش کنید تا تغییر الگوی هزینه زودتر دیده شود.</li>
+</ul>
+{% endblock %}
+{% block strategy_content %}
+<div class="page-header"><h2><i class="fas fa-chart-pie text-success me-2"></i> ترکیب گروه‌های هزینه</h2></div>
+
+{% if result.summary and result.summary.grand_total > 0 %}
+<div class="row g-3 mb-4">
+    <div class="col-md-4"><div class="kpi-card primary"><div class="kpi-value">{{ '{:,.0f}'.format(result.summary.grand_total) }}</div><div class="kpi-label">کل هزینه (ریال)</div></div></div>
+    <div class="col-md-4"><div class="kpi-card success"><div class="kpi-value">{{ result.summary.dominant_category }}</div><div class="kpi-label">گروه غالب</div></div></div>
+    <div class="col-md-4"><div class="kpi-card warning"><div class="kpi-value">{{ result.summary.dominant_share }}%</div><div class="kpi-label">سهم گروه غالب</div></div></div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card strategy-chart-card"><div class="card-header"><i class="fas fa-chart-pie me-2"></i> نمودار دایره‌ای</div>
+        <div class="card-body"><canvas id="mixPie" class="strategy-chart-canvas"></canvas></div></div>
+    </div>
+    <div class="col-md-6">
+        <div class="card strategy-chart-card"><div class="card-header"><i class="fas fa-chart-bar me-2"></i> نمودار مقایسه‌ای</div>
+        <div class="card-body"><canvas id="mixBar" class="strategy-chart-canvas"></canvas></div></div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body table-responsive">
+        <table class="table table-hover table-sm">
+            <thead><tr><th>گروه</th><th>مبلغ کل</th><th>سهم</th><th>تعداد کالا</th><th>تعداد تراکنش</th><th>میانگین قیمت</th></tr></thead>
+            <tbody>
+            {% for _, row in result.data.iterrows() %}
+            <tr><td><strong>{{ row.category }}</strong></td><td class="number-fa">{{ '{:,.0f}'.format(row.total_amount) }}</td><td>{{ row.share_pct }}%</td><td>{{ row.item_count }}</td><td>{{ row.tx_count }}</td><td class="number-fa">{{ '{:,.0f}'.format(row.avg_price) }}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const colors = ['#4caf50','#2196f3','#ff9800','#9c27b0','#f44336'];
+new Chart(document.getElementById('mixPie'), {
+    type: 'doughnut',
+    data: { labels: {{ result.chart.labels | tojson }}, datasets: [{ data: {{ result.chart.amounts | tojson }}, backgroundColor: colors }] }
+});
+new Chart(document.getElementById('mixBar'), {
+    type: 'bar',
+    data: { labels: {{ result.chart.labels | tojson }}, datasets: [{ label: 'مبلغ', data: {{ result.chart.amounts | tojson }}, backgroundColor: colors }] },
+    options: { responsive: true, plugins: { legend: { display: false } } }
+});
+</script>
+{% else %}
+<div class="alert alert-info"><i class="fas fa-info-circle me-2"></i> داده کافی یافت نشد.</div>
+{% endif %}
+{% endblock %}

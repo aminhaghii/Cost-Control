@@ -1,0 +1,91 @@
+{% extends 'strategy/base_strategy.html' %}
+{% block title %}مصرف بودجه{% endblock %}
+{% block strategy_help_title %}راهنمای کامل تحلیل مصرف بودجه{% endblock %}
+{% block strategy_help_body %}
+<h6>هدف این تحلیل چیست؟</h6>
+<p>این تحلیل نشان می‌دهد بودجه تعیین‌شده با چه سرعتی مصرف می‌شود و آیا روند هزینه با سقف بودجه هم‌راستا است یا خیر. خروجی آن برای جلوگیری از کسری بودجه و تصمیم اصلاحی سریع بسیار کاربردی است.</p>
+
+<h6>شاخص‌های کلیدی</h6>
+<ul>
+    <li><strong>بودجه کل:</strong> سقف هزینه مجاز در بازه موردنظر.</li>
+    <li><strong>هزینه‌شده و باقیمانده:</strong> وضعیت فعلی استفاده از بودجه.</li>
+    <li><strong>درصد مصرف:</strong> سهم بودجه مصرف‌شده تا امروز.</li>
+    <li><strong>نرخ روزانه مصرف:</strong> سرعت سوخت بودجه در هر روز.</li>
+    <li><strong>تخمین روز باقیمانده:</strong> با روند فعلی، چند روز دیگر بودجه تمام می‌شود.</li>
+</ul>
+
+<h6>نحوه خواندن نمودار</h6>
+<ul>
+    <li>خط «هزینه تجمعی» روند مصرف واقعی بودجه را نشان می‌دهد.</li>
+    <li>خط «باقیمانده بودجه» مسیر کاهش منابع مالی را نمایش می‌دهد.</li>
+    <li>اگر هزینه تجمعی به سرعت به خط بودجه نزدیک شود، نیاز به اقدام کنترلی فوری دارید.</li>
+</ul>
+
+<h6>اقدام مدیریتی پیشنهادی</h6>
+<ul>
+    <li>در صورت مصرف سریع، هزینه‌ها را به اقلام ضروری/غیرضروری تفکیک و محدود کنید.</li>
+    <li>برای کالاهای پرهزینه، بازنگری قیمت، مذاکره مجدد و زمان‌بندی خرید انجام دهید.</li>
+    <li>بودجه را به‌صورت دوره‌ای بازتنظیم کنید تا با واقعیت عملیاتی همخوان بماند.</li>
+</ul>
+{% endblock %}
+{% block strategy_content %}
+<div class="page-header"><h2><i class="fas fa-fire-alt text-danger me-2"></i> مصرف بودجه</h2></div>
+
+{% if result.summary and result.summary.budget > 0 %}
+<div class="row g-3 mb-4">
+    <div class="col-md-2"><div class="kpi-card primary"><div class="kpi-value">{{ '{:,.0f}'.format(result.summary.budget) }}</div><div class="kpi-label">بودجه (ریال)</div></div></div>
+    <div class="col-md-2"><div class="kpi-card {% if result.summary.on_track %}success{% else %}danger{% endif %}"><div class="kpi-value">{{ '{:,.0f}'.format(result.summary.total_spent) }}</div><div class="kpi-label">هزینه شده</div></div></div>
+    <div class="col-md-2"><div class="kpi-card info"><div class="kpi-value">{{ '{:,.0f}'.format(result.summary.remaining) }}</div><div class="kpi-label">باقیمانده</div></div></div>
+    <div class="col-md-2"><div class="kpi-card warning"><div class="kpi-value">{{ result.summary.pct_used }}%</div><div class="kpi-label">درصد مصرف</div></div></div>
+    <div class="col-md-2"><div class="kpi-card danger"><div class="kpi-value">{{ '{:,.0f}'.format(result.summary.daily_burn_rate) }}</div><div class="kpi-label">نرخ روزانه</div></div></div>
+    <div class="col-md-2"><div class="kpi-card {% if result.summary.estimated_days_left < 7 %}danger{% else %}success{% endif %}"><div class="kpi-value">{{ result.summary.estimated_days_left }}</div><div class="kpi-label">روز باقیمانده (تخمین)</div></div></div>
+</div>
+
+<!-- Progress bar -->
+<div class="card mb-4">
+    <div class="card-body">
+        <h6>پیشرفت مصرف بودجه</h6>
+        <div class="progress" style="height:30px">
+            <div class="progress-bar {% if result.summary.pct_used > 90 %}bg-danger{% elif result.summary.pct_used > 70 %}bg-warning{% else %}bg-success{% endif %}"
+                 style="width:{{ result.summary.pct_used }}%">{{ result.summary.pct_used }}%</div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4 strategy-chart-card">
+    <div class="card-header"><i class="fas fa-chart-line me-2"></i> نمودار مصرف تجمعی</div>
+    <div class="card-body"><canvas id="burndownChart" class="strategy-chart-canvas"></canvas></div>
+</div>
+
+<div class="card">
+    <div class="card-body table-responsive">
+        <table class="table table-hover table-sm">
+            <thead><tr><th>تاریخ</th><th>هزینه روز</th><th>تجمعی</th><th>باقیمانده</th><th>درصد مصرف</th></tr></thead>
+            <tbody>
+            {% for _, row in result.data.iterrows() %}
+            <tr><td>{{ row.transaction_date }}</td><td class="number-fa">{{ '{:,.0f}'.format(row.daily_spend) }}</td><td class="number-fa">{{ '{:,.0f}'.format(row.cumulative) }}</td><td class="number-fa">{{ '{:,.0f}'.format(row.remaining) }}</td><td>{{ row.pct_used }}%</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+new Chart(document.getElementById('burndownChart'), {
+    type: 'line',
+    data: {
+        labels: {{ result.chart.labels | tojson }},
+        datasets: [
+            { label: 'هزینه تجمعی', data: {{ result.chart.cumulative | tojson }}, borderColor: '#e53935', backgroundColor: 'rgba(229,57,53,0.1)', fill: true, tension: 0.3 },
+            { label: 'باقیمانده بودجه', data: {{ result.chart.remaining | tojson }}, borderColor: '#4caf50', backgroundColor: 'rgba(76,175,80,0.1)', fill: true, tension: 0.3 },
+            { label: 'خط بودجه', data: {{ result.chart.budget_line | tojson }}, borderColor: '#9e9e9e', borderDash: [5,5], fill: false, pointRadius: 0 }
+        ]
+    },
+    options: { responsive: true, scales: { y: { title: { display: true, text: 'مبلغ (ریال)' } } } }
+});
+</script>
+{% else %}
+<div class="alert alert-info"><i class="fas fa-info-circle me-2"></i> داده کافی یافت نشد. بودجه را در پارامتر URL وارد کنید: <code>?budget=50000000</code></div>
+{% endif %}
+{% endblock %}

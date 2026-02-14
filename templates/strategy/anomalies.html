@@ -1,0 +1,80 @@
+{% extends 'strategy/base_strategy.html' %}
+{% block title %}تشخیص ناهنجاری{% endblock %}
+{% block strategy_help_title %}راهنمای کامل تحلیل تشخیص ناهنجاری{% endblock %}
+{% block strategy_help_body %}
+<h6>هدف این تحلیل چیست؟</h6>
+<p>این تحلیل تراکنش‌هایی را که از الگوی معمول خرید فاصله دارند شناسایی می‌کند. منظور از ناهنجاری می‌تواند مقدار غیرعادی، قیمت غیرمتعارف یا مبلغ کل غیرمنتظره باشد.</p>
+
+<h6>شاخص‌های کلیدی</h6>
+<ul>
+    <li><strong>تعداد ناهنجاری:</strong> چند تراکنش در بازه انتخابی مشکوک شناسایی شده‌اند.</li>
+    <li><strong>نرخ ناهنجاری:</strong> سهم تراکنش‌های غیرعادی از کل تراکنش‌ها.</li>
+    <li><strong>کالای درگیر:</strong> چند کالا حداقل یک رفتار غیرمعمول داشته‌اند.</li>
+</ul>
+
+<h6>چطور خروجی را بخوانیم؟</h6>
+<ul>
+    <li>نمودار دایره‌ای نسبت تراکنش‌های عادی و غیرعادی را سریع نشان می‌دهد.</li>
+    <li>در جدول، برای هر ردیف علت ناهنجاری نوشته شده تا اقدام اصلاحی هدفمند باشد.</li>
+    <li>ترکیب «قیمت غیرعادی + مقدار بالا» معمولاً اثر مالی بیشتری دارد و باید در اولویت بررسی باشد.</li>
+</ul>
+
+<h6>اقدام مدیریتی پیشنهادی</h6>
+<ul>
+    <li>ناهجاری‌های پرتکرار را به تفکیک تأمین‌کننده بررسی و سقف کنترلی تعریف کنید.</li>
+    <li>برای تراکنش‌های حساس، تأیید دومرحله‌ای یا هشدار قبل از ثبت نهایی بگذارید.</li>
+    <li>با ترکیب این تحلیل و روند قیمت، منشأ اصلی هزینه‌های غیرمنتظره را دقیق‌تر پیدا کنید.</li>
+</ul>
+{% endblock %}
+{% block strategy_content %}
+<div class="page-header"><h2><i class="fas fa-exclamation-triangle text-warning me-2"></i> تشخیص ناهنجاری خرید</h2></div>
+
+{% if result.summary %}
+<div class="row g-3 mb-4">
+    <div class="col-md-3"><div class="kpi-card danger"><div class="kpi-value">{{ result.summary.total_anomalies }}</div><div class="kpi-label">تراکنش غیرعادی</div></div></div>
+    <div class="col-md-3"><div class="kpi-card primary"><div class="kpi-value">{{ result.summary.total_transactions }}</div><div class="kpi-label">کل تراکنش‌ها</div></div></div>
+    <div class="col-md-3"><div class="kpi-card warning"><div class="kpi-value">{{ result.summary.anomaly_rate }}%</div><div class="kpi-label">نرخ ناهنجاری</div></div></div>
+    <div class="col-md-3"><div class="kpi-card info"><div class="kpi-value">{{ result.summary.unique_items_with_anomaly }}</div><div class="kpi-label">کالای درگیر</div></div></div>
+</div>
+
+<div class="card mb-4 strategy-chart-card">
+    <div class="card-header"><i class="fas fa-chart-pie me-2"></i> نسبت عادی / غیرعادی</div>
+    <div class="card-body text-center"><canvas id="anomalyPie" class="strategy-chart-canvas" style="max-width:430px;margin:auto"></canvas></div>
+</div>
+
+{% if not result.data.empty %}
+<div class="card">
+    <div class="card-header bg-danger text-white"><i class="fas fa-list me-2"></i> لیست تراکنش‌های غیرعادی</div>
+    <div class="card-body table-responsive">
+        <table class="table table-hover table-sm">
+            <thead><tr><th>تاریخ</th><th>کد</th><th>نام کالا</th><th>مقدار</th><th>قیمت واحد</th><th>مبلغ کل</th><th>دلایل</th></tr></thead>
+            <tbody>
+            {% for _, row in result.data.iterrows() %}
+            <tr class="table-warning">
+                <td>{{ row.date }}</td><td>{{ row.item_code }}</td><td>{{ row.item_name }}</td>
+                <td>{{ row.quantity }}</td>
+                <td class="number-fa">{{ '{:,.0f}'.format(row.unit_price) }}</td>
+                <td class="number-fa">{{ '{:,.0f}'.format(row.total_amount) }}</td>
+                <td><small>{{ row.reasons }}</small></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+new Chart(document.getElementById('anomalyPie'), {
+    type: 'doughnut',
+    data: {
+        labels: {{ result.chart.labels | tojson }},
+        datasets: [{ data: {{ result.chart.counts | tojson }}, backgroundColor: ['#4caf50','#f44336'] }]
+    }
+});
+</script>
+{% else %}
+<div class="alert alert-info"><i class="fas fa-info-circle me-2"></i> داده کافی یافت نشد.</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,92 @@
+{% extends 'strategy/base_strategy.html' %}
+{% block title %}روند قیمت / تورم{% endblock %}
+{% block strategy_help_title %}راهنمای کامل تحلیل روند قیمت / تورم{% endblock %}
+{% block strategy_help_body %}
+<h6>هدف این تحلیل چیست؟</h6>
+<p>این تحلیل مسیر تغییر قیمت خرید کالاها را در طول زمان نشان می‌دهد تا افزایش‌های غیرعادی، تورم تأمین و کالاهای حساس به نوسان قیمت سریع‌تر شناسایی شوند.</p>
+
+<h6>چه شاخص‌هایی را می‌بینیم؟</h6>
+<ul>
+    <li><strong>میانگین تغییر قیمت:</strong> جهت کلی تورم یا کاهش قیمت در بازه انتخابی.</li>
+    <li><strong>تعداد کالاهای افزایشی/کاهشی:</strong> گستردگی تغییرات قیمت در سبد خرید.</li>
+    <li><strong>بیشترین افزایش:</strong> کالایی که شدیدترین جهش قیمت را داشته است.</li>
+</ul>
+
+<h6>نحوه تفسیر نمودار</h6>
+<ul>
+    <li>هر خط، روند قیمت یک کالا را در هفته‌های متوالی نمایش می‌دهد.</li>
+    <li>شیب تند رو به بالا یعنی ریسک تورم آن کالا بالاست.</li>
+    <li>اگر چند کالا همزمان جهش کنند، احتمال افزایش هزینه کل خرید در ماه آینده بالا می‌رود.</li>
+</ul>
+
+<h6>اقدام مدیریتی پیشنهادی</h6>
+<ul>
+    <li>برای کالاهای با روند صعودی پایدار، مذاکره قیمت یا قرارداد مدت‌دار تعریف کنید.</li>
+    <li>برای کالاهای جهشی، سقف خرید و تأمین‌کننده جایگزین مشخص کنید.</li>
+    <li>برای کالاهای کاهشی، زمان‌بندی خرید را بهینه کنید تا از کاهش قیمت استفاده شود.</li>
+</ul>
+{% endblock %}
+{% block strategy_content %}
+<div class="page-header"><h2><i class="fas fa-chart-line text-danger me-2"></i> روند قیمت / تورم تأمین</h2></div>
+
+{% if result.summary and result.summary.avg_inflation is defined %}
+<div class="row g-3 mb-4">
+    <div class="col-md-3"><div class="kpi-card {% if result.summary.avg_inflation > 0 %}danger{% else %}success{% endif %}"><div class="kpi-value">{{ result.summary.avg_inflation }}%</div><div class="kpi-label">میانگین تغییر قیمت</div></div></div>
+    <div class="col-md-3"><div class="kpi-card warning"><div class="kpi-value">{{ result.summary.items_with_increase }}</div><div class="kpi-label">کالا با افزایش قیمت</div></div></div>
+    <div class="col-md-3"><div class="kpi-card success"><div class="kpi-value">{{ result.summary.items_with_decrease }}</div><div class="kpi-label">کالا با کاهش قیمت</div></div></div>
+    <div class="col-md-3"><div class="kpi-card danger"><div class="kpi-value">{{ result.summary.max_increase_pct }}%</div><div class="kpi-label">بیشترین افزایش: {{ result.summary.max_increase_item }}</div></div></div>
+</div>
+
+{% if result.items_chart %}
+<div class="card mb-4 strategy-chart-card">
+    <div class="card-header"><i class="fas fa-chart-line me-2"></i> نمودار روند قیمت (۱۰ کالای برتر)</div>
+    <div class="card-body"><canvas id="priceTrendChart" class="strategy-chart-canvas"></canvas></div>
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-header"><i class="fas fa-table me-2"></i> تغییرات قیمت</div>
+    <div class="card-body table-responsive">
+        <table class="table table-hover table-sm">
+            <thead><tr><th>کد</th><th>نام کالا</th><th>قیمت اولیه</th><th>قیمت فعلی</th><th>تغییر</th></tr></thead>
+            <tbody>
+            {% for _, row in result.data.iterrows() %}
+            <tr>
+                <td>{{ row.item_code }}</td><td>{{ row.item_name }}</td>
+                <td class="number-fa">{{ '{:,.0f}'.format(row.first_price) }}</td>
+                <td class="number-fa">{{ '{:,.0f}'.format(row.last_price) }}</td>
+                <td><span class="badge {% if row.change_pct > 0 %}bg-danger{% elif row.change_pct < 0 %}bg-success{% else %}bg-secondary{% endif %}">{{ row.change_pct }}%</span></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if result.items_chart %}
+<script type="application/json" id="price-trend-data">{{ result.items_chart | tojson }}</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const trendColors = ['#e53935','#1e88e5','#43a047','#fb8c00','#8e24aa','#00acc1','#6d4c41','#d81b60','#546e7a','#fdd835'];
+const trendSeries = JSON.parse(document.getElementById('price-trend-data').textContent || '[]');
+const trendLabels = trendSeries.length ? trendSeries[0].weeks : [];
+const trendDatasets = trendSeries.map((series, idx) => ({
+    label: series.name,
+    data: series.prices,
+    borderColor: trendColors[idx % trendColors.length],
+    fill: false,
+    tension: 0.3,
+    pointRadius: 3
+}));
+
+new Chart(document.getElementById('priceTrendChart'), {
+    type: 'line',
+    data: { labels: trendLabels, datasets: trendDatasets },
+    options: { responsive: true, scales: { y: { title: { display: true, text: 'قیمت واحد (ریال)' } } } }
+});
+</script>
+{% endif %}
+{% else %}
+<div class="alert alert-info"><i class="fas fa-info-circle me-2"></i> داده کافی یافت نشد.</div>
+{% endif %}
+{% endblock %}

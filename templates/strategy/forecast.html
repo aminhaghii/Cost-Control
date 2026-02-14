@@ -1,0 +1,81 @@
+{% extends 'strategy/base_strategy.html' %}
+{% block title %}پیش‌بینی هزینه{% endblock %}
+{% block strategy_help_title %}راهنمای کامل تحلیل پیش‌بینی هزینه{% endblock %}
+{% block strategy_help_body %}
+<h6>این تحلیل چه چیزی را پیش‌بینی می‌کند؟</h6>
+<p>این تحلیل با استفاده از روند تاریخی هزینه خرید، مقدار هزینه احتمالی در هفته‌های آینده را تخمین می‌زند تا بتوانید زودتر برای بودجه و تأمین تصمیم بگیرید.</p>
+
+<h6>شاخص‌های کلیدی</h6>
+<ul>
+    <li><strong>میانگین هفتگی:</strong> سطح پایه هزینه در هر هفته.</li>
+    <li><strong>پیش‌بینی مجموع:</strong> هزینه مورد انتظار در افق پیش‌بینی.</li>
+    <li><strong>روند کلی:</strong> صعودی یا نزولی بودن مسیر آینده.</li>
+    <li><strong>تغییر هفتگی:</strong> سرعت افزایش/کاهش هزینه در هر هفته.</li>
+</ul>
+
+<h6>نحوه تفسیر نمودار</h6>
+<ul>
+    <li>بخش تاریخی نشان می‌دهد تا امروز چه مسیری طی شده است.</li>
+    <li>بخش پیش‌بینی (میله‌های متمایز) تصویر احتمالی آینده را نمایش می‌دهد.</li>
+    <li>اگر شیب پیش‌بینی زیاد باشد، باید زودتر برنامه اصلاح بودجه یا سیاست خرید را فعال کنید.</li>
+</ul>
+
+<h6>اقدام مدیریتی پیشنهادی</h6>
+<ul>
+    <li>پیش‌بینی را با بودجه ماه آینده مقایسه و شکاف را زودتر مدیریت کنید.</li>
+    <li>برای کالاهای اثرگذار، سناریوی خوش‌بینانه/بدبینانه تعریف کنید.</li>
+    <li>این خروجی را هر هفته با داده جدید به‌روزرسانی کنید تا دقت تصمیم بالا بماند.</li>
+</ul>
+{% endblock %}
+{% block strategy_content %}
+<div class="page-header"><h2><i class="fas fa-chart-line text-primary me-2"></i> پیش‌بینی هزینه خرید</h2></div>
+
+{% if result.summary and result.summary.get('avg_weekly_spend') %}
+<div class="row g-3 mb-4">
+    <div class="col-md-3"><div class="kpi-card primary"><div class="kpi-value">{{ '{:,.0f}'.format(result.summary.avg_weekly_spend) }}</div><div class="kpi-label">میانگین هفتگی (ریال)</div></div></div>
+    <div class="col-md-3"><div class="kpi-card info"><div class="kpi-value">{{ '{:,.0f}'.format(result.summary.forecast_total) }}</div><div class="kpi-label">پیش‌بینی {{ result.summary.forecast_periods }} هفته</div></div></div>
+    <div class="col-md-3"><div class="kpi-card {% if result.summary.trend == 'صعودی' %}danger{% else %}success{% endif %}"><div class="kpi-value">{{ result.summary.trend }}</div><div class="kpi-label">روند کلی</div></div></div>
+    <div class="col-md-3"><div class="kpi-card warning"><div class="kpi-value">{{ '{:,.0f}'.format(result.summary.slope_per_week) }}</div><div class="kpi-label">تغییر هفتگی (ریال)</div></div></div>
+</div>
+
+<div class="card mb-4 strategy-chart-card">
+    <div class="card-header"><i class="fas fa-chart-area me-2"></i> نمودار تاریخی + پیش‌بینی</div>
+    <div class="card-body"><canvas id="forecastChart" class="strategy-chart-canvas"></canvas></div>
+</div>
+
+<div class="card">
+    <div class="card-body table-responsive">
+        <table class="table table-hover table-sm">
+            <thead><tr><th>دوره</th><th>مبلغ</th><th>نوع</th></tr></thead>
+            <tbody>
+            {% for _, row in result.data.iterrows() %}
+            <tr class="{% if row.is_forecast %}table-info{% endif %}">
+                <td>{{ row.week }}</td>
+                <td class="number-fa">{{ '{:,.0f}'.format(row.total_amount) }}</td>
+                <td>{% if row.is_forecast %}<span class="badge bg-info">پیش‌بینی</span>{% else %}<span class="badge bg-secondary">تاریخی</span>{% endif %}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const labels = {{ result.chart.labels | tojson }};
+const amounts = {{ result.chart.amounts | tojson }};
+const isForecast = {{ result.chart.is_forecast | tojson }};
+const bgColors = isForecast.map(f => f ? 'rgba(2,136,209,0.3)' : 'rgba(25,118,210,0.6)');
+const borderColors = isForecast.map(f => f ? '#0288D1' : '#1565C0');
+new Chart(document.getElementById('forecastChart'), {
+    type: 'bar',
+    data: { labels: labels, datasets: [{ label: 'هزینه هفتگی', data: amounts, backgroundColor: bgColors, borderColor: borderColors, borderWidth: 1, borderDash: [] }] },
+    options: { responsive: true, scales: { y: { title: { display: true, text: 'مبلغ (ریال)' } } } }
+});
+</script>
+{% elif result.summary and result.summary.get('message') %}
+<div class="alert alert-warning"><i class="fas fa-exclamation-circle me-2"></i> {{ result.summary.message }}</div>
+{% else %}
+<div class="alert alert-info"><i class="fas fa-info-circle me-2"></i> داده کافی یافت نشد.</div>
+{% endif %}
+{% endblock %}

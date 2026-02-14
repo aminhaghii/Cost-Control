@@ -1,0 +1,78 @@
+{% extends 'strategy/base_strategy.html' %}
+{% block title %}روند هزینه{% endblock %}
+{% block strategy_help_title %}راهنمای کامل تحلیل روند هزینه{% endblock %}
+{% block strategy_help_body %}
+<h6>هدف این تحلیل چیست؟</h6>
+<p>این تحلیل روند زمانی هزینه خرید را در دوره‌های هفتگی یا ماهانه نمایش می‌دهد تا مشخص شود آیا هزینه کل در مسیر کنترل‌شده است یا وارد فاز افزایشی شده است.</p>
+
+<h6>شاخص‌های کلیدی</h6>
+<ul>
+    <li><strong>کل هزینه:</strong> مجموع هزینه ثبت‌شده در بازه زمانی انتخابی.</li>
+    <li><strong>میانگین هر دوره:</strong> سطح پایه هزینه که برای برنامه بودجه مهم است.</li>
+    <li><strong>جهت روند:</strong> صعودی یا نزولی بودن مسیر هزینه.</li>
+    <li><strong>تعداد دوره:</strong> کیفیت پوشش زمانی داده‌ها.</li>
+</ul>
+
+<h6>نحوه تفسیر نمودار</h6>
+<ul>
+    <li>اگر شیب نمودار به‌صورت پایدار صعودی باشد، احتمال کسری بودجه در آینده بالا می‌رود.</li>
+    <li>قله‌های ناگهانی معمولاً ناشی از خریدهای سنگین یا جهش قیمت چند کالای خاص هستند.</li>
+    <li>روند نزولی پایدار می‌تواند نشانه اثرگذاری سیاست‌های کنترلی باشد.</li>
+</ul>
+
+<h6>اقدام مدیریتی پیشنهادی</h6>
+<ul>
+    <li>در روند صعودی، علت را به تفکیک گروه/کالا تحلیل و سقف خرید دوره‌ای تعیین کنید.</li>
+    <li>دوره‌هایی با انحراف بالا را با رویدادهای عملیاتی (اشغال هتل، مناسبت‌ها) تطبیق دهید.</li>
+    <li>برای تصمیم‌گیری بهتر، این خروجی را کنار تحلیل بودجه و نوسان قیمت بررسی کنید.</li>
+</ul>
+{% endblock %}
+{% block strategy_content %}
+<div class="page-header"><h2><i class="fas fa-chart-area text-primary me-2"></i> روند هزینه خرید</h2></div>
+
+{% if result.summary and result.summary.total_spend > 0 %}
+<div class="row g-3 mb-4">
+    <div class="col-md-3"><div class="kpi-card primary"><div class="kpi-value">{{ '{:,.0f}'.format(result.summary.total_spend) }}</div><div class="kpi-label">کل هزینه (ریال)</div></div></div>
+    <div class="col-md-3"><div class="kpi-card info"><div class="kpi-value">{{ '{:,.0f}'.format(result.summary.avg_spend) }}</div><div class="kpi-label">میانگین هر دوره</div></div></div>
+    <div class="col-md-3"><div class="kpi-card {% if result.summary.trend_direction == 'up' %}danger{% else %}success{% endif %}"><div class="kpi-value"><i class="fas fa-arrow-{% if result.summary.trend_direction == 'up' %}up{% else %}down{% endif %}"></i></div><div class="kpi-label">روند {{ 'صعودی' if result.summary.trend_direction == 'up' else 'نزولی' }}</div></div></div>
+    <div class="col-md-3"><div class="kpi-card warning"><div class="kpi-value">{{ result.summary.periods_count }}</div><div class="kpi-label">تعداد دوره</div></div></div>
+</div>
+
+<div class="card mb-4 strategy-chart-card">
+    <div class="card-header"><i class="fas fa-chart-area me-2"></i> نمودار روند هزینه</div>
+    <div class="card-body"><canvas id="spendChart" class="strategy-chart-canvas"></canvas></div>
+</div>
+
+<div class="card">
+    <div class="card-body table-responsive">
+        <table class="table table-hover table-sm">
+            <thead><tr><th>دوره</th><th>مبلغ کل</th><th>تعداد تراکنش</th><th>میانگین سبد</th></tr></thead>
+            <tbody>
+            {% for _, row in result.data.iterrows() %}
+            <tr><td>{{ row.period }}</td><td class="number-fa">{{ '{:,.0f}'.format(row.total_amount) }}</td><td>{{ row.tx_count }}</td><td class="number-fa">{{ '{:,.0f}'.format(row.avg_basket) }}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+new Chart(document.getElementById('spendChart'), {
+    type: 'line',
+    data: {
+        labels: {{ result.chart.labels | tojson }},
+        datasets: [{
+            label: 'هزینه کل',
+            data: {{ result.chart.amounts | tojson }},
+            borderColor: '#1976D2', backgroundColor: 'rgba(25,118,210,0.15)',
+            fill: true, tension: 0.3
+        }]
+    },
+    options: { responsive: true, scales: { y: { title: { display: true, text: 'مبلغ (ریال)' } } } }
+});
+</script>
+{% else %}
+<div class="alert alert-info"><i class="fas fa-info-circle me-2"></i> داده کافی یافت نشد.</div>
+{% endif %}
+{% endblock %}
