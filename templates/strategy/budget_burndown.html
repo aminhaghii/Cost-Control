@@ -70,16 +70,19 @@
     </div>
 </div>
 
+<script type="application/json" id="burndown-chart-data">{{ result.chart | tojson }}</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+const burndownPayload = JSON.parse(document.getElementById('burndown-chart-data').textContent || '{}');
+
 new Chart(document.getElementById('burndownChart'), {
     type: 'line',
     data: {
-        labels: {{ result.chart.labels | tojson }},
+        labels: burndownPayload.labels || [],
         datasets: [
-            { label: 'هزینه تجمعی', data: {{ result.chart.cumulative | tojson }}, borderColor: '#e53935', backgroundColor: 'rgba(229,57,53,0.1)', fill: true, tension: 0.3 },
-            { label: 'باقیمانده بودجه', data: {{ result.chart.remaining | tojson }}, borderColor: '#4caf50', backgroundColor: 'rgba(76,175,80,0.1)', fill: true, tension: 0.3 },
-            { label: 'خط بودجه', data: {{ result.chart.budget_line | tojson }}, borderColor: '#9e9e9e', borderDash: [5,5], fill: false, pointRadius: 0 }
+            { label: 'هزینه تجمعی', data: burndownPayload.cumulative || [], borderColor: '#e53935', backgroundColor: 'rgba(229,57,53,0.1)', fill: true, tension: 0.3 },
+            { label: 'باقیمانده بودجه', data: burndownPayload.remaining || [], borderColor: '#4caf50', backgroundColor: 'rgba(76,175,80,0.1)', fill: true, tension: 0.3 },
+            { label: 'خط بودجه', data: burndownPayload.budget_line || [], borderColor: '#9e9e9e', borderDash: [5,5], fill: false, pointRadius: 0 }
         ]
     },
     options: { responsive: true, scales: { y: { title: { display: true, text: 'مبلغ (ریال)' } } } }

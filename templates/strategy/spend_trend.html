@@ -56,17 +56,22 @@
     </div>
 </div>
 
+<script type="application/json" id="spend-chart-data">{{ result.chart | tojson }}</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+const spendPayload = JSON.parse(document.getElementById('spend-chart-data').textContent || '{}');
+
 new Chart(document.getElementById('spendChart'), {
     type: 'line',
     data: {
-        labels: {{ result.chart.labels | tojson }},
+        labels: spendPayload.labels || [],
         datasets: [{
             label: 'هزینه کل',
-            data: {{ result.chart.amounts | tojson }},
-            borderColor: '#1976D2', backgroundColor: 'rgba(25,118,210,0.15)',
-            fill: true, tension: 0.3
+            data: spendPayload.amounts || [],
+            borderColor: '#1565C0',
+            backgroundColor: 'rgba(21,101,192,0.1)',
+            fill: true,
+            tension: 0.3
         }]
     },
     options: { responsive: true, scales: { y: { title: { display: true, text: 'مبلغ (ریال)' } } } }

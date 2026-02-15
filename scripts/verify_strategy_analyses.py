@@ -92,7 +92,7 @@ def create_test_excel(path):
 def import_test_data(excel_path):
     from app import create_app
     from config import Config
-    from models import db, Transaction, Item
+    from models import db, Transaction, Item, User
     from services.data_importer import DataImporter
 
     app = create_app(Config)
@@ -111,6 +111,50 @@ def import_test_data(excel_path):
             Transaction.is_opening_balance != True,
         ).count()
         print(f"✅ Total purchase transactions in DB: {tx_count}")
+
+        # Seed deterministic consumption transactions for consumption-based KPIs
+        Transaction.query.filter(
+            Transaction.transaction_type == 'مصرف',
+            Transaction.source == 'verification_seed',
+        ).delete(synchronize_session=False)
+
+        seed_user = User.query.first()
+        if seed_user is None:
+            raise RuntimeError('No user found for seeding consumption transactions')
+
+        items = Item.query.filter(Item.category == 'Food').all()
+        start_day = date.today() - timedelta(days=30)
+
+        for item in items:
+            base_qty = 2 + (item.id % 4)
+            for day_idx in range(30):
+                tx_date = start_day + timedelta(days=day_idx)
+                qty = base_qty + ((day_idx + item.id) % 3)
+                tx = Transaction.create_transaction(
+                    item_id=item.id,
+                    transaction_type='مصرف',
+                    quantity=qty,
+                    unit_price=item.unit_price,
+                    category=item.category,
+                    hotel_id=item.hotel_id,
+                    user_id=seed_user.id,
+                    source='verification_seed',
+                    description='مصرف آزمایشی برای تست تحلیل استراتژیک',
+                    allow_price_override=True,
+                )
+                tx.transaction_date = tx_date
+                tx.destination_department = 'kitchen'
+                db.session.add(tx)
+
+        db.session.commit()
+
+        consumption_count = Transaction.query.filter(
+            Transaction.transaction_type == 'مصرف',
+            Transaction.is_deleted != True,
+            Transaction.source == 'verification_seed',
+        ).count()
+        print(f"✅ Seeded consumption transactions: {consumption_count}")
+
         return tx_count
 
 
@@ -168,6 +212,8 @@ def verify_analyses():
             assert not df.empty, "XYZ data is empty"
             assert s['total_items'] > 0, "No items"
             assert s['x_count'] + s['y_count'] + s['z_count'] == s['total_items'], "XYZ counts don't add up"
+            assert s.get('data_quality') == 'consumption_based', "XYZ should be consumption-based"
+            assert s.get('min_days_threshold') == 14, "XYZ min-days threshold mismatch"
             # Verify CV values are non-negative
             assert (df['cv'] >= 0).all(), "Negative CV found"
             # X items should have CV < 0.5
@@ -187,9 +233,11 @@ def verify_analyses():
             r = analyse_abc_xyz(days=90, category='Food')
             df = r['data']
             matrix = r['matrix']
+            errors_list = r.get('errors', [])
             assert matrix, "Matrix is empty"
             total_in_matrix = sum(v['count'] for v in matrix.values())
             assert total_in_matrix == len(df), f"Matrix count {total_in_matrix} != data rows {len(df)}"
+            assert isinstance(errors_list, list), "errors must be a list"
             # Verify all 9 cells exist
             for a in ['A', 'B', 'C']:
                 for x in ['X', 'Y', 'Z']:
@@ -302,9 +350,9 @@ def verify_analyses():
             s = r['summary']
             items_chart = r['items_chart']
             assert len(items_chart) > 0, "No demand chart items"
-            total_demand = s['rising_demand'] + s['falling_demand'] + s['stable_demand']
+            total_demand = s['rising_consumption'] + s['falling_consumption'] + s['stable_consumption']
             assert total_demand > 0, "No demand data"
-            print(f"   ✅ PASS: rising={s['rising_demand']}, stable={s['stable_demand']}, falling={s['falling_demand']}")
+            print(f"   ✅ PASS: rising={s['rising_consumption']}, stable={s['stable_consumption']}, falling={s['falling_consumption']}")
             passes.append("Demand Proxy")
         except Exception as e:
             print(f"   ❌ FAIL: {e}")
@@ -344,6 +392,16 @@ def verify_analyses():
                 forecast_rows = df[df['is_forecast'] == True]
                 assert len(forecast_rows) > 0, "No forecast rows"
                 print(f"   ✅ PASS: avg_weekly={s['avg_weekly_spend']:,.0f}, forecast_total={s['forecast_total']:,.0f}, trend={s['trend']}")
+
+                adjusted = analyse_forecast(
+                    days=90,
+                    category='Food',
+                    occupancy_forecast=[75, 80, 90, 95],
+                    events=[{'week': 3, 'multiplier': 1.5, 'description': 'رویداد تست'}],
+                )
+                adj_summary = adjusted['summary']
+                assert adj_summary.get('occupancy_adjusted') is True, "Forecast occupancy flag not set"
+                assert adj_summary.get('events_included') is True, "Forecast events flag not set"
             else:
                 print(f"   ⚠️  Not enough data for forecast: {s.get('message', 'unknown')}")
             passes.append("Forecast")
@@ -380,6 +438,7 @@ def verify_analyses():
         try:
             overview = get_strategy_overview(days=90, category='Food')
             assert overview['has_data'], "Overview has no data"
+            assert 'validation' in overview, "Overview missing validation payload"
             print(f"   ✅ PASS: Overview loaded successfully")
             passes.append("Hub Overview")
         except Exception as e:

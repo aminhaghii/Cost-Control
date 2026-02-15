@@ -38,6 +38,22 @@
     <div class="col-md-3"><div class="kpi-card warning"><div class="kpi-value">{{ '{:,.0f}'.format(result.summary.slope_per_week) }}</div><div class="kpi-label">تغییر هفتگی (ریال)</div></div></div>
 </div>
 
+{% if result.summary.get('warning') %}
+<div class="alert alert-warning mb-3">
+    <i class="fas fa-exclamation-triangle me-2"></i>
+    {{ result.summary.warning[0] }}
+</div>
+{% endif %}
+
+<div class="d-flex flex-wrap gap-2 mb-3">
+    <span class="badge {% if result.summary.get('occupancy_adjusted') %}bg-success{% else %}bg-secondary{% endif %}">
+        اشغال هتل: {% if result.summary.get('occupancy_adjusted') %}اعمال شده{% else %}اعمال نشده{% endif %}
+    </span>
+    <span class="badge {% if result.summary.get('events_included') %}bg-info{% else %}bg-secondary{% endif %}">
+        رویدادها: {% if result.summary.get('events_included') %}اعمال شده{% else %}اعمال نشده{% endif %}
+    </span>
+</div>
+
 <div class="card mb-4 strategy-chart-card">
     <div class="card-header"><i class="fas fa-chart-area me-2"></i> نمودار تاریخی + پیش‌بینی</div>
     <div class="card-body"><canvas id="forecastChart" class="strategy-chart-canvas"></canvas></div>
@@ -60,13 +76,16 @@
     </div>
 </div>
 
+<script type="application/json" id="forecast-chart-data">{{ result.chart | tojson }}</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-const labels = {{ result.chart.labels | tojson }};
-const amounts = {{ result.chart.amounts | tojson }};
-const isForecast = {{ result.chart.is_forecast | tojson }};
+const forecastPayload = JSON.parse(document.getElementById('forecast-chart-data').textContent || '{}');
+const labels = forecastPayload.labels || [];
+const amounts = forecastPayload.amounts || [];
+const isForecast = forecastPayload.is_forecast || [];
 const bgColors = isForecast.map(f => f ? 'rgba(2,136,209,0.3)' : 'rgba(25,118,210,0.6)');
 const borderColors = isForecast.map(f => f ? '#0288D1' : '#1565C0');
+
 new Chart(document.getElementById('forecastChart'), {
     type: 'bar',
     data: { labels: labels, datasets: [{ label: 'هزینه هفتگی', data: amounts, backgroundColor: bgColors, borderColor: borderColors, borderWidth: 1, borderDash: [] }] },

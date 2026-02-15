@@ -155,7 +155,7 @@
         <i class="fas fa-sort-amount-down text-success"></i> <span>ABC (ارزشی)</span>
     </a>
     <a class="menu-item {% if request.endpoint == 'strategy.xyz' %}active{% endif %}" href="{{ url_for('strategy.xyz') }}">
-        <i class="fas fa-wave-square text-info"></i> <span>XYZ (نوسان خرید)</span>
+        <i class="fas fa-wave-square text-info"></i> <span>XYZ (نوسان مصرف)</span>
     </a>
     <a class="menu-item {% if request.endpoint == 'strategy.abc_xyz' %}active{% endif %}" href="{{ url_for('strategy.abc_xyz') }}">
         <i class="fas fa-border-all text-purple"></i> <span>ماتریس ABC-XYZ</span>
@@ -181,12 +181,12 @@
         <i class="fas fa-fire-alt text-danger"></i> <span>مصرف بودجه</span>
     </a>
 
-    <div class="menu-section"><small>تحلیل تقاضا و پیش‌بینی</small></div>
+    <div class="menu-section"><small>تحلیل مصرف و پیش‌بینی</small></div>
     <a class="menu-item {% if request.endpoint == 'strategy.purchase_frequency' %}active{% endif %}" href="{{ url_for('strategy.purchase_frequency') }}">
         <i class="fas fa-redo text-info"></i> <span>تکرار خرید</span>
     </a>
     <a class="menu-item {% if request.endpoint == 'strategy.demand_proxy' %}active{% endif %}" href="{{ url_for('strategy.demand_proxy') }}">
-        <i class="fas fa-arrow-trend-up text-success"></i> <span>روند تقاضا</span>
+        <i class="fas fa-arrow-trend-up text-success"></i> <span>روند مصرف</span>
     </a>
     <a class="menu-item {% if request.endpoint == 'strategy.anomalies' %}active{% endif %}" href="{{ url_for('strategy.anomalies') }}">
         <i class="fas fa-exclamation-triangle text-warning"></i> <span>تشخیص ناهنجاری</span>

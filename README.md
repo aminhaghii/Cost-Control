@@ -204,5 +204,34 @@ Screenshot Placeholder: داشبورد انبار
 Screenshot Placeholder: صفحه مدیریت کالاها
 Screenshot Placeholder: صفحه ثبت تراکنش
 Screenshot Placeholder: صفحه پیشنهاد سفارش AI
+
+---
+
+## 23) بازطراحی تحلیل‌های استراتژیک (Map Refactor)
+این نسخه شامل بازطراحی کامل ماژول تحلیل‌های استراتژیک است تا خروجی‌ها دقیق‌تر، قابل‌اقدام‌تر و مقاوم‌تر در برابر ضعف داده باشند.
+
+تغییرات کلیدی:
+- تحلیل XYZ از «خرید» به «مصرف واقعی روزانه» منتقل شده است.
+- تحلیل روند تقاضا به تحلیل روند مصرف واقعی (بر پایه تراکنش مصرف) تبدیل شده است.
+- ماتریس ABC-XYZ دارای لایه اعتبارسنجی (duplicate/missing/multi-cell) شده است.
+- پیش‌بینی هزینه از مدل ساده به مدل روند + ضریب اشغال + اثر رویداد ارتقا یافته است.
+- برای Budget / Anomaly / Volatility / Spend، سطح هشدار و اکشن مدیریتی اضافه شده است.
+- یک لایه اعتبارسنجی داده قبل از اجرای نمای کلی استراتژی اضافه شده است.
+
+فایل‌های اصلی مرتبط:
+- `services/strategy_analytics_service.py`
+- `services/strategy_validation.py`
+- `utils/currency.py`
+- `scripts/verify_strategy_analyses.py`
+
+نکته سازگاری:
+- امضای توابع قبلی حفظ شده است.
+- نام تابع `analyse_demand_proxy` برای سازگاری نگه داشته شده ولی خروجی آن consumption-based است.
+
+برای بررسی صحت:
+```bash
+python scripts/verify_strategy_analyses.py
+```
+در حالت صحیح باید همه تست‌ها PASS شوند.
  
 پایان سند

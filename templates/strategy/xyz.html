@@ -1,9 +1,9 @@
 {% extends 'strategy/base_strategy.html' %}
-{% block title %}تحلیل XYZ (نوسان خرید){% endblock %}
-{% block strategy_help_title %}راهنمای کامل تحلیل XYZ (نوسان خرید){% endblock %}
+{% block title %}تحلیل XYZ (نوسان مصرف){% endblock %}
+{% block strategy_help_title %}راهنمای کامل تحلیل XYZ (نوسان مصرف){% endblock %}
 {% block strategy_help_body %}
 <h6>این تحلیل چه مسئله‌ای را حل می‌کند؟</h6>
-<p>تحلیل XYZ پایداری یا بی‌ثباتی الگوی خرید هر کالا را اندازه‌گیری می‌کند. هدف این است که بدانیم کدام کالا مصرف قابل‌پیش‌بینی دارد و کدام کالا رفتار پرنوسان و پرریسک دارد.</p>
+<p>تحلیل XYZ پایداری یا بی‌ثباتی الگوی <strong>مصرف</strong> هر کالا را اندازه‌گیری می‌کند. هدف این است که بدانیم کدام کالا مصرف قابل‌پیش‌بینی دارد و کدام کالا رفتار پرنوسان و پرریسک دارد.</p>
 
 <h6>شاخص اصلی: ضریب تغییرات (CV)</h6>
 <ul>
@@ -28,7 +28,7 @@
 </ul>
 {% endblock %}
 {% block strategy_content %}
-<div class="page-header"><h2><i class="fas fa-wave-square text-info me-2"></i> تحلیل XYZ (نوسان خرید)</h2></div>
+<div class="page-header"><h2><i class="fas fa-wave-square text-info me-2"></i> تحلیل XYZ (نوسان مصرف)</h2></div>
 
 {% if result.summary and result.summary.total_items > 0 %}
 <div class="row g-3 mb-4">
@@ -46,7 +46,7 @@
     <div class="card-header"><i class="fas fa-table me-2"></i> جدول کالاها</div>
     <div class="card-body table-responsive">
         <table class="table table-hover table-sm">
-            <thead><tr><th>کد</th><th>نام کالا</th><th>میانگین ماهانه</th><th>انحراف معیار</th><th>CV</th><th>کلاس</th></tr></thead>
+            <thead><tr><th>کد</th><th>نام کالا</th><th>میانگین مصرف روزانه</th><th>انحراف معیار مصرف</th><th>CV</th><th>کلاس</th></tr></thead>
             <tbody>
             {% for _, row in result.data.iterrows() %}
             <tr>
@@ -62,16 +62,22 @@
     </div>
 </div>
 
+<script type="application/json" id="xyz-chart-data">{{ result.chart | tojson }}</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+const xyzChartData = JSON.parse(document.getElementById('xyz-chart-data').textContent || '{}');
+const xyzLabels = xyzChartData.labels || [];
+const xyzValues = xyzChartData.cv_values || [];
+const xyzClasses = xyzChartData.classes || [];
+
 new Chart(document.getElementById('xyzChart'), {
     type: 'bar',
     data: {
-        labels: {{ result.chart.labels | tojson }},
+        labels: xyzLabels,
         datasets: [{
             label: 'ضریب تغییرات (CV)',
-            data: {{ result.chart.cv_values | tojson }},
-            backgroundColor: {{ result.chart.classes | tojson }}.map(c => c === 'X' ? '#4CAF50' : c === 'Y' ? '#FF9800' : '#F44336')
+            data: xyzValues,
+            backgroundColor: xyzClasses.map(c => c === 'X' ? '#4CAF50' : c === 'Y' ? '#FF9800' : '#F44336')
         }]
     },
     options: { responsive: true, plugins: { legend: { display: false } } }

@@ -46,13 +46,14 @@
 <div class="card">
     <div class="card-body table-responsive">
         <table class="table table-hover table-sm">
-            <thead><tr><th>کد</th><th>نام کالا</th><th>تعداد خرید</th><th>فاصله میانگین (روز)</th><th>مبلغ کل</th><th>طبقه</th></tr></thead>
+            <thead><tr><th>کد</th><th>نام کالا</th><th>تعداد خرید</th><th>فاصله میانگین (روز)</th><th>فاصله پیشنهادی سفارش</th><th></th>مبلغ کل</th><th>طبقه</th></tr></thead>
             <tbody>
             {% for _, row in result.data.iterrows() %}
             <tr>
                 <td>{{ row.item_code }}</td><td>{{ row.item_name_fa }}</td>
                 <td>{{ row.purchase_count }}</td>
                 <td>{{ row.avg_interval_days }}</td>
+                <td>{{ row.suggested_reorder_interval }}</td>
                 <td class="number-fa">{{ '{:,.0f}'.format(row.total_amount) }}</td>
                 <td><span class="badge {% if row.freq_class == 'بسیار مکرر' %}bg-danger{% elif row.freq_class == 'مکرر' %}bg-warning text-dark{% elif row.freq_class == 'متوسط' %}bg-info{% else %}bg-secondary{% endif %}">{{ row.freq_class }}</span></td>
             </tr>
@@ -62,13 +63,16 @@
     </div>
 </div>
 
+<script type="application/json" id="frequency-chart-data">{{ result.chart | tojson }}</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+const frequencyPayload = JSON.parse(document.getElementById('frequency-chart-data').textContent || '{}');
+
 new Chart(document.getElementById('freqChart'), {
     type: 'bar',
     data: {
-        labels: {{ result.chart.labels | tojson }},
-        datasets: [{ label: 'تعداد خرید', data: {{ result.chart.counts | tojson }}, backgroundColor: '#0288D1' }]
+        labels: frequencyPayload.labels || [],
+        datasets: [{ label: 'تعداد خرید', data: frequencyPayload.counts || [], backgroundColor: '#0288D1' }]
     },
     options: { responsive: true, indexAxis: 'y', plugins: { legend: { display: false } } }
 });

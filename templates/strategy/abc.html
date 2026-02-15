@@ -61,21 +61,24 @@
     </div>
 </div>
 
+<script type="application/json" id="abc-chart-data">{{ result.chart | tojson }}</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+const abcPayload = JSON.parse(document.getElementById('abc-chart-data').textContent || '{}');
+
 const ctx = document.getElementById('abcChart').getContext('2d');
 new Chart(ctx, {
     type: 'bar',
     data: {
-        labels: {{ result.chart.labels | tojson }},
+        labels: abcPayload.labels || [],
         datasets: [{
             label: 'مبلغ خرید',
-            data: {{ result.chart.amounts | tojson }},
+            data: abcPayload.amounts || [],
             backgroundColor: 'rgba(46,125,50,0.6)',
             yAxisID: 'y'
         }, {
             label: 'درصد تجمعی',
-            data: {{ result.chart.cumulative | tojson }},
+            data: abcPayload.cumulative || [],
             type: 'line',
             borderColor: '#C62828',
             fill: false,
@@ -92,6 +95,6 @@ new Chart(ctx, {
 });
 </script>
 {% else %}
-<div class="alert alert-info"><i class="fas fa-info-circle me-2"></i> داده خریدی یافت نشد. ابتدا فایل Excel را وارد کنید.</div>
+<div class="alert alert-info"><i class="fas fa-info-circle me-2"></i> داده کافی یافت نشد. ابتدا تراکنش‌ها را وارد کنید.</div>
 {% endif %}
 {% endblock %}

@@ -1,21 +1,21 @@
 {% extends 'strategy/base_strategy.html' %}
-{% block title %}روند تقاضا{% endblock %}
-{% block strategy_help_title %}راهنمای کامل تحلیل روند تقاضا{% endblock %}
+{% block title %}روند مصرف{% endblock %}
+{% block strategy_help_title %}راهنمای کامل تحلیل روند مصرف{% endblock %}
 {% block strategy_help_body %}
 <h6>این تحلیل چه چیزی را نشان می‌دهد؟</h6>
-<p>این تحلیل با استفاده از داده‌های خرید، یک تصویر تقریبی از روند تقاضای کالاها ارائه می‌کند. چون در بسیاری از کسب‌وکارها داده مصرف واقعی کامل نیست، از الگوی خرید به‌عنوان نماینده تقاضا استفاده می‌شود.</p>
+<p>این تحلیل با استفاده از تراکنش‌های <strong>مصرف</strong>، روند واقعی استفاده از کالاها را نشان می‌دهد. خروجی آن مشخص می‌کند کدام کالاها مصرف صعودی، پایدار یا نزولی دارند.</p>
 
 <h6>منطق تحلیل</h6>
 <ul>
-    <li>برای هر کالا، مقدار خرید در ابتدای بازه و انتهای بازه مقایسه می‌شود.</li>
-    <li>درصد تغییر مقدار، جهت روند تقاضا را مشخص می‌کند.</li>
-    <li>کالاها به سه گروه صعودی، پایدار و نزولی تقسیم می‌شوند.</li>
+    <li>مصرف هفتگی کالاهای پرتکرار استخراج می‌شود.</li>
+    <li>با رگرسیون خطی، شیب روند مصرف و درصد تغییر هفتگی محاسبه می‌شود.</li>
+    <li>کالاها به سه گروه مصرف صعودی، پایدار و نزولی تقسیم می‌شوند.</li>
 </ul>
 
 <h6>نحوه خواندن خروجی</h6>
 <ul>
     <li>شاخص‌های بالای صفحه نشان می‌دهند چه تعداد کالا وارد هر وضعیت شده‌اند.</li>
-    <li>نمودار خطی، مسیر مقدار خرید کالاهای مهم را در طول هفته‌ها نمایش می‌دهد.</li>
+    <li>نمودار خطی، مسیر مقدار مصرف کالاهای مهم را در طول هفته‌ها نمایش می‌دهد.</li>
     <li>در جدول، «مقدار اول» و «مقدار آخر» به‌همراه درصد تغییر کمک می‌کند رفتار هر کالا سریع دیده شود.</li>
 </ul>
 
@@ -27,18 +27,18 @@
 </ul>
 {% endblock %}
 {% block strategy_content %}
-<div class="page-header"><h2><i class="fas fa-arrow-up text-success me-2"></i> روند تقاضا (تقریب از خرید)</h2></div>
+<div class="page-header"><h2><i class="fas fa-arrow-up text-success me-2"></i> روند مصرف واقعی</h2></div>
 
-{% if result.summary and (result.summary.rising_demand > 0 or result.summary.falling_demand > 0 or result.summary.stable_demand > 0) %}
+{% if result.summary and (result.summary.rising_consumption > 0 or result.summary.falling_consumption > 0 or result.summary.stable_consumption > 0) %}
 <div class="row g-3 mb-4">
-    <div class="col-md-4"><div class="kpi-card success"><div class="kpi-value">{{ result.summary.rising_demand }}</div><div class="kpi-label">تقاضای صعودی</div></div></div>
-    <div class="col-md-4"><div class="kpi-card warning"><div class="kpi-value">{{ result.summary.stable_demand }}</div><div class="kpi-label">تقاضای پایدار</div></div></div>
-    <div class="col-md-4"><div class="kpi-card danger"><div class="kpi-value">{{ result.summary.falling_demand }}</div><div class="kpi-label">تقاضای نزولی</div></div></div>
+    <div class="col-md-4"><div class="kpi-card success"><div class="kpi-value">{{ result.summary.rising_consumption }}</div><div class="kpi-label">مصرف صعودی</div></div></div>
+    <div class="col-md-4"><div class="kpi-card warning"><div class="kpi-value">{{ result.summary.stable_consumption }}</div><div class="kpi-label">مصرف پایدار</div></div></div>
+    <div class="col-md-4"><div class="kpi-card danger"><div class="kpi-value">{{ result.summary.falling_consumption }}</div><div class="kpi-label">مصرف نزولی</div></div></div>
 </div>
 
 {% if result.items_chart %}
 <div class="card mb-4 strategy-chart-card">
-    <div class="card-header"><i class="fas fa-chart-line me-2"></i> نمودار روند مقدار خرید (۱۰ کالای برتر)</div>
+    <div class="card-header"><i class="fas fa-chart-line me-2"></i> نمودار روند مقدار مصرف (۱۰ کالای برتر)</div>
     <div class="card-body"><canvas id="demandChart" class="strategy-chart-canvas"></canvas></div>
 </div>
 {% endif %}
@@ -48,7 +48,7 @@
     <div class="card-header"><i class="fas fa-table me-2"></i> تغییرات تقاضا</div>
     <div class="card-body table-responsive">
         <table class="table table-hover table-sm">
-            <thead><tr><th>کد</th><th>نام کالا</th><th>مقدار اول</th><th>مقدار آخر</th><th>تغییر</th></tr></thead>
+            <thead><tr><th>کد</th><th>نام کالا</th><th>مصرف اول</th><th>مصرف آخر</th><th>تغییر روند</th></tr></thead>
             <tbody>
             {% for _, row in result.data.iterrows() %}
             <tr>
@@ -64,25 +64,30 @@
 {% endif %}
 
 {% if result.items_chart %}
+<script type="application/json" id="consumption-trend-data">{{ result.items_chart | tojson }}</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 const colors = ['#e53935','#1e88e5','#43a047','#fb8c00','#8e24aa','#00acc1','#6d4c41','#d81b60','#546e7a','#fdd835'];
-const datasets = [];
-{% for item in result.items_chart %}
-datasets.push({
-    label: {{ item.name | tojson }},
-    data: {{ item.quantities | tojson }},
-    borderColor: colors[{{ loop.index0 }} % colors.length],
-    fill: false, tension: 0.3, pointRadius: 3
-});
-{% endfor %}
+const trendSeries = JSON.parse(document.getElementById('consumption-trend-data').textContent || '[]');
+const trendLabels = trendSeries.length ? trendSeries[0].weeks : [];
+const datasets = trendSeries.map((series, idx) => ({
+    label: series.name,
+    data: series.consumption || series.quantities || [],
+    borderColor: colors[idx % colors.length],
+    fill: false,
+    tension: 0.3,
+    pointRadius: 3
+}));
+
 new Chart(document.getElementById('demandChart'), {
     type: 'line',
-    data: { labels: {{ result.items_chart[0].weeks | tojson }}, datasets: datasets },
-    options: { responsive: true, scales: { y: { title: { display: true, text: 'مقدار خرید' } } } }
+    data: { labels: trendLabels, datasets: datasets },
+    options: { responsive: true, scales: { y: { title: { display: true, text: 'مقدار مصرف' } } } }
 });
 </script>
 {% endif %}
+{% elif result.summary and result.summary.message %}
+<div class="alert alert-warning"><i class="fas fa-exclamation-circle me-2"></i> {{ result.summary.message }}</div>
 {% else %}
 <div class="alert alert-info"><i class="fas fa-info-circle me-2"></i> داده کافی یافت نشد.</div>
 {% endif %}
