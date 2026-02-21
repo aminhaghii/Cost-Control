@@ -111,6 +111,9 @@ class Transaction(db.Model):
     # Reference number (invoice/receipt)
     reference_number = db.Column(db.String(100), nullable=True)
     
+    # Supplier tracking
+    supplier = db.Column(db.String(100), nullable=True)
+    
     # Destination department (for consumption)
     destination_department = db.Column(db.String(100), nullable=True)
     
@@ -165,7 +168,7 @@ class Transaction(db.Model):
             
             # If still None, check if unit matches base unit (factor = 1.0)
             if factor is None:
-                item = Item.query.get(self.item_id) if self.item_id else None
+                item = db.session.get(Item, self.item_id) if self.item_id else None
                 
                 # BUG-FIX #13: Better error message when item not found
                 if not item:
@@ -211,7 +214,7 @@ class Transaction(db.Model):
         """
         from .item import Item
 
-        item = Item.query.get(item_id)
+        item = db.session.get(Item, item_id)
         if not item:
             raise ValueError(f"Item {item_id} not found")
 

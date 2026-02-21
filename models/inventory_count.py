@@ -95,7 +95,7 @@ class InventoryCount(db.Model):
         """Factory method to create a new inventory count"""
         from .item import Item
         
-        item = Item.query.get(item_id)
+        item = db.session.get(Item, item_id)
         if not item:
             raise ValueError(f"Item {item_id} not found")
         

@@ -70,6 +70,21 @@ class Item(db.Model):
     
     def __repr__(self):
         return f'<Item {self.item_code}: {self.item_name_fa}>'
+
+    from sqlalchemy.orm import validates
+    @validates('current_stock')
+    def validate_stock(self, key, value):
+        """
+        Force stock to be non-negative to avoid database CHECK constraint failures.
+        Logs a warning if a negative value was attempted.
+        """
+        if value is not None and value < 0:
+            import logging
+            logging.getLogger(__name__).warning(
+                f"Attempted to set negative stock ({value}) for item {self.item_code}. Capping to 0."
+            )
+            return 0.0
+        return value
     
     def get_base_unit(self):
         """
