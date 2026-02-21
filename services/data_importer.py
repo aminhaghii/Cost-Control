@@ -1021,12 +1021,22 @@ class DataImporter:
             ).first()
             
             if not existing and item.current_stock > 0:
+                # Fetch last known price to prevent 0-price skew
+                last_price = 0
+                last_tx = Transaction.query.filter_by(
+                    item_id=item.id, 
+                    is_deleted=False
+                ).filter(Transaction.unit_price > 0).order_by(Transaction.transaction_date.desc()).first()
+                
+                if last_tx:
+                    last_price = last_tx.unit_price
+
                 # P0-2/P0-3/P0-4: Use centralized transaction creation
                 transaction = Transaction.create_transaction(
                     item_id=item.id,
                     transaction_type='اصلاحی',
                     quantity=item.current_stock,
-                    unit_price=0,  # Opening balances have zero cost
+                    unit_price=last_price,  # Use last known price or 0
                     category=item.category,
                     hotel_id=item.hotel_id,
                     user_id=user_id,

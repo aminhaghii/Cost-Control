@@ -24,6 +24,8 @@ def _base_purchase_query(days=90, category=None):
         Transaction.transaction_type == 'خرید',
         Transaction.is_deleted != True,
         Transaction.is_opening_balance != True,
+        Transaction.unit_price > 0,
+        Transaction.source != 'opening_import',
         Transaction.transaction_date >= start_date,
     )
     if category and category != 'all':
@@ -62,6 +64,7 @@ def _base_consumption_query(days=90, category=None):
         Transaction.transaction_type == 'مصرف',
         Transaction.is_deleted != True,
         Transaction.is_opening_balance != True,
+        Transaction.source != 'opening_import',
         Transaction.transaction_date >= start_date,
     )
     if category and category != 'all':
@@ -240,11 +243,27 @@ def analyse_xyz(days=90, category=None):
         daily_consumption=('quantity', 'sum')
     ).reset_index()
 
-    stats = daily.groupby(['item_id', 'item_code', 'item_name_fa']).agg(
+    start_date = date.today() - timedelta(days=days)
+    end_date = date.today()
+    all_dates = pd.date_range(start=start_date, end=end_date).date
+
+    items_info = df[['item_id', 'item_code', 'item_name_fa']].drop_duplicates().copy()
+    items_info['key'] = 1
+    date_df = pd.DataFrame({'day': all_dates, 'key': 1})
+    grid = pd.merge(items_info, date_df, on='key').drop('key', axis=1)
+
+    daily_full = pd.merge(grid, daily, on=['item_id', 'item_code', 'item_name_fa', 'day'], how='left')
+    daily_full['daily_consumption'] = daily_full['daily_consumption'].fillna(0)
+
+    stats = daily_full.groupby(['item_id', 'item_code', 'item_name_fa']).agg(
         mean_consumption=('daily_consumption', 'mean'),
         std_consumption=('daily_consumption', 'std'),
-        days_active=('day', 'nunique'),
     ).reset_index()
+
+    active_days = daily_full[daily_full['daily_consumption'] > 0].groupby('item_id')['day'].nunique().reset_index(name='days_active')
+    stats = pd.merge(stats, active_days, on='item_id', how='left')
+    stats['days_active'] = stats['days_active'].fillna(0)
+
     stats = stats[stats['days_active'] >= min_days].copy()
 
     if stats.empty:
@@ -419,10 +438,13 @@ def analyse_price_trend(days=90, category=None, top_n=10):
     top_items = df.groupby('item_id')['total_amount'].sum().nlargest(top_n).index.tolist()
     df_top = df[df['item_id'].isin(top_items)].copy()
     df_top['year_week'] = df_top['transaction_date'].dt.strftime('%Y-W%W')
+    df_top['week_start'] = df_top['transaction_date'] - pd.to_timedelta(df_top['transaction_date'].dt.weekday, unit='D')
+    df_top['week_start'] = df_top['week_start'].dt.normalize()
 
     weekly_price = df_top.groupby(['item_code', 'item_name_fa', 'year_week']).agg(
         avg_price=('unit_price', 'mean'),
         total_qty=('quantity', 'sum'),
+        week_start=('week_start', 'min'),
     ).reset_index().sort_values(['item_code', 'year_week'])
 
     price_changes = []
@@ -434,13 +456,16 @@ def analyse_price_trend(days=90, category=None, top_n=10):
         last_price = float(grp.iloc[-1]['avg_price'])
 
         if len(grp) >= 3:
-            x = np.arange(len(grp))
+            first_date = grp['week_start'].min()
+            x = (grp['week_start'] - first_date).dt.days / 7.0
             y = grp['avg_price'].values.astype(float)
             coeffs = np.polyfit(x, y, 1)
             slope = coeffs[0]
             avg_price = y.mean()
             trend_pct_per_week = (slope / avg_price * 100) if avg_price > 0 else 0
-            change_pct = trend_pct_per_week * len(grp)
+            
+            total_weeks_span = (grp['week_start'].max() - first_date).days / 7.0
+            change_pct = trend_pct_per_week * max(1, total_weeks_span)
         else:
             trend_pct_per_week = 0
             change_pct = ((last_price - first_price) / first_price * 100) if first_price > 0 else 0
@@ -580,14 +605,18 @@ def analyse_spend_trend(days=90, category=None, period='weekly'):
 
     if period == 'monthly':
         df['period'] = df['transaction_date'].dt.to_period('M').astype(str)
+        df['period_start'] = df['transaction_date'].dt.to_period('M').dt.start_time
     else:
         df['period'] = df['transaction_date'].dt.strftime('%Y-W%W')
+        df['period_start'] = df['transaction_date'] - pd.to_timedelta(df['transaction_date'].dt.weekday, unit='D')
+        df['period_start'] = df['period_start'].dt.normalize()
 
     trend = df.groupby('period').agg(
         total_amount=('total_amount', 'sum'),
         tx_count=('total_amount', 'count'),
         avg_basket=('total_amount', 'mean'),
-    ).reset_index().sort_values('period')
+        period_start=('period_start', 'min'),
+    ).reset_index().sort_values('period_start')
     trend = trend.round({'total_amount': 0, 'avg_basket': 0})
 
     cat_trend = df.groupby(['period', 'category']).agg(
@@ -598,7 +627,12 @@ def analyse_spend_trend(days=90, category=None, period='weekly'):
     max_spend_period = trend.loc[trend['total_amount'].idxmax(), 'period'] if not trend.empty else '-'
 
     if len(trend) >= 2:
-        x = np.arange(len(trend))
+        first_date = trend['period_start'].min()
+        if period == 'monthly':
+            x = (trend['period_start'] - first_date).dt.days / 30.436875
+        else:
+            x = (trend['period_start'] - first_date).dt.days / 7.0
+            
         y = trend['total_amount'].values.astype(float)
         slope = float(np.polyfit(x, y, 1)[0])
     else:
@@ -768,9 +802,12 @@ def analyse_demand_proxy(days=90, category=None, top_n=10):
     top_items = df.groupby('item_id')['quantity'].sum().nlargest(top_n).index.tolist()
     df_top = df[df['item_id'].isin(top_items)].copy()
     df_top['week'] = df_top['transaction_date'].dt.strftime('%Y-W%W')
+    df_top['week_start'] = df_top['transaction_date'] - pd.to_timedelta(df_top['transaction_date'].dt.weekday, unit='D')
+    df_top['week_start'] = df_top['week_start'].dt.normalize()
 
     weekly = df_top.groupby(['item_code', 'item_name_fa', 'week']).agg(
         total_consumption=('quantity', 'sum'),
+        week_start=('week_start', 'min'),
     ).reset_index().sort_values(['item_code', 'week'])
 
     items_chart = []
@@ -788,7 +825,8 @@ def analyse_demand_proxy(days=90, category=None, top_n=10):
         )
 
         if len(grp) >= 3:
-            x = np.arange(len(grp))
+            first_date = grp['week_start'].min()
+            x = (grp['week_start'] - first_date).dt.days / 7.0
             y = grp['total_consumption'].values.astype(float)
             slope = float(np.polyfit(x, y, 1)[0])
             avg = float(y.mean())
@@ -871,19 +909,21 @@ def analyse_anomalies(days=90, category=None, z_threshold=2.0):
     if df.empty:
         return {'data': pd.DataFrame(), 'summary': {}, 'chart': {}}
 
-    item_stats = df.groupby(['item_id', 'item_code', 'item_name_fa']).agg(
-        mean_amount=('total_amount', 'mean'),
-        std_amount=('total_amount', 'std'),
-        mean_qty=('quantity', 'mean'),
-        std_qty=('quantity', 'std'),
-        mean_price=('unit_price', 'mean'),
-        std_price=('unit_price', 'std'),
-    ).reset_index().fillna(0)
+    df = df.sort_values(['item_id', 'transaction_date']).copy()
+    window = 5
 
-    df_merged = df.merge(item_stats, on=['item_id', 'item_code', 'item_name_fa'], suffixes=('', '_stat'))
+    for col, stat_name in [('total_amount', 'amount'), ('quantity', 'qty'), ('unit_price', 'price')]:
+        df[f'mean_{stat_name}'] = df.groupby('item_id')[col].transform(lambda x: x.rolling(window, min_periods=2).mean().shift())
+        df[f'std_{stat_name}'] = df.groupby('item_id')[col].transform(lambda x: x.rolling(window, min_periods=2).std().shift())
+
+        global_mean = df.groupby('item_id')[col].transform('mean')
+        global_std = df.groupby('item_id')[col].transform('std')
+
+        df[f'mean_{stat_name}'] = df[f'mean_{stat_name}'].fillna(global_mean)
+        df[f'std_{stat_name}'] = df[f'std_{stat_name}'].fillna(global_std).fillna(0)
 
     anomalies = []
-    for _, row in df_merged.iterrows():
+    for _, row in df.iterrows():
         reasons = []
         if row['std_amount'] > 0:
             z_amount = abs(row['total_amount'] - row['mean_amount']) / row['std_amount']
@@ -949,7 +989,7 @@ def analyse_anomalies(days=90, category=None, z_threshold=2.0):
 # ──────────────────────────────────────────────
 # 11. Cost Forecast (occupancy-aware)
 # ──────────────────────────────────────────────
-def analyse_forecast(days=90, category=None, forecast_periods=4, occupancy_forecast=None, events=None):
+def analyse_forecast(days=90, category=None, forecast_periods=4, occupancy_forecast=None, events=None, historical_avg_occ=100):
     """Cost forecast with optional occupancy and event adjustments."""
     df = _base_purchase_df(days, category)
     if df.empty:
@@ -982,7 +1022,6 @@ def analyse_forecast(days=90, category=None, forecast_periods=4, occupancy_forec
         baseline_forecast = 0.6 * trend_value + 0.4 * avg_weekly
 
         if occupancy_forecast and len(occupancy_forecast) >= i:
-            historical_avg_occ = 70
             occ_multiplier = occupancy_forecast[i - 1] / historical_avg_occ
             baseline_forecast *= occ_multiplier
 
@@ -1056,7 +1095,7 @@ def analyse_budget_burndown(days=30, category=None, budget=None):
     daily['pct_used'] = (daily['cumulative'] / budget * 100).round(1)
 
     total_spent = float(df['total_amount'].sum())
-    days_elapsed = (date.today() - df_sorted['transaction_date'].dt.date.min()).days or 1
+    days_elapsed = max(1, days)
     daily_rate = total_spent / days_elapsed
     days_remaining = max(0, (budget - total_spent) / daily_rate) if daily_rate > 0 else 999
 
