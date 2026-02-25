@@ -1,100 +1,293 @@
 {% extends 'strategy/base_strategy.html' %}
+
 {% block title %}پیش‌بینی هزینه{% endblock %}
-{% block strategy_help_title %}راهنمای کامل تحلیل پیش‌بینی هزینه{% endblock %}
+
+{% block strategy_help_title %}راهنمای تحلیل پیش‌بینی هزینه{% endblock %}
 {% block strategy_help_body %}
-<h6>این تحلیل چه چیزی را پیش‌بینی می‌کند؟</h6>
-<p>این تحلیل با استفاده از روند تاریخی هزینه خرید، مقدار هزینه احتمالی در هفته‌های آینده را تخمین می‌زند تا بتوانید زودتر برای بودجه و تأمین تصمیم بگیرید.</p>
-
-<h6>شاخص‌های کلیدی</h6>
-<ul>
-    <li><strong>میانگین هفتگی:</strong> سطح پایه هزینه در هر هفته.</li>
-    <li><strong>پیش‌بینی مجموع:</strong> هزینه مورد انتظار در افق پیش‌بینی.</li>
-    <li><strong>روند کلی:</strong> صعودی یا نزولی بودن مسیر آینده.</li>
-    <li><strong>تغییر هفتگی:</strong> سرعت افزایش/کاهش هزینه در هر هفته.</li>
-</ul>
-
-<h6>نحوه تفسیر نمودار</h6>
-<ul>
-    <li>بخش تاریخی نشان می‌دهد تا امروز چه مسیری طی شده است.</li>
-    <li>بخش پیش‌بینی (میله‌های متمایز) تصویر احتمالی آینده را نمایش می‌دهد.</li>
-    <li>اگر شیب پیش‌بینی زیاد باشد، باید زودتر برنامه اصلاح بودجه یا سیاست خرید را فعال کنید.</li>
-</ul>
-
-<h6>اقدام مدیریتی پیشنهادی</h6>
-<ul>
-    <li>پیش‌بینی را با بودجه ماه آینده مقایسه و شکاف را زودتر مدیریت کنید.</li>
-    <li>برای کالاهای اثرگذار، سناریوی خوش‌بینانه/بدبینانه تعریف کنید.</li>
-    <li>این خروجی را هر هفته با داده جدید به‌روزرسانی کنید تا دقت تصمیم بالا بماند.</li>
-</ul>
+<div class="vstack gap-3 text-end">
+    <div>
+        <h6 class="fw-bold text-dark"><i class="fa-solid fa-wand-magic-sparkles text-primary me-2"></i>هدف تحلیل</h6>
+        <p class="text-muted small mb-0">تخمین مخارج آتی بر اساس الگوی مصرف گذشته، ضریب اشغال هتل و رویدادهای تقویمی.
+        </p>
+    </div>
+    <div>
+        <h6 class="fw-bold text-dark"><i class="fa-solid fa-chart-line text-info me-2"></i>نکات کلیدی</h6>
+        <ul class="list-unstyled text-muted small mb-0">
+            <li class="mb-1"><i class="fa-solid fa-check text-success me-1"></i>روند صعودی پیش‌بینی نیاز به تأمین اعتبار
+                زودهمگام دارد.</li>
+            <li class="mb-1"><i class="fa-solid fa-check text-success me-1"></i>تفاوت فاحش پیش‌بینی با بودجه، زنگ خطر
+                کسری نقدینگی است.</li>
+        </ul>
+    </div>
+</div>
 {% endblock %}
+
 {% block strategy_content %}
-<div class="page-header"><h2><i class="fas fa-chart-line text-primary me-2"></i> پیش‌بینی هزینه خرید</h2></div>
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold text-dark mb-1">پیش‌بینی هزینه خرید</h2>
+        <p class="text-muted mb-0">برآورد هوشمند مخارج آتی جهت برنامه‌ریزی نقدینگی</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-light border shadow-sm text-muted" onclick="window.print()"><i
+                class="fa-solid fa-print me-1"></i>چاپ</button>
+    </div>
+</div>
 
 {% if result.summary and result.summary.get('avg_weekly_spend') %}
-<div class="row g-3 mb-4">
-    <div class="col-md-3"><div class="kpi-card primary"><div class="kpi-value">{{ '{:,.0f}'.format(result.summary.avg_weekly_spend) }}</div><div class="kpi-label">میانگین هفتگی (ریال)</div></div></div>
-    <div class="col-md-3"><div class="kpi-card info"><div class="kpi-value">{{ '{:,.0f}'.format(result.summary.forecast_total) }}</div><div class="kpi-label">پیش‌بینی {{ result.summary.forecast_periods }} هفته</div></div></div>
-    <div class="col-md-3"><div class="kpi-card {% if result.summary.trend == 'صعودی' %}danger{% else %}success{% endif %}"><div class="kpi-value">{{ result.summary.trend }}</div><div class="kpi-label">روند کلی</div></div></div>
-    <div class="col-md-3"><div class="kpi-card warning"><div class="kpi-value">{{ '{:,.0f}'.format(result.summary.slope_per_week) }}</div><div class="kpi-label">تغییر هفتگی (ریال)</div></div></div>
+<!-- KPI Cards -->
+<div class="row g-4 mb-4">
+    <!-- Avg Weekly -->
+    <div class="col-md-6 col-lg-3">
+        <div class="card border-0 shadow-sm rounded-4 h-100 position-relative overflow-hidden">
+            <div class="card-body p-4 d-flex flex-column justify-content-center">
+                <div class="position-absolute start-0 bottom-0 opacity-25 ms-2 mb-2">
+                    <i class="fa-solid fa-scale-unbalanced fa-2x text-primary"></i>
+                </div>
+                <h6 class="text-uppercase text-muted small fw-bold tracking-wide mb-2">میانگین هفتگی</h6>
+                <h2 class="fs-2 fw-bolder text-dark mb-0">{{ '{:,.0f}'.format(result.summary.avg_weekly_spend) }} <small
+                        class="fs-6 text-muted">ریال</small></h2>
+                <div class="mt-2">
+                    <span class="badge bg-primary-subtle text-primary rounded-pill">
+                        <i class="fa-solid fa-ruler-horizontal me-1"></i>سطح پایه
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Forecast Total -->
+    <div class="col-md-6 col-lg-3">
+        <div class="card border-0 shadow-sm rounded-4 h-100 position-relative overflow-hidden">
+            <div class="card-body p-4 d-flex flex-column justify-content-center">
+                <div class="position-absolute start-0 bottom-0 opacity-25 ms-2 mb-2">
+                    <i class="fa-solid fa-sack-dollar fa-2x text-info"></i>
+                </div>
+                <h6 class="text-uppercase text-muted small fw-bold tracking-wide mb-2">پیش‌بینی {{
+                    result.summary.forecast_periods }} هفته آتی</h6>
+                <h2 class="fs-2 fw-bolder text-dark mb-0">{{ '{:,.0f}'.format(result.summary.forecast_total) }} <small
+                        class="fs-6 text-muted">ریال</small></h2>
+                <div class="mt-2">
+                    <span class="badge bg-info-subtle text-info rounded-pill">
+                        <i class="fa-solid fa-calculator me-1"></i>تخمین کل
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Trend -->
+    <div class="col-md-6 col-lg-3">
+        <div class="card border-0 shadow-sm rounded-4 h-100 position-relative overflow-hidden">
+            <div class="card-body p-4 d-flex flex-column justify-content-center">
+                <div class="position-absolute start-0 bottom-0 opacity-25 ms-2 mb-2">
+                    <i
+                        class="fa-solid fa-arrow-trend-{{ 'up' if result.summary.trend == 'صعودی' else 'down' }} fa-2x {{ 'text-danger' if result.summary.trend == 'صعودی' else 'text-success' }}"></i>
+                </div>
+                <h6 class="text-uppercase text-muted small fw-bold tracking-wide mb-2">جهت‌گیری روند</h6>
+                <h2
+                    class="fs-2 fw-bolder {{ 'text-danger' if result.summary.trend == 'صعودی' else 'text-success' }} mb-0">
+                    {{ result.summary.trend }}
+                </h2>
+                <div class="mt-2">
+                    <span
+                        class="badge {{ 'bg-danger-subtle text-danger' if result.summary.trend == 'صعودی' else 'bg-success-subtle text-success' }} rounded-pill">
+                        <i class="fa-solid fa-chart-line me-1"></i>مسیر آتی
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slope -->
+    <div class="col-md-6 col-lg-3">
+        <div class="card border-0 shadow-sm rounded-4 h-100 position-relative overflow-hidden">
+            <div class="card-body p-4 d-flex flex-column justify-content-center">
+                <div class="position-absolute start-0 bottom-0 opacity-25 ms-2 mb-2">
+                    <i class="fa-solid fa-stopwatch fa-2x text-warning"></i>
+                </div>
+                <h6 class="text-uppercase text-muted small fw-bold tracking-wide mb-2">شتاب تغییر هفتگی</h6>
+                <h2 class="fs-2 fw-bolder text-dark mb-0">{{ '{:,.0f}'.format(result.summary.slope_per_week) }} <small
+                        class="fs-6 text-muted">ریال</small></h2>
+                <div class="mt-2">
+                    <span class="badge bg-warning-subtle text-warning-emphasis rounded-pill">
+                        <i class="fa-solid fa-gauge-high me-1"></i>نرخ تغییر
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
-{% if result.summary.get('warning') %}
-<div class="alert alert-warning mb-3">
-    <i class="fas fa-exclamation-triangle me-2"></i>
-    {{ result.summary.warning[0] }}
-</div>
-{% endif %}
+<!-- Config Badges & Warnings -->
+<div class="d-flex align-items-center flex-wrap gap-2 mb-4">
+    {% if result.summary.get('warning') %}
+    <div class="alert alert-warning border-0 shadow-sm rounded-3 py-2 px-3 mb-0 d-flex align-items-center flex-grow-1">
+        <i class="fa-solid fa-triangle-exclamation me-2 fs-5"></i>
+        <span>{{ result.summary.warning[0] }}</span>
+    </div>
+    {% endif %}
 
-<div class="d-flex flex-wrap gap-2 mb-3">
-    <span class="badge {% if result.summary.get('occupancy_adjusted') %}bg-success{% else %}bg-secondary{% endif %}">
-        اشغال هتل: {% if result.summary.get('occupancy_adjusted') %}اعمال شده{% else %}اعمال نشده{% endif %}
-    </span>
-    <span class="badge {% if result.summary.get('events_included') %}bg-info{% else %}bg-secondary{% endif %}">
-        رویدادها: {% if result.summary.get('events_included') %}اعمال شده{% else %}اعمال نشده{% endif %}
-    </span>
+    <div class="card border-0 shadow-sm rounded-pill px-3 py-2 bg-white d-flex flex-row align-items-center gap-3">
+        <span class="text-muted small fw-bold text-uppercase">پارامترهای مدل:</span>
+        <span
+            class="badge {{ 'bg-success-subtle text-success' if result.summary.get('occupancy_adjusted') else 'bg-secondary-subtle text-secondary' }} rounded-pill">
+            <i class="fa-solid fa-hotel me-1"></i>اشغال هتل: {{ 'فعال' if result.summary.get('occupancy_adjusted') else
+            'غیرفعال' }}
+        </span>
+        <span
+            class="badge {{ 'bg-info-subtle text-info' if result.summary.get('events_included') else 'bg-secondary-subtle text-secondary' }} rounded-pill">
+            <i class="fa-solid fa-calendar-day me-1"></i>رویدادها: {{ 'فعال' if result.summary.get('events_included')
+            else 'غیرفعال' }}
+        </span>
+    </div>
 </div>
 
-<div class="card mb-4 strategy-chart-card">
-    <div class="card-header"><i class="fas fa-chart-area me-2"></i> نمودار تاریخی + پیش‌بینی</div>
-    <div class="card-body"><canvas id="forecastChart" class="strategy-chart-canvas"></canvas></div>
+<!-- Chart Section -->
+<div class="card border-0 shadow-sm rounded-4 mb-4">
+    <div class="card-header bg-transparent border-0 py-3 px-4">
+        <h5 class="fw-bold text-dark mb-0"><i class="fa-solid fa-chart-column text-primary me-2"></i>نمودار تاریخی +
+            پیش‌بینی</h5>
+    </div>
+    <div class="card-body p-4">
+        <div style="height: 400px; width: 100%;">
+            <canvas id="forecastChart"></canvas>
+        </div>
+    </div>
 </div>
 
-<div class="card">
-    <div class="card-body table-responsive">
-        <table class="table table-hover table-sm">
-            <thead><tr><th>دوره</th><th>مبلغ</th><th>نوع</th></tr></thead>
-            <tbody>
-            {% for _, row in result.data.iterrows() %}
-            <tr class="{% if row.is_forecast %}table-info{% endif %}">
-                <td>{{ row.week }}</td>
-                <td class="number-fa">{{ '{:,.0f}'.format(row.total_amount) }}</td>
-                <td>{% if row.is_forecast %}<span class="badge bg-info">پیش‌بینی</span>{% else %}<span class="badge bg-secondary">تاریخی</span>{% endif %}</td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+<!-- Data Table -->
+<div class="card border-0 shadow-sm rounded-4">
+    <div class="card-header bg-transparent border-0 py-3 px-4">
+        <h5 class="fw-bold text-dark mb-0"><i class="fa-solid fa-list text-primary me-2"></i>جزئیات دوره‌ها</h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-borderless align-middle mb-0">
+                <thead class="bg-light text-muted small text-uppercase">
+                    <tr>
+                        <th class="py-3 px-4 rounded-start">دوره زمانی</th>
+                        <th class="py-3 text-end">مبلغ (ریال)</th>
+                        <th class="py-3 text-center rounded-end">نوع داده</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for _, row in result.data.iterrows() %}
+                    <tr class="border-bottom border-light {{ 'bg-primary-subtle bg-opacity-10' if row.is_forecast }}">
+                        <td class="px-4 py-3 fw-medium text-dark">{{ row.week }}</td>
+                        <td class="text-end py-3">
+                            <span
+                                class="number-fa fs-5 fw-bold {{ 'text-primary' if row.is_forecast else 'text-dark' }}">
+                                {{ '{:,.0f}'.format(row.total_amount) }}
+                            </span>
+                        </td>
+                        <td class="text-center py-3">
+                            {% if row.is_forecast %}
+                            <span class="badge bg-primary shadow-sm rounded-pill px-3">
+                                <i class="fa-solid fa-forward me-1"></i>پیش‌بینی
+                            </span>
+                            {% else %}
+                            <span class="badge bg-secondary-subtle text-dark rounded-pill px-3">
+                                <i class="fa-solid fa-clock-rotate-left me-1"></i>تاریخی
+                            </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
 <script type="application/json" id="forecast-chart-data">{{ result.chart | tojson }}</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-const forecastPayload = JSON.parse(document.getElementById('forecast-chart-data').textContent || '{}');
-const labels = forecastPayload.labels || [];
-const amounts = forecastPayload.amounts || [];
-const isForecast = forecastPayload.is_forecast || [];
-const bgColors = isForecast.map(f => f ? 'rgba(2,136,209,0.3)' : 'rgba(25,118,210,0.6)');
-const borderColors = isForecast.map(f => f ? '#0288D1' : '#1565C0');
+    document.addEventListener('DOMContentLoaded', function () {
+        const forecastPayload = JSON.parse(document.getElementById('forecast-chart-data').textContent || '{}');
+        const labels = forecastPayload.labels || [];
+        const amounts = forecastPayload.amounts || [];
+        const isForecast = forecastPayload.is_forecast || [];
 
-new Chart(document.getElementById('forecastChart'), {
-    type: 'bar',
-    data: { labels: labels, datasets: [{ label: 'هزینه هفتگی', data: amounts, backgroundColor: bgColors, borderColor: borderColors, borderWidth: 1, borderDash: [] }] },
-    options: { responsive: true, scales: { y: { title: { display: true, text: 'مبلغ (ریال)' } } } }
-});
+        // Modern Colors
+        const historicalColor = '#424242'; // Dark Grey
+        const forecastColor = '#2962FF';   // Bright Blue
+
+        const bgColors = isForecast.map(f => f ? forecastColor : historicalColor);
+        const borderColors = isForecast.map(f => f ? forecastColor : historicalColor);
+
+        const ctx = document.getElementById('forecastChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'هزینه هفتگی',
+                    data: amounts,
+                    backgroundColor: bgColors,
+                    borderRadius: 4,
+                    barThickness: 20
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(33, 33, 33, 0.9)',
+                        padding: 12,
+                        titleFont: { family: 'Vazirmatn' },
+                        bodyFont: { family: 'Vazirmatn' },
+                        callbacks: {
+                            label: function (context) {
+                                let label = context.dataset.label || '';
+                                if (label) label += ': ';
+                                label += new Intl.NumberFormat('fa-IR').format(context.raw) + ' ریال';
+                                if (isForecast[context.dataIndex]) label += ' (پیش‌بینی)';
+                                return label;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: { grid: { display: false } },
+                    y: {
+                        grid: { color: '#f3f4f6', borderDash: [5, 5] },
+                        ticks: {
+                            callback: function (value) {
+                                if (value >= 1000000) return (value / 1000000).toLocaleString('fa-IR') + ' M';
+                                return value.toLocaleString('fa-IR');
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    });
 </script>
+
 {% elif result.summary and result.summary.get('message') %}
-<div class="alert alert-warning"><i class="fas fa-exclamation-circle me-2"></i> {{ result.summary.message }}</div>
+<div class="card border-0 shadow-sm rounded-4 py-5 text-center">
+    <div class="card-body">
+        <div class="mb-3 opacity-25">
+            <i class="fa-solid fa-triangle-exclamation fa-2x text-warning"></i>
+        </div>
+        <h4 class="fw-bold text-dark">داده کافی نیست</h4>
+        <p class="text-muted">{{ result.summary.message }}</p>
+    </div>
+</div>
 {% else %}
-<div class="alert alert-info"><i class="fas fa-info-circle me-2"></i> داده کافی یافت نشد.</div>
+<div class="card border-0 shadow-sm rounded-4 py-5 text-center">
+    <div class="card-body">
+        <div class="mb-3 opacity-25">
+            <i class="fa-solid fa-folder-open fa-2x text-muted"></i>
+        </div>
+        <h4 class="fw-bold text-dark">داده‌ای یافت نشد</h4>
+        <p class="text-muted">برای ایجاد پیش‌بینی، نیاز به سابقه خرید حداقل ۳ هفته دارید.</p>
+    </div>
+</div>
 {% endif %}
+
 {% endblock %}

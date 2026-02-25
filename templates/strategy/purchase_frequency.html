@@ -1,83 +1,260 @@
 {% extends 'strategy/base_strategy.html' %}
+
 {% block title %}تکرار خرید{% endblock %}
-{% block strategy_help_title %}راهنمای کامل تحلیل تکرار خرید{% endblock %}
+
+{% block strategy_help_title %}راهنمای تحلیل تکرار خرید{% endblock %}
 {% block strategy_help_body %}
-<h6>هدف این تحلیل چیست؟</h6>
-<p>این تحلیل ریتم سفارش کالاها را نشان می‌دهد؛ یعنی هر کالا با چه فاصله زمانی و چه تعداد دفعات خریداری می‌شود. خروجی آن برای تنظیم نقطه سفارش و جلوگیری از کمبود یا خرید اضافه بسیار کاربردی است.</p>
-
-<h6>شاخص‌های کلیدی</h6>
-<ul>
-    <li><strong>تعداد خرید:</strong> هر کالا در بازه انتخابی چند بار خرید شده است.</li>
-    <li><strong>میانگین فاصله (روز):</strong> بین دو خرید متوالی یک کالا به طور میانگین چند روز فاصله بوده است.</li>
-    <li><strong>کالاهای تک‌خرید:</strong> اقلامی که تنها یک‌بار خرید شده‌اند و داده ریتم آن‌ها ضعیف‌تر است.</li>
-    <li><strong>طبقه تکرار:</strong> برچسبی مثل بسیار مکرر/مکرر/متوسط/کم‌تکرار برای تصمیم‌گیری سریع.</li>
-</ul>
-
-<h6>نحوه تفسیر خروجی</h6>
-<ul>
-    <li>نمودار میله‌ای نشان می‌دهد کدام کالاها بیشترین تعداد خرید را داشته‌اند.</li>
-    <li>در جدول، اگر تعداد خرید بالا و فاصله زمانی کوتاه باشد، کالا برای عملیات روزمره حیاتی‌تر است.</li>
-    <li>کالاهای کم‌تکرار اما پرهزینه باید جداگانه از منظر سیاست خرید بررسی شوند.</li>
-</ul>
-
-<h6>اقدام مدیریتی پیشنهادی</h6>
-<ul>
-    <li>برای کالاهای بسیار مکرر، نقطه سفارش خودکار و حداقل موجودی ایمن تعریف کنید.</li>
-    <li>برای کالاهای کم‌تکرار، از خرید مازاد جلوگیری و خرید را نزدیک زمان مصرف انجام دهید.</li>
-    <li>با ترکیب این تحلیل و ABC، روی کالاهای پرتکرار و پرارزش تمرکز مدیریتی بیشتری بگذارید.</li>
-</ul>
+<div class="vstack gap-3 text-end">
+    <div>
+        <h6 class="fw-bold text-dark"><i class="fa-solid fa-rotate text-info me-2"></i>هدف تحلیل</h6>
+        <p class="text-muted small mb-0">شناسایی ریتم مصرف کالاها برای تنظیم نقاط سفارش خودکار و جلوگیری از خواب سرمایه
+            یا کسری موجودی.</p>
+    </div>
+    <div>
+        <h6 class="fw-bold text-dark"><i class="fa-solid fa-lightbulb text-warning me-2"></i>توصیه‌های مدیریتی</h6>
+        <ul class="list-unstyled text-muted small mb-0">
+            <li class="mb-1"><i class="fa-solid fa-check text-success me-1"></i>کالاهای "بسیار مکرر" باید قرارداد تامین
+                بلندمدت داشته باشند.</li>
+            <li class="mb-1"><i class="fa-solid fa-check text-success me-1"></i>کالاهای "کم‌تکرار" را فقط بر اساس نیاز
+                (On-Demand) خریداری کنید.</li>
+        </ul>
+    </div>
+</div>
 {% endblock %}
+
 {% block strategy_content %}
-<div class="page-header"><h2><i class="fas fa-redo text-info me-2"></i> تکرار خرید / ریتم سفارش</h2></div>
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold text-dark mb-1">تکرار خرید و ریتم سفارش</h2>
+        <p class="text-muted mb-0">بهینه‌سازی زمان‌بندی تامین بر اساس رفتار مصرف واقعی</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-light border shadow-sm text-muted" onclick="window.print()"><i
+                class="fa-solid fa-print me-1"></i>چاپ</button>
+    </div>
+</div>
 
 {% if result.summary and result.summary.total_items > 0 %}
-<div class="row g-3 mb-4">
-    <div class="col-md-3"><div class="kpi-card info"><div class="kpi-value">{{ result.summary.most_frequent_count }}</div><div class="kpi-label">{{ result.summary.most_frequent }}</div></div></div>
-    <div class="col-md-3"><div class="kpi-card primary"><div class="kpi-value">{{ result.summary.avg_interval }}</div><div class="kpi-label">میانگین فاصله (روز)</div></div></div>
-    <div class="col-md-3"><div class="kpi-card warning"><div class="kpi-value">{{ result.summary.single_purchase_items }}</div><div class="kpi-label">کالا با یک خرید</div></div></div>
-    <div class="col-md-3"><div class="kpi-card success"><div class="kpi-value">{{ result.summary.total_items }}</div><div class="kpi-label">کل کالاها</div></div></div>
+<!-- KPI Cards -->
+<div class="row g-4 mb-4">
+    <!-- Most Frequent -->
+    <div class="col-md-6 col-lg-3">
+        <div class="card border-0 shadow-sm rounded-4 h-100 position-relative overflow-hidden">
+            <div class="card-body p-4 d-flex flex-column justify-content-center">
+                <div class="position-absolute start-0 bottom-0 opacity-25 ms-2 mb-2">
+                    <i class="fa-solid fa-crown fa-2x text-info"></i>
+                </div>
+                <h6 class="text-uppercase text-muted small fw-bold tracking-wide mb-2">پر تکرارترین کالا</h6>
+                <h2 class="fs-4 fw-bolder text-dark mb-1 text-truncate" title="{{ result.summary.most_frequent }}">{{
+                    result.summary.most_frequent }}</h2>
+                <div class="mt-2">
+                    <span class="badge bg-info-subtle text-info rounded-pill">
+                        <i class="fa-solid fa-repeat me-1"></i>{{ result.summary.most_frequent_count }} بار خرید
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Avg Interval -->
+    <div class="col-md-6 col-lg-3">
+        <div class="card border-0 shadow-sm rounded-4 h-100 position-relative overflow-hidden">
+            <div class="card-body p-4 d-flex flex-column justify-content-center">
+                <div class="position-absolute start-0 bottom-0 opacity-25 ms-2 mb-2">
+                    <i class="fa-solid fa-hourglass-half fa-2x text-primary"></i>
+                </div>
+                <h6 class="text-uppercase text-muted small fw-bold tracking-wide mb-2">میانگین فاصله خرید</h6>
+                <h2 class="display-6 fw-bolder text-dark mb-0">{{ result.summary.avg_interval }} <small
+                        class="fs-6 text-muted">روز</small></h2>
+                <div class="mt-2">
+                    <span class="badge bg-primary-subtle text-primary rounded-pill">
+                        <i class="fa-solid fa-clock-rotate-left me-1"></i>ریتم کلی
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Single Purchase -->
+    <div class="col-md-6 col-lg-3">
+        <div class="card border-0 shadow-sm rounded-4 h-100 position-relative overflow-hidden">
+            <div class="card-body p-4 d-flex flex-column justify-content-center">
+                <div class="position-absolute start-0 bottom-0 opacity-25 ms-2 mb-2">
+                    <i class="fa-solid fa-1 fa-2x text-warning"></i>
+                </div>
+                <h6 class="text-uppercase text-muted small fw-bold tracking-wide mb-2">کالاهای تک‌خرید</h6>
+                <h2 class="display-6 fw-bolder text-dark mb-0">{{ result.summary.single_purchase_items }}</h2>
+                <div class="mt-2">
+                    <span class="badge bg-warning-subtle text-warning-emphasis rounded-pill">
+                        <i class="fa-solid fa-triangle-exclamation me-1"></i>نیاز به بررسی
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Total Items -->
+    <div class="col-md-6 col-lg-3">
+        <div class="card border-0 shadow-sm rounded-4 h-100 position-relative overflow-hidden">
+            <div class="card-body p-4 d-flex flex-column justify-content-center">
+                <div class="position-absolute start-0 bottom-0 opacity-25 ms-2 mb-2">
+                    <i class="fa-solid fa-boxes-stacked fa-2x text-success"></i>
+                </div>
+                <h6 class="text-uppercase text-muted small fw-bold tracking-wide mb-2">تعداد اقلام تحلیل‌شده</h6>
+                <h2 class="display-6 fw-bolder text-dark mb-0">{{ result.summary.total_items }}</h2>
+                <div class="mt-2">
+                    <span class="badge bg-success-subtle text-success rounded-pill">
+                        <i class="fa-solid fa-check-double me-1"></i>جامعه آماری
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
-<div class="card mb-4 strategy-chart-card">
-    <div class="card-header"><i class="fas fa-chart-bar me-2"></i> تعداد خرید هر کالا</div>
-    <div class="card-body"><canvas id="freqChart" class="strategy-chart-canvas"></canvas></div>
-</div>
+<div class="row g-4">
+    <!-- Chart Column -->
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-header bg-transparent border-0 py-3 px-4">
+                <h5 class="fw-bold text-dark mb-0"><i class="fa-solid fa-chart-bar text-primary me-2"></i>Top 20 پرتکرار
+                </h5>
+            </div>
+            <div class="card-body p-4 d-flex align-items-center">
+                <div style="height: 500px; width: 100%;">
+                    <canvas id="freqChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
 
-<div class="card">
-    <div class="card-body table-responsive">
-        <table class="table table-hover table-sm">
-            <thead><tr><th>کد</th><th>نام کالا</th><th>تعداد خرید</th><th>فاصله میانگین (روز)</th><th>فاصله پیشنهادی سفارش</th><th></th>مبلغ کل</th><th>طبقه</th></tr></thead>
-            <tbody>
-            {% for _, row in result.data.iterrows() %}
-            <tr>
-                <td>{{ row.item_code }}</td><td>{{ row.item_name_fa }}</td>
-                <td>{{ row.purchase_count }}</td>
-                <td>{{ row.avg_interval_days }}</td>
-                <td>{{ row.suggested_reorder_interval }}</td>
-                <td class="number-fa">{{ '{:,.0f}'.format(row.total_amount) }}</td>
-                <td><span class="badge {% if row.freq_class == 'بسیار مکرر' %}bg-danger{% elif row.freq_class == 'مکرر' %}bg-warning text-dark{% elif row.freq_class == 'متوسط' %}bg-info{% else %}bg-secondary{% endif %}">{{ row.freq_class }}</span></td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+    <!-- Table Column -->
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div
+                class="card-header bg-transparent border-0 py-3 px-4 d-flex justify-content-between align-items-center">
+                <h5 class="fw-bold text-dark mb-0"><i class="fa-solid fa-list-ol text-primary me-2"></i>جزئیات ریتم
+                    سفارش</h5>
+                <input type="text" class="form-control form-control-sm w-auto rounded-pill px-3"
+                    placeholder="جستجو در کالاها..." id="tableSearch">
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive" style="max-height: 550px; overflow-y: auto;">
+                    <table class="table table-hover table-borderless align-middle mb-0" id="freqTable">
+                        <thead class="bg-light text-muted small text-uppercase sticky-top">
+                            <tr>
+                                <th class="py-3 px-4 text-center">کد</th>
+                                <th class="py-3">نام کالا</th>
+                                <th class="py-3 text-center">دفعات خرید</th>
+                                <th class="py-3 text-center">فاصله (روز)</th>
+                                <th class="py-3 px-4 text-center bg-primary-subtle text-primary">پیشنهاد سفارش</th>
+                                <th class="py-3 text-center">طبقه</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for _, row in result.data.iterrows() %}
+                            <tr class="border-bottom border-light">
+                                <td class="text-center text-muted small">{{ row.item_code }}</td>
+                                <td class="fw-medium text-dark">{{ row.item_name_fa }}</td>
+                                <td class="text-center">
+                                    <span class="badge bg-secondary-subtle text-dark rounded-pill px-2">{{
+                                        row.purchase_count }}</span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="fw-bold text-dark">{{ row.avg_interval_days }}</span>
+                                </td>
+                                <td class="text-center bg-primary-subtle text-primary fw-medium">
+                                    {{ row.suggested_reorder_interval }}
+                                </td>
+                                <td class="text-center px-4">
+                                    {% if row.freq_class == 'بسیار مکرر' %}
+                                    <span class="badge bg-danger-subtle text-danger rounded-pill w-100">بسیار
+                                        مکرر</span>
+                                    {% elif row.freq_class == 'مکرر' %}
+                                    <span
+                                        class="badge bg-warning-subtle text-warning-emphasis rounded-pill w-100">مکرر</span>
+                                    {% elif row.freq_class == 'متوسط' %}
+                                    <span class="badge bg-info-subtle text-info rounded-pill w-100">متوسط</span>
+                                    {% else %}
+                                    <span class="badge bg-light text-muted border rounded-pill w-100">کم‌تکرار</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
 <script type="application/json" id="frequency-chart-data">{{ result.chart | tojson }}</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-const frequencyPayload = JSON.parse(document.getElementById('frequency-chart-data').textContent || '{}');
+    document.addEventListener('DOMContentLoaded', function () {
+        const frequencyPayload = JSON.parse(document.getElementById('frequency-chart-data').textContent || '{}');
+        const ctx = document.getElementById('freqChart').getContext('2d');
 
-new Chart(document.getElementById('freqChart'), {
-    type: 'bar',
-    data: {
-        labels: frequencyPayload.labels || [],
-        datasets: [{ label: 'تعداد خرید', data: frequencyPayload.counts || [], backgroundColor: '#0288D1' }]
-    },
-    options: { responsive: true, indexAxis: 'y', plugins: { legend: { display: false } } }
-});
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: frequencyPayload.labels || [],
+                datasets: [{
+                    label: 'تعداد خرید',
+                    data: frequencyPayload.counts || [],
+                    backgroundColor: '#0288D1',
+                    borderRadius: 4,
+                    barThickness: 12
+                }]
+            },
+            options: {
+                indexAxis: 'y', // Horizontal bar
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        titleFont: { family: 'Vazirmatn' },
+                        bodyFont: { family: 'Vazirmatn' }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false, drawBorder: false },
+                        ticks: { font: { family: 'Vazirmatn' } }
+                    },
+                    y: {
+                        grid: { display: false },
+                        ticks: { font: { family: 'Vazirmatn' }, autoSkip: false }
+                    }
+                }
+            }
+        });
+
+        // Simple Table Search
+        document.getElementById('tableSearch').addEventListener('keyup', function () {
+            const searchText = this.value.toLowerCase();
+            const rows = document.querySelectorAll('#freqTable tbody tr');
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(searchText) ? '' : 'none';
+            });
+        });
+    });
 </script>
+
 {% else %}
-<div class="alert alert-info"><i class="fas fa-info-circle me-2"></i> داده کافی یافت نشد.</div>
+<div class="card border-0 shadow-sm rounded-4 py-5 text-center">
+    <div class="card-body">
+        <div class="mb-3 opacity-25">
+            <i class="fa-solid fa-box-open fa-2x text-muted"></i>
+        </div>
+        <h4 class="fw-bold text-dark">داده‌ای یافت نشد</h4>
+        <p class="text-muted">برای تحلیل تکرار خرید، نیاز به ثبت تراکنش‌های خرید در بازه زمانی دارید.</p>
+    </div>
+</div>
 {% endif %}
+
 {% endblock %}

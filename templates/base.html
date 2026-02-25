@@ -1,15 +1,16 @@
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{% block title %}سیستم مدیریت موجودی هتل{% endblock %}</title>
-    
+
     <!-- Bootstrap 5 RTL -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.rtl.min.css') }}">
     <!-- Font Awesome -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/font-awesome.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/font-awesome.min.css', v='6.5.1') }}">
     <!-- Select2 -->
     <link href="{{ url_for('static', filename='css/select2.min.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/select2-bootstrap-5-theme.rtl.min.css') }}" rel="stylesheet">
@@ -17,7 +18,7 @@
     <link href="{{ url_for('static', filename='css/vazirmatn.css') }}" rel="stylesheet">
     <!-- Custom UX Improvements -->
     <link href="{{ url_for('static', filename='css/custom.css') }}" rel="stylesheet">
-    
+
     <style>
         :root {
             --primary-color: #1976D2;
@@ -27,21 +28,21 @@
             --danger-color: #C62828;
             --info-color: #0288D1;
         }
-        
+
         * {
             font-family: 'Vazirmatn', 'B Nazanin', Tahoma, sans-serif;
         }
-        
+
         body {
             background-color: #f5f7fa;
             min-height: 100vh;
         }
-        
+
         .navbar {
             background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
-        
+
         .navbar-brand {
             font-weight: 700;
             font-size: 1.3rem;
@@ -49,20 +50,21 @@
             align-items: center;
             gap: 10px;
         }
+
         .navbar-brand img.logo {
             height: 36px;
             width: auto;
         }
-        
+
         .sidebar {
             background: #fff;
             min-height: calc(100vh - 56px);
-            box-shadow: 2px 0 10px rgba(0,0,0,0.05);
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
             padding-top: 1rem;
             transition: width 0.3s ease, min-width 0.3s ease, max-width 0.3s ease;
             overflow-x: hidden;
         }
-        
+
         .sidebar .nav-link {
             color: #455a64;
             padding: 0.8rem 1.2rem;
@@ -74,17 +76,17 @@
             gap: 0.5rem;
             white-space: nowrap;
         }
-        
+
         .sidebar .nav-link:hover {
             background: #e3f2fd;
             color: var(--primary-color);
         }
-        
+
         .sidebar .nav-link.active {
             background: var(--primary-color);
             color: #fff;
         }
-        
+
         .sidebar .nav-link i {
             min-width: 22px;
             text-align: center;
@@ -154,28 +156,28 @@
                 flex: 1 1 auto !important;
             }
         }
-        
+
         .main-content {
             padding: 1.5rem;
         }
-        
+
         .card {
             border: none;
             border-radius: 12px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
             transition: transform 0.3s ease;
         }
-        
+
         .card:hover {
             transform: translateY(-2px);
         }
-        
+
         .card-header {
             background: transparent;
             border-bottom: 1px solid #eee;
             font-weight: 600;
         }
-        
+
         .kpi-card {
             border-radius: 12px;
             padding: 1.5rem;
@@ -183,7 +185,7 @@
             position: relative;
             overflow: hidden;
         }
-        
+
         .kpi-card::before {
             content: '';
             position: absolute;
@@ -191,26 +193,40 @@
             right: -50%;
             width: 100%;
             height: 200%;
-            background: rgba(255,255,255,0.1);
+            background: rgba(255, 255, 255, 0.1);
             transform: rotate(45deg);
         }
-        
-        .kpi-card.primary { background: linear-gradient(135deg, #1976D2, #1565C0); }
-        .kpi-card.success { background: linear-gradient(135deg, #2E7D32, #1B5E20); }
-        .kpi-card.warning { background: linear-gradient(135deg, #F57F17, #E65100); }
-        .kpi-card.danger { background: linear-gradient(135deg, #C62828, #B71C1C); }
-        .kpi-card.info { background: linear-gradient(135deg, #0288D1, #01579B); }
-        
+
+        .kpi-card.primary {
+            background: linear-gradient(135deg, #1976D2, #1565C0);
+        }
+
+        .kpi-card.success {
+            background: linear-gradient(135deg, #2E7D32, #1B5E20);
+        }
+
+        .kpi-card.warning {
+            background: linear-gradient(135deg, #F57F17, #E65100);
+        }
+
+        .kpi-card.danger {
+            background: linear-gradient(135deg, #C62828, #B71C1C);
+        }
+
+        .kpi-card.info {
+            background: linear-gradient(135deg, #0288D1, #01579B);
+        }
+
         .kpi-card .kpi-value {
             font-size: 2rem;
             font-weight: 700;
         }
-        
+
         .kpi-card .kpi-label {
             font-size: 0.9rem;
             opacity: 0.9;
         }
-        
+
         .kpi-card .kpi-icon {
             position: absolute;
             left: 1rem;
@@ -219,34 +235,45 @@
             font-size: 3rem;
             opacity: 0.3;
         }
-        
+
         .btn-primary {
             background: var(--primary-color);
             border-color: var(--primary-color);
         }
-        
+
         .btn-primary:hover {
             background: var(--secondary-color);
             border-color: var(--secondary-color);
         }
-        
+
         .table {
             background: #fff;
             border-radius: 8px;
             overflow: hidden;
         }
-        
+
         .table thead th {
             background: #455a64;
             color: #fff;
             border: none;
             font-weight: 500;
         }
-        
-        .badge-a { background: #C8E6C9; color: #1B5E20; }
-        .badge-b { background: #FFF9C4; color: #F57F17; }
-        .badge-c { background: #FFCCBC; color: #BF360C; }
-        
+
+        .badge-a {
+            background: #C8E6C9;
+            color: #1B5E20;
+        }
+
+        .badge-b {
+            background: #FFF9C4;
+            color: #F57F17;
+        }
+
+        .badge-c {
+            background: #FFCCBC;
+            color: #BF360C;
+        }
+
         .alert-float {
             position: fixed;
             top: 80px;
@@ -256,34 +283,42 @@
             min-width: 300px;
             animation: slideDown 0.5s ease;
         }
-        
+
         @keyframes slideDown {
-            from { top: 0; opacity: 0; }
-            to { top: 80px; opacity: 1; }
+            from {
+                top: 0;
+                opacity: 0;
+            }
+
+            to {
+                top: 80px;
+                opacity: 1;
+            }
         }
-        
-        .form-control:focus, .form-select:focus {
+
+        .form-control:focus,
+        .form-select:focus {
             border-color: var(--primary-color);
             box-shadow: 0 0 0 0.2rem rgba(25, 118, 210, 0.25);
         }
-        
+
         .page-header {
             margin-bottom: 1.5rem;
             padding-bottom: 1rem;
             border-bottom: 2px solid #e0e0e0;
         }
-        
+
         .page-header h2 {
             color: #37474f;
             font-weight: 600;
         }
-        
+
         .number-fa {
             font-family: 'Vazirmatn', sans-serif;
             direction: ltr;
             text-align: right;
         }
-        
+
         .select2-container--bootstrap-5 .select2-selection {
             min-height: 38px;
         }
@@ -318,6 +353,7 @@
     </style>
     {% block extra_css %}{% endblock %}
 </head>
+
 <body>
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark">
@@ -348,19 +384,23 @@
                         </a>
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="{{ url_for('reports.executive_summary') }}">
-                                <i class="fas fa-briefcase me-2 text-warning"></i> خلاصه مدیریتی
-                            </a></li>
-                            <li><hr class="dropdown-divider"></li>
+                                    <i class="fas fa-briefcase me-2 text-warning"></i> خلاصه مدیریتی
+                                </a></li>
+                            <li>
+                                <hr class="dropdown-divider">
+                            </li>
                             <li><a class="dropdown-item" href="{{ url_for('reports.pareto') }}">
-                                <i class="fas fa-chart-bar me-2"></i> تحلیل پارتو
-                            </a></li>
+                                    <i class="fas fa-chart-bar me-2"></i> تحلیل پارتو
+                                </a></li>
                             <li><a class="dropdown-item" href="{{ url_for('reports.abc') }}">
-                                <i class="fas fa-layer-group me-2"></i> طبقه‌بندی ABC
-                            </a></li>
-                            <li><hr class="dropdown-divider"></li>
+                                    <i class="fas fa-layer-group me-2"></i> طبقه‌بندی ABC
+                                </a></li>
+                            <li>
+                                <hr class="dropdown-divider">
+                            </li>
                             <li><a class="dropdown-item" href="{{ url_for('strategy.hub') }}">
-                                <i class="fas fa-chess-queen me-2 text-purple"></i> تحلیل‌های استراتژیک
-                            </a></li>
+                                    <i class="fas fa-chess-queen me-2 text-purple"></i> تحلیل‌های استراتژیک
+                                </a></li>
                         </ul>
                     </li>
                     <li class="nav-item">
@@ -398,15 +438,17 @@
                         </a>
                         <ul class="dropdown-menu dropdown-menu-start">
                             <li><a class="dropdown-item" href="{{ url_for('security.security_settings') }}">
-                                <i class="fas fa-shield-alt me-2"></i> تنظیمات امنیتی
-                            </a></li>
+                                    <i class="fas fa-shield-alt me-2"></i> تنظیمات امنیتی
+                                </a></li>
                             <li><a class="dropdown-item" href="{{ url_for('security.change_password') }}">
-                                <i class="fas fa-key me-2"></i> تغییر رمز عبور
-                            </a></li>
-                            <li><hr class="dropdown-divider"></li>
+                                    <i class="fas fa-key me-2"></i> تغییر رمز عبور
+                                </a></li>
+                            <li>
+                                <hr class="dropdown-divider">
+                            </li>
                             <li><a class="dropdown-item text-danger" href="{{ url_for('auth.logout') }}">
-                                <i class="fas fa-sign-out-alt me-2"></i> خروج
-                            </a></li>
+                                    <i class="fas fa-sign-out-alt me-2"></i> خروج
+                                </a></li>
                         </ul>
                     </li>
                     {% endif %}
@@ -417,14 +459,14 @@
 
     <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-            <div class="alert alert-{{ category }} alert-dismissible fade show alert-float" role="alert">
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-            {% endfor %}
-        {% endif %}
+    {% if messages %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category }} alert-dismissible fade show alert-float" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+    {% endif %}
     {% endwith %}
 
     <!-- Main Content -->
@@ -434,42 +476,51 @@
             <!-- Sidebar -->
             <div class="col-md-2 sidebar d-none d-md-block">
                 <nav class="nav flex-column">
-                    <button class="btn btn-outline-primary w-100 sidebar-toggle-btn" type="button" id="sidebarToggle" aria-pressed="false">
+                    <button class="btn btn-outline-primary w-100 sidebar-toggle-btn" type="button" id="sidebarToggle"
+                        aria-pressed="false">
                         <i class="fas fa-bars toggle-icon"></i>
                         <span class="sidebar-label">جمع‌کردن منو</span>
                     </button>
-                    <a class="nav-link {% if request.endpoint == 'dashboard.index' %}active{% endif %}" href="{{ url_for('dashboard.index') }}">
+                    <a class="nav-link {% if request.endpoint == 'dashboard.index' %}active{% endif %}"
+                        href="{{ url_for('dashboard.index') }}">
                         <i class="fas fa-tachometer-alt"></i>
                         <span class="sidebar-label">داشبورد</span>
                     </a>
-                    <a class="nav-link {% if 'transactions' in request.endpoint %}active{% endif %}" href="{{ url_for('transactions.list_transactions') }}">
+                    <a class="nav-link {% if 'transactions' in request.endpoint %}active{% endif %}"
+                        href="{{ url_for('transactions.list_transactions') }}">
                         <i class="fas fa-exchange-alt"></i>
                         <span class="sidebar-label">تراکنش‌ها</span>
                     </a>
-                    <a class="nav-link {% if request.endpoint == 'transactions.create' %}active{% endif %}" href="{{ url_for('transactions.create') }}">
+                    <a class="nav-link {% if request.endpoint == 'transactions.create' %}active{% endif %}"
+                        href="{{ url_for('transactions.create') }}">
                         <i class="fas fa-plus-circle"></i>
                         <span class="sidebar-label">ثبت تراکنش جدید</span>
                     </a>
                     <hr>
-                    <a class="nav-link {% if 'warehouse' in request.endpoint %}active{% endif %}" href="{{ url_for('warehouse.dashboard') }}">
+                    <a class="nav-link {% if 'warehouse' in request.endpoint %}active{% endif %}"
+                        href="{{ url_for('warehouse.dashboard') }}">
                         <i class="fas fa-warehouse"></i>
                         <span class="sidebar-label">مدیریت انبار</span>
                     </a>
                     <hr>
-                    <a class="nav-link {% if request.endpoint == 'reports.executive_summary' %}active{% endif %}" href="{{ url_for('reports.executive_summary') }}">
+                    <a class="nav-link {% if request.endpoint == 'reports.executive_summary' %}active{% endif %}"
+                        href="{{ url_for('reports.executive_summary') }}">
                         <i class="fas fa-briefcase text-warning"></i>
                         <span class="sidebar-label">خلاصه مدیریتی</span>
                     </a>
-                    <a class="nav-link {% if request.endpoint == 'reports.pareto' %}active{% endif %}" href="{{ url_for('reports.pareto') }}">
+                    <a class="nav-link {% if request.endpoint == 'reports.pareto' %}active{% endif %}"
+                        href="{{ url_for('reports.pareto') }}">
                         <i class="fas fa-chart-bar"></i>
                         <span class="sidebar-label">تحلیل پارتو</span>
                     </a>
-                    <a class="nav-link {% if request.endpoint == 'reports.abc' %}active{% endif %}" href="{{ url_for('reports.abc') }}">
+                    <a class="nav-link {% if request.endpoint == 'reports.abc' %}active{% endif %}"
+                        href="{{ url_for('reports.abc') }}">
                         <i class="fas fa-layer-group"></i>
                         <span class="sidebar-label">طبقه‌بندی ABC</span>
                     </a>
                     <hr>
-                    <a class="nav-link {% if 'strategy' in (request.endpoint or '') %}active{% endif %}" href="{{ url_for('strategy.hub') }}">
+                    <a class="nav-link {% if 'strategy' in (request.endpoint or '') %}active{% endif %}"
+                        href="{{ url_for('strategy.hub') }}">
                         <i class="fas fa-chess-queen text-purple"></i>
                         <span class="sidebar-label">تحلیل‌های استراتژیک</span>
                     </a>
@@ -481,294 +532,295 @@
                 </nav>
             </div>
             <div class="col-md-10 main-content">
-            {% else %}
-            <div class="col-12">
-            {% endif %}
-                {% block content %}{% endblock %}
+                {% else %}
+                <div class="col-12">
+                    {% endif %}
+                    {% block content %}{% endblock %}
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- Scripts -->
-    <script src="{{ url_for('static', filename='js/jquery-3.7.1.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/select2.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/chart.umd.min.js') }}"></script>
-    
-    <script>
-        $(document).ready(function() {
-            $('.select2').select2({
-                theme: 'bootstrap-5',
-                dir: 'rtl',
-                language: {
-                    noResults: function() { return "نتیجه‌ای یافت نشد"; },
-                    searching: function() { return "در حال جستجو..."; }
-                }
-            });
-            
-            setTimeout(function() {
-                $('.alert-float').fadeOut('slow');
-            }, 5000);
+        <!-- Scripts -->
+        <script src="{{ url_for('static', filename='js/jquery-3.7.1.min.js') }}"></script>
+        <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+        <script src="{{ url_for('static', filename='js/select2.min.js') }}"></script>
+        <script src="{{ url_for('static', filename='js/chart.umd.min.js') }}"></script>
 
-            $('#sidebarToggle').on('click', function() {
-                $('body').toggleClass('sidebar-collapsed');
-                const isCollapsed = $('body').hasClass('sidebar-collapsed');
-                $(this).attr('aria-pressed', isCollapsed.toString());
-                const icon = $(this).find('.toggle-icon');
-                if (isCollapsed) {
-                    icon.removeClass('fa-bars').addClass('fa-chevron-left');
-                } else {
-                    icon.removeClass('fa-chevron-left').addClass('fa-bars');
-                }
+        <script>
+            $(document).ready(function () {
+                $('.select2').select2({
+                    theme: 'bootstrap-5',
+                    dir: 'rtl',
+                    language: {
+                        noResults: function () { return "نتیجه‌ای یافت نشد"; },
+                        searching: function () { return "در حال جستجو..."; }
+                    }
+                });
+
+                setTimeout(function () {
+                    $('.alert-float').fadeOut('slow');
+                }, 5000);
+
+                $('#sidebarToggle').on('click', function () {
+                    $('body').toggleClass('sidebar-collapsed');
+                    const isCollapsed = $('body').hasClass('sidebar-collapsed');
+                    $(this).attr('aria-pressed', isCollapsed.toString());
+                    const icon = $(this).find('.toggle-icon');
+                    if (isCollapsed) {
+                        icon.removeClass('fa-bars').addClass('fa-chevron-left');
+                    } else {
+                        icon.removeClass('fa-chevron-left').addClass('fa-bars');
+                    }
+                });
             });
-        });
-        
-        function formatNumber(num) {
-            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-        }
-        
-        // Validation Constants (Bug #1, #2)
-        const MAX_QUANTITY = 999999;
-        const MAX_PRICE = 999999999;
-        const MIN_QUANTITY = 0.01;
-        const MIN_PRICE = 1;
-        
-        function showValidationError(message) {
-            // Create toast notification for validation errors
-            const toast = $(`
+
+            function formatNumber(num) {
+                return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+            }
+
+            // Validation Constants (Bug #1, #2)
+            const MAX_QUANTITY = 999999;
+            const MAX_PRICE = 999999999;
+            const MIN_QUANTITY = 0.01;
+            const MIN_PRICE = 1;
+
+            function showValidationError(message) {
+                // Create toast notification for validation errors
+                const toast = $(`
                 <div class="alert alert-danger alert-dismissible fade show alert-float" role="alert" style="z-index: 9999;">
                     <i class="fas fa-exclamation-triangle me-2"></i>${message}
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
             `);
-            $('body').append(toast);
-            setTimeout(() => toast.fadeOut('slow', () => toast.remove()), 10000);
-        }
-        
-        // Live Iran clock widget
-        function startIranClock() {
-            const clockEl = document.getElementById('iranClock');
-            if (!clockEl) return;
+                $('body').append(toast);
+                setTimeout(() => toast.fadeOut('slow', () => toast.remove()), 10000);
+            }
 
-            const formatter = new Intl.DateTimeFormat('fa-IR', {
-                timeZone: 'Asia/Tehran',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit'
+            // Live Iran clock widget
+            function startIranClock() {
+                const clockEl = document.getElementById('iranClock');
+                if (!clockEl) return;
+
+                const formatter = new Intl.DateTimeFormat('fa-IR', {
+                    timeZone: 'Asia/Tehran',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+
+                const tick = () => {
+                    const now = new Date();
+                    clockEl.textContent = formatter.format(now);
+                };
+
+                tick();
+                setInterval(tick, 1000);
+            }
+
+            document.addEventListener('DOMContentLoaded', startIranClock);
+
+            // Keyboard shortcuts
+            document.addEventListener('keydown', function (e) {
+                // Ctrl+N: New transaction
+                if (e.ctrlKey && e.key === 'n') {
+                    e.preventDefault();
+                    window.location.href = '/transactions/create';
+                }
+                // Ctrl+F: Focus search (if exists)
+                if (e.ctrlKey && e.key === 'f') {
+                    const searchInput = document.querySelector('input[name="search"]');
+                    if (searchInput) {
+                        e.preventDefault();
+                        searchInput.focus();
+                        searchInput.select();
+                    }
+                }
+                // Ctrl+P: Pareto report
+                if (e.ctrlKey && e.key === 'p') {
+                    e.preventDefault();
+                    window.location.href = '/reports/pareto';
+                }
+                // Escape: Clear focused input or close modals
+                if (e.key === 'Escape') {
+                    const focusedInput = document.activeElement;
+                    if (focusedInput && focusedInput.tagName === 'INPUT') {
+                        focusedInput.blur();
+                    }
+                    // Close any open modals
+                    const modals = document.querySelectorAll('.modal.show');
+                    modals.forEach(modal => {
+                        const bsModal = bootstrap.Modal.getInstance(modal);
+                        if (bsModal) bsModal.hide();
+                    });
+                }
             });
 
-            const tick = () => {
-                const now = new Date();
-                clockEl.textContent = formatter.format(now);
-            };
+            function validateTransactionForm() {
+                const quantity = parseFloat($('input[name="quantity"]').val());
+                const unitPrice = parseFloat($('input[name="unit_price"]').val());
+                const transactionDate = $('input[name="transaction_date"]').val();
+                let isValid = true;
 
-            tick();
-            setInterval(tick, 1000);
-        }
-
-        document.addEventListener('DOMContentLoaded', startIranClock);
-
-        // Keyboard shortcuts
-        document.addEventListener('keydown', function(e) {
-            // Ctrl+N: New transaction
-            if (e.ctrlKey && e.key === 'n') {
-                e.preventDefault();
-                window.location.href = '/transactions/create';
-            }
-            // Ctrl+F: Focus search (if exists)
-            if (e.ctrlKey && e.key === 'f') {
-                const searchInput = document.querySelector('input[name="search"]');
-                if (searchInput) {
-                    e.preventDefault();
-                    searchInput.focus();
-                    searchInput.select();
-                }
-            }
-            // Ctrl+P: Pareto report
-            if (e.ctrlKey && e.key === 'p') {
-                e.preventDefault();
-                window.location.href = '/reports/pareto';
-            }
-            // Escape: Clear focused input or close modals
-            if (e.key === 'Escape') {
-                const focusedInput = document.activeElement;
-                if (focusedInput && focusedInput.tagName === 'INPUT') {
-                    focusedInput.blur();
-                }
-                // Close any open modals
-                const modals = document.querySelectorAll('.modal.show');
-                modals.forEach(modal => {
-                    const bsModal = bootstrap.Modal.getInstance(modal);
-                    if (bsModal) bsModal.hide();
-                });
-            }
-        });
-
-        function validateTransactionForm() {
-            const quantity = parseFloat($('input[name="quantity"]').val());
-            const unitPrice = parseFloat($('input[name="unit_price"]').val());
-            const transactionDate = $('input[name="transaction_date"]').val();
-            let isValid = true;
-            
-            // Bug #1: Validate negative values
-            if (isNaN(quantity) || quantity <= 0) {
-                showValidationError('مقدار باید بزرگتر از صفر باشد');
-                $('input[name="quantity"]').addClass('is-invalid');
-                isValid = false;
-            } else {
-                $('input[name="quantity"]').removeClass('is-invalid');
-            }
-            
-            if (isNaN(unitPrice) || unitPrice <= 0) {
-                showValidationError('قیمت واحد باید بزرگتر از صفر باشد');
-                $('input[name="unit_price"]').addClass('is-invalid');
-                isValid = false;
-            } else {
-                $('input[name="unit_price"]').removeClass('is-invalid');
-            }
-            
-            // Bug #2: Validate max values
-            if (quantity > MAX_QUANTITY) {
-                showValidationError(`مقدار نمی‌تواند بیشتر از ${MAX_QUANTITY.toLocaleString()} باشد`);
-                $('input[name="quantity"]').addClass('is-invalid');
-                isValid = false;
-            }
-            
-            if (unitPrice > MAX_PRICE) {
-                showValidationError(`قیمت واحد نمی‌تواند بیشتر از ${MAX_PRICE.toLocaleString()} ریال باشد`);
-                $('input[name="unit_price"]').addClass('is-invalid');
-                isValid = false;
-            }
-            
-            // Bug #4: Validate future date - use string comparison to avoid timezone issues
-            if (transactionDate) {
-                // Get today's date in YYYY-MM-DD format
-                const today = new Date();
-                const todayStr = today.getFullYear() + '-' + 
-                    String(today.getMonth() + 1).padStart(2, '0') + '-' + 
-                    String(today.getDate()).padStart(2, '0');
-                
-                if (transactionDate > todayStr) {
-                    showValidationError('تاریخ تراکنش نمی‌تواند در آینده باشد');
-                    $('input[name="transaction_date"]').addClass('is-invalid');
+                // Bug #1: Validate negative values
+                if (isNaN(quantity) || quantity <= 0) {
+                    showValidationError('مقدار باید بزرگتر از صفر باشد');
+                    $('input[name="quantity"]').addClass('is-invalid');
                     isValid = false;
                 } else {
-                    $('input[name="transaction_date"]').removeClass('is-invalid');
+                    $('input[name="quantity"]').removeClass('is-invalid');
                 }
-            }
-            
-            return isValid;
-        }
-        
-        function validateDateRange() {
-            const dateFrom = $('input[name="date_from"]').val();
-            const dateTo = $('input[name="date_to"]').val();
-            
-            if (dateFrom && dateTo) {
-                if (new Date(dateFrom) > new Date(dateTo)) {
-                    showValidationError('تاریخ پایان باید بزرگتر از تاریخ شروع باشد');
-                    $('input[name="date_to"]').addClass('is-invalid');
-                    return false;
+
+                if (isNaN(unitPrice) || unitPrice <= 0) {
+                    showValidationError('قیمت واحد باید بزرگتر از صفر باشد');
+                    $('input[name="unit_price"]').addClass('is-invalid');
+                    isValid = false;
+                } else {
+                    $('input[name="unit_price"]').removeClass('is-invalid');
                 }
+
+                // Bug #2: Validate max values
+                if (quantity > MAX_QUANTITY) {
+                    showValidationError(`مقدار نمی‌تواند بیشتر از ${MAX_QUANTITY.toLocaleString()} باشد`);
+                    $('input[name="quantity"]').addClass('is-invalid');
+                    isValid = false;
+                }
+
+                if (unitPrice > MAX_PRICE) {
+                    showValidationError(`قیمت واحد نمی‌تواند بیشتر از ${MAX_PRICE.toLocaleString()} ریال باشد`);
+                    $('input[name="unit_price"]').addClass('is-invalid');
+                    isValid = false;
+                }
+
+                // Bug #4: Validate future date - use string comparison to avoid timezone issues
+                if (transactionDate) {
+                    // Get today's date in YYYY-MM-DD format
+                    const today = new Date();
+                    const todayStr = today.getFullYear() + '-' +
+                        String(today.getMonth() + 1).padStart(2, '0') + '-' +
+                        String(today.getDate()).padStart(2, '0');
+
+                    if (transactionDate > todayStr) {
+                        showValidationError('تاریخ تراکنش نمی‌تواند در آینده باشد');
+                        $('input[name="transaction_date"]').addClass('is-invalid');
+                        isValid = false;
+                    } else {
+                        $('input[name="transaction_date"]').removeClass('is-invalid');
+                    }
+                }
+
+                return isValid;
             }
-            $('input[name="date_to"]').removeClass('is-invalid');
-            return true;
-        }
-        
-        function calculateTotal() {
-            var quantity = parseFloat($('input[name="quantity"]').val()) || 0;
-            var unitPrice = parseFloat($('input[name="unit_price"]').val()) || 0;
-            
-            // Real-time validation feedback
-            if (quantity < 0) {
-                $('input[name="quantity"]').addClass('is-invalid');
-            } else {
-                $('input[name="quantity"]').removeClass('is-invalid');
+
+            function validateDateRange() {
+                const dateFrom = $('input[name="date_from"]').val();
+                const dateTo = $('input[name="date_to"]').val();
+
+                if (dateFrom && dateTo) {
+                    if (new Date(dateFrom) > new Date(dateTo)) {
+                        showValidationError('تاریخ پایان باید بزرگتر از تاریخ شروع باشد');
+                        $('input[name="date_to"]').addClass('is-invalid');
+                        return false;
+                    }
+                }
+                $('input[name="date_to"]').removeClass('is-invalid');
+                return true;
             }
-            
-            if (unitPrice < 0) {
-                $('input[name="unit_price"]').addClass('is-invalid');
-            } else {
-                $('input[name="unit_price"]').removeClass('is-invalid');
+
+            function calculateTotal() {
+                var quantity = parseFloat($('input[name="quantity"]').val()) || 0;
+                var unitPrice = parseFloat($('input[name="unit_price"]').val()) || 0;
+
+                // Real-time validation feedback
+                if (quantity < 0) {
+                    $('input[name="quantity"]').addClass('is-invalid');
+                } else {
+                    $('input[name="quantity"]').removeClass('is-invalid');
+                }
+
+                if (unitPrice < 0) {
+                    $('input[name="unit_price"]').addClass('is-invalid');
+                } else {
+                    $('input[name="unit_price"]').removeClass('is-invalid');
+                }
+
+                var total = quantity * unitPrice;
+                // Set numeric value to hidden field for form submission
+                $('#total_amount').val(total);
+                // Set formatted value to display field
+                $('#total_amount_display').val(formatNumber(total));
             }
-            
-            var total = quantity * unitPrice;
-            // Set numeric value to hidden field for form submission
-            $('#total_amount').val(total);
-            // Set formatted value to display field
-            $('#total_amount_display').val(formatNumber(total));
-        }
-        
-        $(document).ready(function() {
-            // Initialize Bootstrap tooltips
-            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-                return new bootstrap.Tooltip(tooltipTriggerEl);
+
+            $(document).ready(function () {
+                // Initialize Bootstrap tooltips
+                var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+                var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                    return new bootstrap.Tooltip(tooltipTriggerEl);
+                });
+
+                // Global form submit handler with loading spinner
+                $('form').on('submit', function (e) {
+                    const $form = $(this);
+                    const $submitBtn = $form.find('button[type="submit"]');
+
+                    // Skip if already processing
+                    if ($submitBtn.prop('disabled')) {
+                        return false;
+                    }
+
+                    // Store original button content
+                    const originalContent = $submitBtn.html();
+
+                    // Add loading state
+                    $submitBtn.html('<span class="spinner-border spinner-border-sm me-2"></span>در حال پردازش...').prop('disabled', true);
+
+                    // Restore button after 30 seconds (fallback)
+                    setTimeout(function () {
+                        $submitBtn.html(originalContent).prop('disabled', false);
+                    }, 30000);
+                });
+
+                // Attach validation to transaction forms
+                $('form[action*="transactions"]').on('submit', function (e) {
+                    if (!validateTransactionForm()) {
+                        e.preventDefault();
+                        // Restore submit button
+                        const $submitBtn = $(this).find('button[type="submit"]');
+                        $submitBtn.html('<i class="fas fa-save me-1"></i>ثبت تراکنش').prop('disabled', false);
+                        return false;
+                    }
+                });
+
+                // Bug #3: Validate date range in filter form
+                $('form.row.g-3').on('submit', function (e) {
+                    if (!validateDateRange()) {
+                        e.preventDefault();
+                        return false;
+                    }
+                });
+
+                // Real-time validation on input
+                $('input[name="quantity"]').on('input', function () {
+                    const val = parseFloat($(this).val());
+                    if (val <= 0 || val > MAX_QUANTITY) {
+                        $(this).addClass('is-invalid');
+                    } else {
+                        $(this).removeClass('is-invalid');
+                    }
+                });
+
+                $('input[name="unit_price"]').on('input', function () {
+                    const val = parseFloat($(this).val());
+                    if (val <= 0 || val > MAX_PRICE) {
+                        $(this).addClass('is-invalid');
+                    } else {
+                        $(this).removeClass('is-invalid');
+                    }
+                });
             });
 
-            // Global form submit handler with loading spinner
-            $('form').on('submit', function(e) {
-                const $form = $(this);
-                const $submitBtn = $form.find('button[type="submit"]');
-                
-                // Skip if already processing
-                if ($submitBtn.prop('disabled')) {
-                    return false;
-                }
-                
-                // Store original button content
-                const originalContent = $submitBtn.html();
-                
-                // Add loading state
-                $submitBtn.html('<span class="spinner-border spinner-border-sm me-2"></span>در حال پردازش...').prop('disabled', true);
-                
-                // Restore button after 30 seconds (fallback)
-                setTimeout(function() {
-                    $submitBtn.html(originalContent).prop('disabled', false);
-                }, 30000);
-            });
-
-            // Attach validation to transaction forms
-            $('form[action*="transactions"]').on('submit', function(e) {
-                if (!validateTransactionForm()) {
-                    e.preventDefault();
-                    // Restore submit button
-                    const $submitBtn = $(this).find('button[type="submit"]');
-                    $submitBtn.html('<i class="fas fa-save me-1"></i>ثبت تراکنش').prop('disabled', false);
-                    return false;
-                }
-            });
-            
-            // Bug #3: Validate date range in filter form
-            $('form.row.g-3').on('submit', function(e) {
-                if (!validateDateRange()) {
-                    e.preventDefault();
-                    return false;
-                }
-            });
-            
-            // Real-time validation on input
-            $('input[name="quantity"]').on('input', function() {
-                const val = parseFloat($(this).val());
-                if (val <= 0 || val > MAX_QUANTITY) {
-                    $(this).addClass('is-invalid');
-                } else {
-                    $(this).removeClass('is-invalid');
-                }
-            });
-            
-            $('input[name="unit_price"]').on('input', function() {
-                const val = parseFloat($(this).val());
-                if (val <= 0 || val > MAX_PRICE) {
-                    $(this).addClass('is-invalid');
-                } else {
-                    $(this).removeClass('is-invalid');
-                }
-            });
-        });
-        
-        $('input[name="quantity"], input[name="unit_price"]').on('input', calculateTotal);
-    </script>
-    {% block extra_js %}{% endblock %}
+            $('input[name="quantity"], input[name="unit_price"]').on('input', calculateTotal);
+        </script>
+        {% block extra_js %}{% endblock %}
 </body>
+
 </html>

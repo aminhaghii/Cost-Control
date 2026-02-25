@@ -695,36 +695,29 @@ class DataImporter:
                 unit = standardize_unit(row.get(cols.get('unit'), 'عدد'))
                 current_stock = clean_number_robust(row.get(cols.get('stock')))
                 
-                item = self._create_item_safe(item_name, unit, category)
+                # BUG-FIX: Check existence FIRST, then create only if needed.
+                # Also scope query to hotel_id to avoid cross-hotel collisions.
+                exist_query = Item.query.filter_by(item_name_fa=item_name)
+                if self.hotel_id:
+                    exist_query = exist_query.filter_by(hotel_id=self.hotel_id)
+                existing = exist_query.first()
+                
+                if existing:
+                    item = existing
+                    # BUG-FIX: Actually update stock for existing items (was a no-op 'pass')
+                    if current_stock is not None:
+                        item.current_stock = current_stock
+                    # Update unit if it changed in the new import
+                    if unit and unit != item.unit:
+                        item.unit = unit
+                else:
+                    item = self._create_item_safe(item_name, unit, category)
+                    if current_stock is not None:
+                        item.current_stock = current_stock
+                
                 if item:
-                    # Logic to update stock if item exists is handled inside _create_item_safe? 
-                    # No, _create_item_safe creates new or fails. 
-                    # Wait, the original code updated existing items. 
-                    # I need to restore that logic.
-                    
-                    # My _create_item_safe assumes NEW item. 
-                    # I should use _get_or_create_item equivalent logic.
-                    
-                    # Correction: I need to check existence first inside _import_sheet loop.
-                    # Since I extracted _create_item_safe, I should use it only when item doesn't exist.
-                    
-                    # Let's check if item exists first.
-                    existing = Item.query.filter_by(item_name_fa=item_name).first()
-                    if existing:
-                        item = existing
-                        # Update logic (skipped for brevity in previous thought, but needed here)
-                        if current_stock is not None:
-                             # Check unit match/conversion...
-                             # For inventory import, we overwrite stock usually.
-                             pass 
-                    else:
-                        item = self._create_item_safe(item_name, unit, category)
-                        if current_stock:
-                            item.current_stock = current_stock
-                    
-                    if item:
-                        self.affected_item_ids.add(item.id)
-                        items_added += 1
+                    self.affected_item_ids.add(item.id)
+                    items_added += 1
 
             db.session.flush()
             self.imported_items += items_added

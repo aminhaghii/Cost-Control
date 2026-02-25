@@ -20,32 +20,53 @@
         align-items: center;
         justify-content: center;
     }
-    .strategy-menu-btn:hover { transform: scale(1.1); box-shadow: 0 6px 20px rgba(106,17,203,0.5); color: #fff; }
-    .strategy-menu-btn:focus { color: #fff; box-shadow: 0 6px 20px rgba(106,17,203,0.5); }
+
+    .strategy-menu-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 6px 20px rgba(106, 17, 203, 0.5);
+        color: #fff;
+    }
+
+    .strategy-menu-btn:focus {
+        color: #fff;
+        box-shadow: 0 6px 20px rgba(106, 17, 203, 0.5);
+    }
 
     .strategy-sidebar {
         position: fixed;
-        top: 0; left: -360px;
-        width: 320px; height: 100vh;
+        top: 0;
+        left: -360px;
+        width: 320px;
+        height: 100vh;
         background: #fff;
         z-index: 1045;
-        box-shadow: 4px 0 25px rgba(0,0,0,0.15);
-        transition: left 0.35s cubic-bezier(.4,0,.2,1);
+        box-shadow: 4px 0 25px rgba(0, 0, 0, 0.15);
+        transition: left 0.35s cubic-bezier(.4, 0, .2, 1);
         overflow-y: auto;
         padding-top: 0;
     }
-    .strategy-sidebar.open { left: 0; }
+
+    .strategy-sidebar.open {
+        left: 0;
+    }
 
     .strategy-overlay {
-        position: fixed; top: 0; left: 0;
-        width: 100%; height: 100%;
-        background: rgba(0,0,0,0.4);
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.4);
         z-index: 1044;
         display: none;
         opacity: 0;
         transition: opacity 0.3s ease;
     }
-    .strategy-overlay.show { display: block; opacity: 1; }
+
+    .strategy-overlay.show {
+        display: block;
+        opacity: 1;
+    }
 
     .strategy-sidebar .menu-header {
         padding: 1.25rem 1.5rem;
@@ -58,8 +79,9 @@
         top: 0;
         z-index: 2;
     }
+
     .strategy-sidebar .menu-header .close-btn {
-        background: rgba(255,255,255,0.2);
+        background: rgba(255, 255, 255, 0.2);
         border: none;
         color: #fff;
         width: 32px;
@@ -72,24 +94,64 @@
         transition: background 0.2s;
         font-size: 0.9rem;
     }
-    .strategy-sidebar .menu-header .close-btn:hover { background: rgba(255,255,255,0.35); }
+
+    .strategy-sidebar .menu-header .close-btn:hover {
+        background: rgba(255, 255, 255, 0.35);
+    }
 
     .strategy-sidebar .menu-item {
-        display: flex; align-items: center; gap: 12px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
         padding: 0.75rem 1.5rem;
         color: #37474f;
         text-decoration: none;
         border-bottom: 1px solid #f0f0f0;
         transition: all 0.2s;
     }
-    .strategy-sidebar .menu-item:hover { background: #e8eaf6; color: #1a237e; text-decoration: none; }
-    .strategy-sidebar .menu-item.active { background: #e3f2fd; color: #1565c0; font-weight: 600; border-right: 4px solid #1565c0; }
-    .strategy-sidebar .menu-item i { width: 24px; text-align: center; font-size: 1.1rem; }
-    .strategy-sidebar .menu-item .badge { font-size: 0.65rem; }
-    .strategy-sidebar .menu-section { padding: 0.5rem 1.5rem 0.25rem; }
-    .strategy-sidebar .menu-section small { font-weight: 700; color: #9e9e9e; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; }
 
-    .filter-bar { background: #fff; border-radius: 12px; padding: 1rem 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .strategy-sidebar .menu-item:hover {
+        background: #e8eaf6;
+        color: #1a237e;
+        text-decoration: none;
+    }
+
+    .strategy-sidebar .menu-item.active {
+        background: #e3f2fd;
+        color: #1565c0;
+        font-weight: 600;
+        border-right: 4px solid #1565c0;
+    }
+
+    .strategy-sidebar .menu-item i {
+        width: 24px;
+        text-align: center;
+        font-size: 1.1rem;
+    }
+
+    .strategy-sidebar .menu-item .badge {
+        font-size: 0.65rem;
+    }
+
+    .strategy-sidebar .menu-section {
+        padding: 0.5rem 1.5rem 0.25rem;
+    }
+
+    .strategy-sidebar .menu-section small {
+        font-weight: 700;
+        color: #9e9e9e;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+
+    .filter-bar {
+        background: #fff;
+        border-radius: 12px;
+        padding: 1rem 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
 
     .strategy-actions-bar {
         display: flex;
@@ -146,53 +208,71 @@
         <button class="close-btn" id="strategyCloseBtn" title="بستن"><i class="fas fa-times"></i></button>
     </div>
 
-    <a class="menu-item {% if request.endpoint == 'strategy.hub' %}active{% endif %}" href="{{ url_for('strategy.hub') }}">
+    <a class="menu-item {% if request.endpoint == 'strategy.hub' %}active{% endif %}"
+        href="{{ url_for('strategy.hub') }}">
         <i class="fas fa-th-large text-primary"></i> <span>داشبورد تحلیل‌ها</span>
+    </a>
+    <a class="menu-item {% if request.endpoint == 'strategy.history' %}active{% endif %}"
+        href="{{ url_for('strategy.history') }}">
+        <i class="fas fa-clock-rotate-left text-indigo"></i> <span>تاریخچه KPI</span>
+        <span class="badge bg-info text-white ms-auto">جدید</span>
     </a>
 
     <div class="menu-section"><small>تحلیل ارزش و طبقه‌بندی</small></div>
-    <a class="menu-item {% if request.endpoint == 'strategy.abc' %}active{% endif %}" href="{{ url_for('strategy.abc') }}">
+    <a class="menu-item {% if request.endpoint == 'strategy.abc' %}active{% endif %}"
+        href="{{ url_for('strategy.abc') }}">
         <i class="fas fa-sort-amount-down text-success"></i> <span>ABC (ارزشی)</span>
     </a>
-    <a class="menu-item {% if request.endpoint == 'strategy.xyz' %}active{% endif %}" href="{{ url_for('strategy.xyz') }}">
+    <a class="menu-item {% if request.endpoint == 'strategy.xyz' %}active{% endif %}"
+        href="{{ url_for('strategy.xyz') }}">
         <i class="fas fa-wave-square text-info"></i> <span>XYZ (نوسان مصرف)</span>
     </a>
-    <a class="menu-item {% if request.endpoint == 'strategy.abc_xyz' %}active{% endif %}" href="{{ url_for('strategy.abc_xyz') }}">
+    <a class="menu-item {% if request.endpoint == 'strategy.abc_xyz' %}active{% endif %}"
+        href="{{ url_for('strategy.abc_xyz') }}">
         <i class="fas fa-border-all text-purple"></i> <span>ماتریس ABC-XYZ</span>
         <span class="badge bg-warning text-dark ms-auto">کلیدی</span>
     </a>
 
     <div class="menu-section"><small>تحلیل قیمت</small></div>
-    <a class="menu-item {% if request.endpoint == 'strategy.price_trend' %}active{% endif %}" href="{{ url_for('strategy.price_trend') }}">
+    <a class="menu-item {% if request.endpoint == 'strategy.price_trend' %}active{% endif %}"
+        href="{{ url_for('strategy.price_trend') }}">
         <i class="fas fa-chart-line text-danger"></i> <span>روند قیمت / تورم</span>
     </a>
-    <a class="menu-item {% if request.endpoint == 'strategy.price_volatility' %}active{% endif %}" href="{{ url_for('strategy.price_volatility') }}">
+    <a class="menu-item {% if request.endpoint == 'strategy.price_volatility' %}active{% endif %}"
+        href="{{ url_for('strategy.price_volatility') }}">
         <i class="fas fa-bolt text-warning"></i> <span>نوسان قیمت</span>
     </a>
 
     <div class="menu-section"><small>تحلیل هزینه</small></div>
-    <a class="menu-item {% if request.endpoint == 'strategy.spend_trend' %}active{% endif %}" href="{{ url_for('strategy.spend_trend') }}">
+    <a class="menu-item {% if request.endpoint == 'strategy.spend_trend' %}active{% endif %}"
+        href="{{ url_for('strategy.spend_trend') }}">
         <i class="fas fa-chart-area text-primary"></i> <span>روند هزینه</span>
     </a>
-    <a class="menu-item {% if request.endpoint == 'strategy.category_mix' %}active{% endif %}" href="{{ url_for('strategy.category_mix') }}">
+    <a class="menu-item {% if request.endpoint == 'strategy.category_mix' %}active{% endif %}"
+        href="{{ url_for('strategy.category_mix') }}">
         <i class="fas fa-chart-pie text-success"></i> <span>ترکیب گروه‌ها</span>
     </a>
-    <a class="menu-item {% if request.endpoint == 'strategy.budget_burndown' %}active{% endif %}" href="{{ url_for('strategy.budget_burndown') }}">
-        <i class="fas fa-fire-alt text-danger"></i> <span>مصرف بودجه</span>
+    <a class="menu-item {% if request.endpoint == 'strategy.budget_burndown' %}active{% endif %}"
+        href="{{ url_for('strategy.budget_burndown') }}">
+        <i class="fas fa-fire-flame-curved text-danger"></i> <span>مصرف بودجه</span>
     </a>
 
     <div class="menu-section"><small>تحلیل مصرف و پیش‌بینی</small></div>
-    <a class="menu-item {% if request.endpoint == 'strategy.purchase_frequency' %}active{% endif %}" href="{{ url_for('strategy.purchase_frequency') }}">
+    <a class="menu-item {% if request.endpoint == 'strategy.purchase_frequency' %}active{% endif %}"
+        href="{{ url_for('strategy.purchase_frequency') }}">
         <i class="fas fa-redo text-info"></i> <span>تکرار خرید</span>
     </a>
-    <a class="menu-item {% if request.endpoint == 'strategy.demand_proxy' %}active{% endif %}" href="{{ url_for('strategy.demand_proxy') }}">
+    <a class="menu-item {% if request.endpoint == 'strategy.demand_proxy' %}active{% endif %}"
+        href="{{ url_for('strategy.demand_proxy') }}">
         <i class="fas fa-arrow-trend-up text-success"></i> <span>روند مصرف</span>
     </a>
-    <a class="menu-item {% if request.endpoint == 'strategy.anomalies' %}active{% endif %}" href="{{ url_for('strategy.anomalies') }}">
+    <a class="menu-item {% if request.endpoint == 'strategy.anomalies' %}active{% endif %}"
+        href="{{ url_for('strategy.anomalies') }}">
         <i class="fas fa-exclamation-triangle text-warning"></i> <span>تشخیص ناهنجاری</span>
     </a>
-    <a class="menu-item {% if request.endpoint == 'strategy.forecast' %}active{% endif %}" href="{{ url_for('strategy.forecast') }}">
-        <i class="fas fa-crystal-ball text-primary"></i> <span>پیش‌بینی هزینه</span>
+    <a class="menu-item {% if request.endpoint == 'strategy.forecast' %}active{% endif %}"
+        href="{{ url_for('strategy.forecast') }}">
+        <i class="fas fa-wand-magic-sparkles text-primary"></i> <span>پیش‌بینی هزینه</span>
     </a>
 </div>
 
@@ -201,25 +281,26 @@
     <form method="GET" class="d-flex flex-wrap align-items-center gap-2" id="filterForm">
         <label class="fw-bold small text-muted">بازه:</label>
         <select name="days" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
-            <option value="30" {% if days == 30 %}selected{% endif %}>۳۰ روز</option>
-            <option value="60" {% if days == 60 %}selected{% endif %}>۶۰ روز</option>
-            <option value="90" {% if days == 90 %}selected{% endif %}>۹۰ روز</option>
-            <option value="180" {% if days == 180 %}selected{% endif %}>۶ ماه</option>
-            <option value="365" {% if days == 365 %}selected{% endif %}>۱ سال</option>
+            <option value="30" {% if days==30 %}selected{% endif %}>۳۰ روز</option>
+            <option value="60" {% if days==60 %}selected{% endif %}>۶۰ روز</option>
+            <option value="90" {% if days==90 %}selected{% endif %}>۹۰ روز</option>
+            <option value="180" {% if days==180 %}selected{% endif %}>۶ ماه</option>
+            <option value="365" {% if days==365 %}selected{% endif %}>۱ سال</option>
         </select>
         {% if category is defined and request.endpoint != 'strategy.category_mix' %}
         <label class="fw-bold small text-muted">گروه:</label>
         <select name="category" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
-            <option value="Food" {% if category == 'Food' %}selected{% endif %}>مواد غذایی</option>
-            <option value="NonFood" {% if category == 'NonFood' %}selected{% endif %}>غیرغذایی</option>
-            <option value="all" {% if category == 'all' %}selected{% endif %}>همه</option>
+            <option value="Food" {% if category=='Food' %}selected{% endif %}>مواد غذایی</option>
+            <option value="NonFood" {% if category=='NonFood' %}selected{% endif %}>غیرغذایی</option>
+            <option value="all" {% if category=='all' %}selected{% endif %}>همه</option>
         </select>
         {% endif %}
     </form>
 </div>
 
 <div class="strategy-actions-bar">
-    <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#strategyHelpModal">
+    <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="modal"
+        data-bs-target="#strategyHelpModal">
         <i class="fas fa-circle-info me-1"></i>
         راهنمای کامل این تحلیل
     </button>
@@ -234,7 +315,8 @@
             </div>
             <div class="modal-body strategy-help-content">
                 {% block strategy_help_body %}
-                <p>در این صفحه می‌توانید تعریف، منطق محاسبه، نحوه خواندن نمودار و اقدام پیشنهادی این تحلیل را ببینید.</p>
+                <p>در این صفحه می‌توانید تعریف، منطق محاسبه، نحوه خواندن نمودار و اقدام پیشنهادی این تحلیل را ببینید.
+                </p>
                 {% endblock %}
             </div>
             <div class="modal-footer">
@@ -247,26 +329,26 @@
 {% block strategy_content %}{% endblock %}
 
 <script>
-const menuBtn = document.getElementById('strategyMenuBtn');
-const sidebar = document.getElementById('strategySidebar');
-const overlay = document.getElementById('strategyOverlay');
-const closeBtn = document.getElementById('strategyCloseBtn');
+    const menuBtn = document.getElementById('strategyMenuBtn');
+    const sidebar = document.getElementById('strategySidebar');
+    const overlay = document.getElementById('strategyOverlay');
+    const closeBtn = document.getElementById('strategyCloseBtn');
 
-function openMenu() {
-    sidebar.classList.add('open');
-    overlay.classList.add('show');
-}
-function closeMenu() {
-    sidebar.classList.remove('open');
-    overlay.classList.remove('show');
-}
+    function openMenu() {
+        sidebar.classList.add('open');
+        overlay.classList.add('show');
+    }
+    function closeMenu() {
+        sidebar.classList.remove('open');
+        overlay.classList.remove('show');
+    }
 
-menuBtn.addEventListener('click', openMenu);
-overlay.addEventListener('click', closeMenu);
-closeBtn.addEventListener('click', closeMenu);
+    menuBtn.addEventListener('click', openMenu);
+    overlay.addEventListener('click', closeMenu);
+    closeBtn.addEventListener('click', closeMenu);
 
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') closeMenu();
-});
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeMenu();
+    });
 </script>
 {% endblock %}

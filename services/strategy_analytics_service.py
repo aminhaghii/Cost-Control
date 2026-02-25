@@ -907,83 +907,250 @@ def analyse_demand_proxy(days=90, category=None, top_n=10):
 def analyse_anomalies(days=90, category=None, z_threshold=2.0):
     df = _base_purchase_df(days, category)
     if df.empty:
-        return {'data': pd.DataFrame(), 'summary': {}, 'chart': {}}
+        return {'data': pd.DataFrame(), 'anomalies': [], 'summary': {}, 'chart': {}}
 
     df = df.sort_values(['item_id', 'transaction_date']).copy()
     window = 5
 
     for col, stat_name in [('total_amount', 'amount'), ('quantity', 'qty'), ('unit_price', 'price')]:
-        df[f'mean_{stat_name}'] = df.groupby('item_id')[col].transform(lambda x: x.rolling(window, min_periods=2).mean().shift())
-        df[f'std_{stat_name}'] = df.groupby('item_id')[col].transform(lambda x: x.rolling(window, min_periods=2).std().shift())
-
+        df[f'mean_{stat_name}'] = df.groupby('item_id')[col].transform(
+            lambda x: x.rolling(window, min_periods=2).mean().shift()
+        )
+        df[f'std_{stat_name}'] = df.groupby('item_id')[col].transform(
+            lambda x: x.rolling(window, min_periods=2).std().shift()
+        )
         global_mean = df.groupby('item_id')[col].transform('mean')
         global_std = df.groupby('item_id')[col].transform('std')
-
         df[f'mean_{stat_name}'] = df[f'mean_{stat_name}'].fillna(global_mean)
         df[f'std_{stat_name}'] = df[f'std_{stat_name}'].fillna(global_std).fillna(0)
 
+    def _build_reason_detail(dim_type, actual, mean, std, z):
+        """Build a structured, richly explained reason dict for one anomaly dimension."""
+        direction = 'high' if actual > mean else 'low'
+        pct_diff = round((actual - mean) / mean * 100, 1) if mean > 0 else 0
+        severity = 'critical' if z >= 3.5 else ('high' if z >= 2.5 else 'medium')
+
+        label_map = {
+            'price':   'قیمت واحد غیرعادی',
+            'quantity': 'مقدار خرید غیرعادی',
+            'amount':  'مبلغ کل غیرعادی',
+        }
+        unit_map = {
+            'price':   'ریال',
+            'quantity': 'واحد',
+            'amount':  'ریال',
+        }
+        icon_map = {
+            'price':   'fa-tag',
+            'quantity': 'fa-weight-hanging',
+            'amount':  'fa-coins',
+        }
+
+        dir_fa = 'بالاتر' if direction == 'high' else 'پایین‌تر'
+        dir_sign = '+' if direction == 'high' else '-'
+        unit = unit_map[dim_type]
+        label = label_map[dim_type]
+
+        # Full Farsi explanation
+        if dim_type == 'price':
+            explanation = (
+                f"قیمت واحد این تراکنش <strong>{actual:,.0f} {unit}</strong> است، "
+                f"در حالی که میانگین تاریخی برای این کالا <strong>{mean:,.0f} {unit}</strong> "
+                f"با انحراف معیار ±{std:,.0f} {unit} بوده است. "
+                f"این قیمت <strong>{abs(pct_diff):.1f}٪ {dir_fa}</strong> از میانگین و "
+                f"<strong>{z:.1f} برابر انحراف معیار</strong> فاصله دارد."
+            )
+            if direction == 'high':
+                possible_causes = [
+                    'افزایش ناگهانی قیمت توسط تأمین‌کننده بدون اطلاع قبلی',
+                    'خطای ورودی داده توسط کاربر (مثلاً اضافه شدن یک صفر)',
+                    'تغییر واحد اندازه‌گیری بدون تنظیم قیمت (مثلاً از کیلوگرم به گرم)',
+                    'تورم فصلی یا کمبود کالا در بازار',
+                    'احتمال تقلب در فاکتور یا دریافت رشوه از تأمین‌کننده',
+                ]
+                action = (
+                    'فاکتور فیزیکی را با قیمت ثبت‌شده مطابقت دهید. '
+                    'با تأمین‌کننده تماس بگیرید و آخرین لیست قیمت را دریافت کنید. '
+                    'اگر قیمت صحیح است، آن را بپذیرید و یادداشتی ثبت کنید؛ '
+                    'در غیر این صورت تراکنش را ویرایش یا حذف کنید.'
+                )
+            else:
+                possible_causes = [
+                    'تخفیف ویژه یا معامله دسته‌جمعی که ثبت نشده',
+                    'خطای ورودی (حذف یک رقم از قیمت)',
+                    'تغییر تأمین‌کننده به گزینه ارزان‌تر',
+                    'دریافت کالا با کیفیت پایین‌تر با قیمت کمتر',
+                ]
+                action = (
+                    'بررسی کنید آیا تخفیف رسمی از تأمین‌کننده وجود دارد. '
+                    'کیفیت کالای دریافتی را با قیمت پرداختی مقایسه کنید. '
+                    'اگر خطای ورودی است، تراکنش را اصلاح کنید.'
+                )
+
+        elif dim_type == 'quantity':
+            explanation = (
+                f"مقدار خریداری‌شده <strong>{actual:,.2f} {unit}</strong> است، "
+                f"در حالی که میانگین تاریخی سفارش این کالا <strong>{mean:,.2f} {unit}</strong> "
+                f"با انحراف معیار ±{std:,.2f} {unit} بوده است. "
+                f"این مقدار <strong>{abs(pct_diff):.1f}٪ {dir_fa}</strong> از میانگین و "
+                f"<strong>{z:.1f} برابر انحراف معیار</strong> فاصله دارد."
+            )
+            if direction == 'high':
+                possible_causes = [
+                    'خرید انبوه پیشگیرانه به دلیل پیش‌بینی کمبود یا ترقی قیمت',
+                    'ثبت اشتباه واحد (مثلاً ۱۰۰۰ کیلوگرم به جای ۱۰۰ کیلوگرم)',
+                    'ترکیب چند سفارش در یک تراکنش',
+                    'نیاز واقعی رویداد خاص (مراسم، تعطیلات پرمشغله)',
+                    'خرید مازاد برای جلوگیری از اتمام موجودی',
+                ]
+                action = (
+                    'بررسی کنید آیا رویداد یا مراسم خاصی در آن تاریخ برگزار شده. '
+                    'موجودی فعلی انبار را بررسی کنید تا از کفایت مطمئن شوید. '
+                    'اگر خرید اضافه بوده، برنامه مصرف آن را بررسی کنید تا ضایعات رخ ندهد.'
+                )
+            else:
+                possible_causes = [
+                    'سفارش آزمایشی برای ارزیابی تأمین‌کننده جدید',
+                    'کاهش نیاز به دلیل کاهش اشغال هتل یا سطح فعالیت',
+                    'خطای ورودی (کم شدن یک رقم از مقدار)',
+                    'محدودیت موجود نزد تأمین‌کننده',
+                ]
+                action = (
+                    'موجودی انبار و نرخ مصرف فعلی را بررسی کنید. '
+                    'اگر کاهش واقعی تقاضا است، برنامه سفارش را به‌روز کنید.'
+                )
+
+        else:  # amount
+            explanation = (
+                f"مبلغ کل این تراکنش <strong>{actual:,.0f} {unit}</strong> است، "
+                f"در حالی که میانگین تاریخی مبلغ کل برای این کالا "
+                f"<strong>{mean:,.0f} {unit}</strong> با انحراف معیار ±{std:,.0f} {unit} بوده است. "
+                f"این مبلغ <strong>{abs(pct_diff):.1f}٪ {dir_fa}</strong> از میانگین و "
+                f"<strong>{z:.1f} برابر انحراف معیار</strong> فاصله دارد. "
+                f"توجه: این ناهنجاری ممکن است ترکیبی از قیمت و مقدار باشد."
+            )
+            if direction == 'high':
+                possible_causes = [
+                    'ترکیب همزمان افزایش قیمت و مقدار (اثر ضربی)',
+                    'یک فاکتور بزرگ که چند دوره را پوشش می‌دهد',
+                    'خطای ورودی در مبلغ کل یا محاسبه اشتباه',
+                    'رویداد یا مراسم خاص با نیاز مقطعی بالا',
+                ]
+                action = (
+                    'هر دو مؤلفه قیمت و مقدار را جداگانه بررسی کنید. '
+                    'فاکتور فیزیکی را با مبلغ ثبت‌شده مطابقت دهید. '
+                    'اگر فاکتور چند دوره را پوشش می‌دهد، آن را به تراکنش‌های جداگانه تقسیم کنید.'
+                )
+            else:
+                possible_causes = [
+                    'تخفیف دسته‌جمعی کاهش‌دهنده مبلغ کل',
+                    'سفارش کوچک‌تر از معمول',
+                    'خطای ورودی (حذف رقم یا ورود اشتباه)',
+                ]
+                action = (
+                    'اطمینان حاصل کنید که کالای کافی دریافت شده. '
+                    'مطمئن شوید مبلغ پرداختی به تأمین‌کننده با ثبت سیستم مطابقت دارد.'
+                )
+
+        severity_label = {'critical': 'بحرانی', 'high': 'بالا', 'medium': 'متوسط'}[severity]
+        severity_color = {'critical': 'danger', 'high': 'warning', 'medium': 'info'}[severity]
+
+        return {
+            'type': dim_type,
+            'label': label,
+            'icon': icon_map[dim_type],
+            'severity': severity,
+            'severity_label': severity_label,
+            'severity_color': severity_color,
+            'z_score': round(z, 2),
+            'actual_value': round(actual, 2),
+            'mean_value': round(mean, 2),
+            'std_value': round(std, 2),
+            'pct_diff': pct_diff,
+            'direction': direction,
+            'direction_fa': dir_fa,
+            'explanation': explanation,
+            'possible_causes': possible_causes,
+            'recommended_action': action,
+        }
+
     anomalies = []
     for _, row in df.iterrows():
-        reasons = []
+        reason_details = []
+
         if row['std_amount'] > 0:
             z_amount = abs(row['total_amount'] - row['mean_amount']) / row['std_amount']
             if z_amount >= z_threshold:
-                reasons.append(f'مبلغ غیرعادی (Z={z_amount:.1f})')
+                reason_details.append(_build_reason_detail(
+                    'amount', float(row['total_amount']),
+                    float(row['mean_amount']), float(row['std_amount']), z_amount
+                ))
+
         if row['std_qty'] > 0:
             z_qty = abs(row['quantity'] - row['mean_qty']) / row['std_qty']
             if z_qty >= z_threshold:
-                reasons.append(f'مقدار غیرعادی (Z={z_qty:.1f})')
+                reason_details.append(_build_reason_detail(
+                    'quantity', float(row['quantity']),
+                    float(row['mean_qty']), float(row['std_qty']), z_qty
+                ))
+
         if row['std_price'] > 0:
             z_price = abs(row['unit_price'] - row['mean_price']) / row['std_price']
             if z_price >= z_threshold:
-                reasons.append(f'قیمت غیرعادی (Z={z_price:.1f})')
+                reason_details.append(_build_reason_detail(
+                    'price', float(row['unit_price']),
+                    float(row['mean_price']), float(row['std_price']), z_price
+                ))
 
-        if reasons:
-            anomalies.append(
-                {
-                    'item_code': row['item_code'],
-                    'item_name': row['item_name_fa'],
-                    'date': row['transaction_date'].strftime('%Y-%m-%d'),
-                    'quantity': round(float(row['quantity']), 2),
-                    'unit_price': round(float(row['unit_price'])),
-                    'total_amount': round(float(row['total_amount'])),
-                    'reasons': ' | '.join(reasons),
-                }
+        if reason_details:
+            max_severity = max(
+                ['medium', 'high', 'critical'].index(rd['severity']) for rd in reason_details
             )
+            overall_severity = ['medium', 'high', 'critical'][max_severity]
+            reasons_short = ' | '.join(rd['label'] + f" (Z={rd['z_score']})" for rd in reason_details)
 
-    anomaly_df = pd.DataFrame(anomalies) if anomalies else pd.DataFrame()
+            anomalies.append({
+                'item_code': row['item_code'],
+                'item_name': row['item_name_fa'],
+                'date': row['transaction_date'].strftime('%Y-%m-%d'),
+                'unit': row.get('unit', ''),
+                'quantity': round(float(row['quantity']), 2),
+                'unit_price': round(float(row['unit_price'])),
+                'total_amount': round(float(row['total_amount'])),
+                'reasons': reasons_short,        # backward compat string
+                'reason_details': reason_details, # rich structured data
+                'overall_severity': overall_severity,
+                'overall_severity_color': {'medium': 'info', 'high': 'warning', 'critical': 'danger'}[overall_severity],
+                'dimension_count': len(reason_details),
+            })
+
+    anomaly_df = pd.DataFrame([
+        {k: v for k, v in a.items() if k != 'reason_details'} for a in anomalies
+    ]) if anomalies else pd.DataFrame()
+
     anomaly_rate = round(len(anomalies) / len(df) * 100, 1) if len(df) > 0 else 0
     summary = {
         'total_anomalies': len(anomalies),
         'total_transactions': len(df),
         'anomaly_rate': anomaly_rate,
         'unique_items_with_anomaly': len(set(a['item_code'] for a in anomalies)),
+        'critical_count': sum(1 for a in anomalies if a['overall_severity'] == 'critical'),
+        'high_count': sum(1 for a in anomalies if a['overall_severity'] == 'high'),
+        'medium_count': sum(1 for a in anomalies if a['overall_severity'] == 'medium'),
     }
     thresholds = {
-        'red': [
-            {
-                'metric': 'anomaly_rate',
-                'operator': '>',
-                'threshold': 15,
-                'action': 'نرخ ناهنجاری بحرانی است - پایش فاکتور و تایید دو مرحله‌ای فعال شود',
-            }
-        ],
-        'yellow': [
-            {
-                'metric': 'anomaly_rate',
-                'operator': '>',
-                'threshold': 8,
-                'action': 'نرخ ناهنجاری بالا است - نمونه‌برداری و ممیزی خرید پیشنهاد می‌شود',
-            }
-        ],
+        'red': [{'metric': 'anomaly_rate', 'operator': '>', 'threshold': 15,
+                 'action': 'نرخ ناهنجاری بحرانی است - پایش فاکتور و تایید دو مرحله‌ای فعال شود'}],
+        'yellow': [{'metric': 'anomaly_rate', 'operator': '>', 'threshold': 8,
+                    'action': 'نرخ ناهنجاری بالا است - نمونه‌برداری و ممیزی خرید پیشنهاد می‌شود'}],
     }
     summary = _add_alert_level(summary, thresholds)
-
     chart = {
         'labels': ['عادی', 'غیرعادی'],
         'counts': [len(df) - len(anomalies), len(anomalies)],
     }
-    return {'data': anomaly_df, 'summary': summary, 'chart': chart}
+    return {'data': anomaly_df, 'anomalies': anomalies, 'summary': summary, 'chart': chart}
+
 
 
 # ──────────────────────────────────────────────
@@ -1181,3 +1348,259 @@ def get_strategy_overview(days=90, category='Food'):
     except Exception as e:
         logger.error(f'Strategy overview error: {e}')
         return {'has_data': False, 'error': str(e), 'validation': validation}
+
+
+# ──────────────────────────────────────────────
+# KPI History – Multi-period comparison
+# ──────────────────────────────────────────────
+def _compute_period_kpis(start_date, end_date, category=None):
+    """Compute all KPIs for a single date range [start_date, end_date)."""
+    from sqlalchemy import func as sqlfunc
+
+    # Ensure we compare date objects (not datetime) with the DB column
+    if hasattr(start_date, 'date'):
+        start_date = start_date.date()
+    if hasattr(end_date, 'date'):
+        end_date = end_date.date()
+
+    # ── Purchase transactions (ORDER BY date is REQUIRED for correct inflation calc) ──
+    pq = db.session.query(Transaction).join(Item).filter(
+        Transaction.transaction_type == 'خرید',
+        Transaction.is_deleted != True,
+        Transaction.is_opening_balance != True,
+        Transaction.unit_price > 0,
+        Transaction.source != 'opening_import',
+        Transaction.transaction_date >= start_date,
+        Transaction.transaction_date < end_date,
+    ).order_by(Transaction.transaction_date)
+    if category and category != 'all':
+        pq = pq.filter(Transaction.category == category)
+
+    purchase_rows = pq.with_entities(
+        Item.id.label('item_id'),
+        Transaction.quantity,
+        Transaction.unit_price,
+        Transaction.total_amount,
+        Transaction.transaction_date,
+    ).all()
+
+    total_spend = 0.0
+    tx_count = 0
+    item_ids = set()
+    # Key: item_id (int, never None). Value: list of unit_price float, in date order.
+    prices_by_item = {}
+
+    for r in purchase_rows:
+        total_spend += float(r.total_amount)
+        tx_count += 1
+        item_ids.add(r.item_id)
+        prices_by_item.setdefault(r.item_id, []).append(float(r.unit_price))
+
+    avg_basket = (total_spend / tx_count) if tx_count > 0 else 0
+
+    # ── ABC class-A count (top 80% of spend) ──
+    class_a_count = 0
+    if total_spend > 0:
+        item_spend = {}
+        for r in purchase_rows:
+            item_spend[r.item_id] = item_spend.get(r.item_id, 0) + float(r.total_amount)
+
+        sorted_items = sorted(item_spend.values(), reverse=True)
+        cumulative = 0.0
+        threshold_80 = total_spend * 0.80
+        for val in sorted_items:
+            cumulative += val
+            class_a_count += 1
+            if cumulative >= threshold_80:
+                break
+
+    # ── Anomaly count (simple z-score) ──
+    anomaly_count = 0
+    for item_code, price_list in prices_by_item.items():
+        if len(price_list) < 3:
+            continue
+        arr = np.array(price_list)
+        mean_p = arr.mean()
+        std_p = arr.std()
+        if std_p > 0:
+            z_scores = np.abs((arr - mean_p) / std_p)
+            anomaly_count += int((z_scores >= 2.0).sum())
+
+    anomaly_rate = round(anomaly_count / tx_count * 100, 1) if tx_count > 0 else 0
+
+    # ── Price inflation ──
+    inflation_values = []
+    for item_code, price_list in prices_by_item.items():
+        if len(price_list) >= 2:
+            first_p = price_list[0]
+            last_p = price_list[-1]
+            if first_p > 0:
+                inflation_values.append((last_p - first_p) / first_p * 100)
+    avg_inflation = round(float(np.mean(inflation_values)), 1) if inflation_values else 0
+
+    # ── High-volatility items ──
+    high_vol_count = 0
+    for item_code, price_list in prices_by_item.items():
+        if len(price_list) >= 3:
+            arr = np.array(price_list)
+            cv = arr.std() / arr.mean() if arr.mean() > 0 else 0
+            if cv > 0.3:
+                high_vol_count += 1
+
+    # ── Waste rate ──
+    waste_q = db.session.query(
+        sqlfunc.coalesce(sqlfunc.sum(Transaction.total_amount), 0)
+    ).filter(
+        Transaction.transaction_type == 'ضایعات',
+        Transaction.is_deleted != True,
+        Transaction.transaction_date >= start_date,
+        Transaction.transaction_date < end_date,
+    )
+    if category and category != 'all':
+        waste_q = waste_q.filter(Transaction.category == category)
+    total_waste = float(waste_q.scalar() or 0)
+    waste_rate = round(total_waste / total_spend * 100, 2) if total_spend > 0 else 0
+
+    return {
+        'total_spend': round(total_spend),
+        'tx_count': tx_count,
+        'avg_basket': round(avg_basket),
+        'active_items': len(item_ids),
+        'class_a_count': class_a_count,
+        'anomaly_count': anomaly_count,
+        'anomaly_rate': anomaly_rate,
+        'avg_inflation': avg_inflation,
+        'high_vol_items': high_vol_count,
+        'waste_rate': waste_rate,
+    }
+
+
+def get_kpi_history(granularity='monthly', category='Food'):
+    """
+    Compute KPIs for each historical period.
+
+    Args:
+        granularity: 'monthly' | 'quarterly' | 'semi_annual' | 'annual'
+        category: 'Food' | 'NonFood' | 'all'
+
+    Returns:
+        dict with periods list, kpi rows, and chart data
+    """
+    from dateutil.relativedelta import relativedelta
+
+    today = date.today()
+
+    # Define period parameters
+    if granularity == 'quarterly':
+        num_periods = 8
+        delta = relativedelta(months=3)
+        label_fmt = lambda s, e: f"Q{((s.month-1)//3)+1} {s.year}"
+    elif granularity == 'semi_annual':
+        num_periods = 6
+        delta = relativedelta(months=6)
+        label_fmt = lambda s, e: f"{'H1' if s.month <= 6 else 'H2'} {s.year}"
+    elif granularity == 'annual':
+        num_periods = 5
+        delta = relativedelta(years=1)
+        label_fmt = lambda s, e: f"{s.year}"
+    else:  # monthly
+        num_periods = 12
+        delta = relativedelta(months=1)
+        label_fmt = lambda s, e: f"{s.year}/{s.month:02d}"
+
+    # Build period boundaries (most recent first)
+    periods = []
+    end = today.replace(day=1) + relativedelta(months=1)  # Start of next month
+    for i in range(num_periods):
+        period_end = end - (delta * i)
+        period_start = period_end - delta
+        periods.append((period_start, period_end))
+
+    periods.reverse()  # Chronological order
+
+    # Compute KPIs for each period
+    kpi_keys = [
+        'total_spend', 'tx_count', 'avg_basket', 'active_items',
+        'class_a_count', 'anomaly_count', 'anomaly_rate',
+        'avg_inflation', 'high_vol_items', 'waste_rate',
+    ]
+    kpi_labels = {
+        'total_spend': 'کل هزینه',
+        'tx_count': 'تعداد تراکنش',
+        'avg_basket': 'میانگین سبد',
+        'active_items': 'کالاهای فعال',
+        'class_a_count': 'اقلام A',
+        'anomaly_count': 'ناهنجاری‌ها',
+        'anomaly_rate': 'نرخ ناهنجاری %',
+        'avg_inflation': 'تورم میانگین %',
+        'high_vol_items': 'اقلام پرنوسان',
+        'waste_rate': 'نرخ ضایعات %',
+    }
+    kpi_formats = {
+        'total_spend': 'currency',
+        'avg_basket': 'currency',
+        'anomaly_rate': 'percent',
+        'avg_inflation': 'percent',
+        'waste_rate': 'percent',
+    }
+    # Which KPIs are "lower is better"
+    kpi_inverse = {'anomaly_count', 'anomaly_rate', 'high_vol_items', 'waste_rate'}
+
+    results = []
+    period_labels = []
+
+    for start, end_d in periods:
+        label = label_fmt(start, end_d)
+        period_labels.append(label)
+        try:
+            kpis = _compute_period_kpis(start, end_d, category)
+        except Exception as e:
+            logger.error(f"KPI history error for {label}: {e}")
+            kpis = {k: 0 for k in kpi_keys}
+        results.append(kpis)
+
+    # Build rows with deltas
+    rows = []
+    for i, (label, kpis) in enumerate(zip(period_labels, results)):
+        row = {'period': label, 'kpis': {}}
+        for key in kpi_keys:
+            val = kpis.get(key, 0)
+            delta_pct = None
+            delta_direction = 'neutral'
+            if i > 0:
+                prev = results[i - 1].get(key, 0)
+                if prev and prev != 0:
+                    delta_pct = round((val - prev) / abs(prev) * 100, 1)
+                    if key in kpi_inverse:
+                        delta_direction = 'good' if delta_pct < 0 else ('bad' if delta_pct > 5 else 'neutral')
+                    else:
+                        delta_direction = 'good' if delta_pct > 0 else ('bad' if delta_pct < -5 else 'neutral')
+                elif val > 0:
+                    delta_direction = 'good' if key not in kpi_inverse else 'bad'
+
+            row['kpis'][key] = {
+                'value': val,
+                'delta_pct': delta_pct,
+                'direction': delta_direction,
+                'format': kpi_formats.get(key, 'number'),
+            }
+        rows.append(row)
+
+    # Chart data (time series per KPI)
+    charts = {}
+    for key in kpi_keys:
+        charts[key] = {
+            'label': kpi_labels[key],
+            'values': [r.get(key, 0) for r in results],
+        }
+
+    return {
+        'periods': period_labels,
+        'rows': rows,
+        'charts': charts,
+        'kpi_labels': kpi_labels,
+        'kpi_keys': kpi_keys,
+        'granularity': granularity,
+        'category': category,
+    }
+

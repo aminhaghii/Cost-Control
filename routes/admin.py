@@ -625,8 +625,10 @@ def items_delete(item_id):
     """Delete an item"""
     item = Item.query.get_or_404(item_id)
     
-    # Check if item has transactions
-    if item.transactions.count() > 0:
+    # Check if item has active (non-deleted) transactions
+    # BUG-FIX: Filter out soft-deleted transactions so they don't block deletion
+    active_tx_count = item.transactions.filter_by(is_deleted=False).count()
+    if active_tx_count > 0:
         flash('این کالا دارای تراکنش است و نمی‌توان آن را حذف کرد. می‌توانید آن را غیرفعال کنید.', 'danger')
         return redirect(url_for('admin.items_list'))
     

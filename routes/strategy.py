@@ -127,6 +127,18 @@ def forecast():
     return render_template('strategy/forecast.html', result=result, days=days, category=category)
 
 
+@strategy_bp.route('/history')
+@login_required
+def history():
+    from services.strategy_analytics_service import get_kpi_history
+    granularity = request.args.get('granularity', 'monthly')
+    category = request.args.get('category', 'Food')
+    if granularity not in ('monthly', 'quarterly', 'semi_annual', 'annual'):
+        granularity = 'monthly'
+    data = get_kpi_history(granularity, category)
+    return render_template('strategy/history.html', data=data, granularity=granularity, category=category)
+
+
 @strategy_bp.route('/budget-burndown')
 @login_required
 def budget_burndown():
